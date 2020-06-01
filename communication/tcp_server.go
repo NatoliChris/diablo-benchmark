@@ -109,39 +109,6 @@ func (s *MasterServer) PrepareBenchmarkClients() []error {
 	}
 
 	return errorList
-
-	// isErrorState := false
-	// errorList := make([]error, 0)
-
-	// for _, c := range s.Clients {
-
-	// 	// Write the prepare byte to prepare for the benchmark
-	// 	if _, err := c.Write(PREPARE); err != nil {
-	// 		// TODO: Log fail here
-
-	// 		// Return the error immediately here, since we can't send to a client.
-	// 		return []error{err}
-	// 	}
-
-	// 	// Wait for the receive.
-	// 	reply := make([]byte, 1)
-	// 	_, err := c.Read(reply)
-
-	// 	if err != nil {
-	// 		// TODO: Log fail here
-	// 		isErrorState = true
-
-	// 		// List all the errors together, we will log
-	// 		// and fail graciously instead of panic.
-	// 		errorList = append(errorList, err)
-	// 	}
-	// }
-
-	// if isErrorState {
-	// 	return errorList
-	// }
-
-	// return nil
 }
 
 func (s *MasterServer) SendBlockchainType() error {
