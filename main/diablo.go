@@ -3,7 +3,6 @@ package main
 import (
 	"diablo-benchmark/communication"
 	"diablo-benchmark/core"
-	"flag"
 	"fmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -21,8 +20,7 @@ func printWelcome(isMaster bool) {
 	fmt.Println("=====================")
 }
 
-func main() {
-
+func prepareLogger() {
 	config := zap.NewDevelopmentConfig()
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	logger, err := config.Build()
@@ -31,16 +29,18 @@ func main() {
 		fmt.Errorf("Failed to produce a logger: %s", err.Error())
 		os.Exit(1)
 	}
+	zap.ReplaceGlobals(logger)
+}
 
-	masterCommand := flag.NewFlagSet("master", flag.ExitOnError)
-	workerCommand := flag.NewFlagSet("worker", flag.ExitOnError)
+func main() {
+	prepareLogger()
 
-	logger.Info("Welcome to Diablo")
+	args := core.DefineArguments()
 
 	if len(os.Args) < 2 {
 		// This is going to be a master
-		fmt.Println("Hello, I am the master.")
-		masterCommand.Parse(os.Args[1:])
+		zap.L().Info("No subcommand given, running as master!")
+		args.MasterCommand.Parse(os.Args[1:])
 	} else {
 		switch os.Args[1] {
 		case "master":
@@ -48,7 +48,13 @@ func main() {
 			printWelcome(true)
 
 			// Parse the arguments
-			masterCommand.Parse(os.Args[2:])
+			args.MasterCommand.Parse(os.Args[2:])
+
+			fmt.Println("HELLO")
+			fmt.Println(args.MasterArgs.ConfigPath)
+
+			args.MasterArgs.CheckArgs()
+
 			m := core.InitMaster()
 			m.Run()
 
@@ -57,7 +63,7 @@ func main() {
 			printWelcome(false)
 
 			// Parse the arguments
-			workerCommand.Parse(os.Args[2:])
+			args.WorkerCommand.Parse(os.Args[2:])
 			s, err := communication.SetupClientTCP("localhost:8123")
 			if err != nil {
 				panic(err)
