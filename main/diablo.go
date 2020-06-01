@@ -44,14 +44,20 @@ func main() {
 	} else {
 		switch os.Args[1] {
 		case "master":
-			masterCommand.Parse(os.Args[2:])
+			// Print the welcome message
 			printWelcome(true)
+
+			// Parse the arguments
+			masterCommand.Parse(os.Args[2:])
 			m := core.InitMaster()
 			m.Run()
 
 		case "worker":
-			workerCommand.Parse(os.Args[2:])
+			// Print the welcome message
 			printWelcome(false)
+
+			// Parse the arguments
+			workerCommand.Parse(os.Args[2:])
 			s, err := communication.SetupClientTCP("localhost:8123")
 			if err != nil {
 				panic(err)
