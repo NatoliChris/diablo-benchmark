@@ -17,7 +17,7 @@ keys:
   - private: "0xb33cb58af3686ce54cc081b0ae095242702618d8f9b2b1f421fa523d337fca9c"
     address: "0x3438d5c33bc1f8c4ef69affb891a58b1d67f8ad7"`
 
-func TestCanParseProperYaml(t *testing.T) {
+func TestCanParseCorrectYaml(t *testing.T) {
 	t.Run("test no error", func(t *testing.T) {
 		exampleBytes := []byte(exampleCorrectYaml)
 
