@@ -2,6 +2,7 @@ package parsers
 
 import (
 	"diablo-benchmark/core/configs"
+	"errors"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
 )
@@ -49,6 +50,11 @@ func parseBenchYaml(content []byte) (*configs.BenchConfig, error) {
 // NOTE: this is only a naive implementation, will definitely require more work ;)
 // TODO: more complex generation of transaction intervals.
 func generateFullIntervals(intervals configs.TPSIntervals) (configs.TPSIntervals, error) {
+
+	if len(intervals) == 0 {
+		return nil, errors.New("empty intervals found in benchmark")
+	}
+
 	intervalKeys := make([]int, 0)
 	for k := range intervals {
 		intervalKeys = append(intervalKeys, k)
@@ -65,7 +71,7 @@ func generateFullIntervals(intervals configs.TPSIntervals) (configs.TPSIntervals
 	}
 
 	// make the list of transaction intervals
-	finalIntervals := make(map[int]int, intervalKeys[len(intervalKeys)-1])
+	finalIntervals := make(configs.TPSIntervals, intervalKeys[len(intervalKeys)-1])
 
 	// Go through each interval
 	// Fill in the gaps by calculating a linear ramp-up.
