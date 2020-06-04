@@ -22,7 +22,7 @@ func TestParseSampleBenchConfig(t *testing.T) {
 	check := func(fn string, expected, got interface{}) {
 		if got != expected {
 			t.Errorf(
-				"%s mismatch: expected %s, got: %s",
+				"%s mismatch: expected %v, got: %v",
 				fn,
 				expected,
 				got,
@@ -117,5 +117,31 @@ bench:
 			)
 			currentValue += intervalValue
 		}
+	})
+
+	t.Run("test ramp-up no clear divisions", func(t *testing.T) {
+		exampleBytes := []byte(sampleConfig)
+
+		bConfig, err := parseBenchYaml(exampleBytes)
+
+		if err != nil {
+			t.Errorf("Failed to parse YAML")
+		}
+
+		for i := 0; i <= 10; i++ {
+			check(
+				fmt.Sprintf("single-rate send at start"),
+				70,
+				bConfig.TxInfo.Intervals[i],
+			)
+		}
+
+		fmt.Println(bConfig.TxInfo.Intervals)
+
+		check(
+			fmt.Sprintf("ramp-up-values"),
+			40,
+			bConfig.TxInfo.Intervals[29],
+		)
 	})
 }
