@@ -54,12 +54,41 @@ func generateFullIntervals(intervals configs.TPSIntervals) (configs.TPSIntervals
 		intervalKeys = append(intervalKeys, k)
 	}
 
+	// Check that it starts at 0
+	// TODO: If the values don't start at 0, do we start at the next rate or 0?
+	// NOTE: I'm going to go with 0, since it seems logical for ramp-up. People can define
+	// Their own start with a 0 index if they want.
+	if _, ok := intervals[0]; !ok {
+		// if 0 doesn't exist, we need it to.
+		intervalKeys = append([]int{0}, intervalKeys...)
+		intervals[0] = 0
+	}
+
 	// make the list of transaction intervals
 	finalIntervals := make(map[int]int, intervalKeys[len(intervalKeys)-1])
 
-	prev := intervalKeys[0]
-	for _, v := range intervalKeys[1:] {
+	// Go through each interval
+	// Fill in the gaps by calculating a linear ramp-up.
+	// TODO: this needs improvement, big time!
+	currentKey := intervalKeys[0]
+	for _, nextKey := range intervalKeys[1:] {
+		// Note: extremely naive linear ramp-up.
+		// Next value - current value / number of intervals between keys.
+		// e.g 10sec=30tps, 40sec=100tps; increment_val = (100-30) / (40-10) => 2.33333 increment per second.
 
+		numberOfIntervals := nextKey - currentKey
+		startTPS := intervals[currentKey]
+		endTPS := intervals[nextKey]
+
+		incrementValue := (endTPS - startTPS) / numberOfIntervals
+
+		currentTPS := startTPS
+		for i := currentKey; i < nextKey; i++ {
+			finalIntervals[i] = currentTPS
+			currentTPS += incrementValue
+		}
+
+		currentKey = nextKey
 	}
 
 	return finalIntervals, nil
