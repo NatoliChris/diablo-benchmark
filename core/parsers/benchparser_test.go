@@ -52,6 +52,7 @@ func TestParseSampleBenchConfig(t *testing.T) {
 		check("name", "sample", bConfig.Name)
 		check("description", "descriptions", bConfig.Description)
 		check("txtype", configs.TxTypeSimple, bConfig.TxInfo.TxType)
+		// Should be finalValue + 1 - this accounts for the 0th second starting interval.
 		check("fullTxLength", 31, len(bConfig.TxInfo.Intervals))
 	})
 
@@ -141,6 +142,5 @@ bench:
 			40,
 			bConfig.TxInfo.Intervals[30],
 		)
-
 	})
 }
