@@ -52,7 +52,7 @@ func TestParseSampleBenchConfig(t *testing.T) {
 		check("name", "sample", bConfig.Name)
 		check("description", "descriptions", bConfig.Description)
 		check("txtype", configs.TxTypeSimple, bConfig.TxInfo.TxType)
-		check("fullTxLength", 30, len(bConfig.TxInfo.Intervals))
+		check("fullTxLength", 31, len(bConfig.TxInfo.Intervals))
 	})
 
 	t.Run("test filling values onerate", func(t *testing.T) {
@@ -136,12 +136,11 @@ bench:
 			)
 		}
 
-		fmt.Println(bConfig.TxInfo.Intervals)
-
 		check(
 			fmt.Sprintf("ramp-up-values"),
 			40,
-			bConfig.TxInfo.Intervals[29],
+			bConfig.TxInfo.Intervals[30],
 		)
+
 	})
 }
