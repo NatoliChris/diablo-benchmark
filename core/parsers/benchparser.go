@@ -5,6 +5,7 @@ import (
 	"errors"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
+	"sort"
 )
 
 // Parse the benchmark configuration file, read the filepath to see
@@ -59,6 +60,9 @@ func generateFullIntervals(intervals configs.TPSIntervals) (configs.TPSIntervals
 	for k := range intervals {
 		intervalKeys = append(intervalKeys, k)
 	}
+
+	// Sort
+	sort.Ints(intervalKeys)
 
 	// Check that it starts at 0
 	// TODO: If the values don't start at 0, do we start at the next rate or 0?
