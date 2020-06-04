@@ -106,5 +106,16 @@ bench:
 				bConfig.TxInfo.Intervals[i],
 			)
 		}
+
+		intervalValue := 2
+		currentValue := 10
+		for i := 10; i < 40; i++ {
+			check(
+				fmt.Sprintf("non-Zero start linear rate [%d]", i),
+				currentValue,
+				bConfig.TxInfo.Intervals[i],
+			)
+			currentValue += intervalValue
+		}
 	})
 }
