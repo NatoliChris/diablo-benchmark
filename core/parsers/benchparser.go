@@ -5,6 +5,7 @@ import (
 	"errors"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
+	"math"
 	"sort"
 )
 
@@ -90,16 +91,18 @@ func generateFullIntervals(intervals configs.TPSIntervals) (configs.TPSIntervals
 		startTPS := intervals[currentKey]
 		endTPS := intervals[nextKey]
 
-		incrementValue := (endTPS - startTPS) / numberOfIntervals
+		incrementValue := float64(endTPS-startTPS) / float64(numberOfIntervals)
 
-		currentTPS := startTPS
+		currentTPS := float64(startTPS)
 		for i := currentKey; i < nextKey; i++ {
-			finalIntervals[i] = currentTPS
+			finalIntervals[i] = int(math.Floor(currentTPS))
 			currentTPS += incrementValue
 		}
 
 		currentKey = nextKey
 	}
+
+	finalIntervals[intervalKeys[len(intervalKeys)-1]] = intervals[intervalKeys[len(intervalKeys)-1]]
 
 	return finalIntervals, nil
 }
