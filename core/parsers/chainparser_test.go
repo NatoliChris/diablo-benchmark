@@ -1,6 +1,7 @@
 package parsers
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 )
@@ -24,7 +25,7 @@ func TestCanParseCorrectYaml(t *testing.T) {
 		_, err := parseChainYaml(exampleBytes)
 
 		if err != nil {
-			t.FailNow()
+			t.Errorf("Failed to parse yaml, reason: %s", err.Error())
 		}
 	})
 
@@ -45,21 +46,37 @@ func TestCanParseCorrectYaml(t *testing.T) {
 			t.FailNow()
 		}
 
+		// Should have the correct name
 		if c.Name != "ethereum" {
 			fmt.Println("Failed name")
 			t.FailNow()
 		}
 
+		// Should have correct number of nodes
 		if len(c.Nodes) != len(correctNodes) {
 			fmt.Println("Failed nodes length")
 			t.FailNow()
 		}
 
+		// Compare the nodes
 		for i, node := range c.Nodes {
 			if node != correctNodes[i] {
 				fmt.Println("Failed node comparison")
 				t.FailNow()
 			}
+		}
+
+		// We should get the correct number of keys
+		if len(c.Keys) != 2 {
+			t.Errorf("Failed to get keys in parse, length was %d", len(c.Keys))
+		}
+
+		// Make sure that we have the correct bytes.
+		// Known byte sequence of the key above.
+		keyBytes := []byte{245, 152, 29, 28, 156, 189, 193, 224, 229, 112, 209, 157, 131, 62, 13, 185, 106, 243, 29, 59, 101, 246, 182, 127, 142, 91, 42, 183, 175, 197, 255, 200}
+
+		if bytes.Compare(keyBytes, c.Keys[0].PrivateKey) != 0 {
+			t.Errorf("private key did not unmarshal to correct bytes")
 		}
 	})
 }
