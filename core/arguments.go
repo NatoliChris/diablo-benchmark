@@ -16,9 +16,9 @@ type Arguments struct {
 
 // Arguments for the paster
 type MasterArgs struct {
-	BenchConfigPath   string // Path to the configurations
-	NetworkConfigPath string // Path to the network configuration
-	Port              int    // Port that it should run on (can be provided in config)
+	BenchConfigPath string // Path to the configurations
+	ChainConfigPath string // Path to the chain configuration
+	Port            int    // Port that it should run on (can be provided in config)
 }
 
 // Worker arguments
@@ -48,6 +48,9 @@ func DefineArguments() *Arguments {
 	masterCommand.IntVar(&masterArgs.Port, "port", 0, "--port=portnumber (e.g. --port=34226)")
 	masterCommand.IntVar(&masterArgs.Port, "p", 0, "-p portnumber (e.g. --p 34226)")
 
+	masterCommand.StringVar(&masterArgs.ChainConfigPath, "chain-config", "", "--chain-config=/path/to/chain/yml (required)")
+	masterCommand.StringVar(&masterArgs.ChainConfigPath, "cc", "", "-cc /path/to/chain/yml")
+
 	// Worker Arguments
 	workerCommand.StringVar(&workerArgs.MasterAddr, "master", "", "--master=<ipaddr>:<port>")
 	workerCommand.StringVar(&workerArgs.MasterAddr, "m", "", "-m <ipaddress>:<port>")
@@ -64,7 +67,12 @@ func DefineArguments() *Arguments {
 // Check the master arguments conform to specified requirements
 func (ma *MasterArgs) CheckArgs() {
 	if ma.BenchConfigPath == "" {
-		zap.L().Error("config not provided")
+		zap.L().Error("benchmark config not provided")
+		os.Exit(0)
+	}
+
+	if ma.ChainConfigPath == "" {
+		zap.L().Error("chain configuration not provided")
 		os.Exit(0)
 	}
 }
