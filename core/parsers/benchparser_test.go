@@ -116,7 +116,7 @@ bench:
 
 func TestParseSampleBenchConfig(t *testing.T) {
 
-	check := func(fn string, expected, got interface{}) {
+	check := func(fn string, expected, got interface{}) bool {
 		if got != expected {
 			t.Errorf(
 				"%s mismatch: expected %v, got: %v",
@@ -124,7 +124,10 @@ func TestParseSampleBenchConfig(t *testing.T) {
 				expected,
 				got,
 			)
+			return false
 		}
+
+		return true
 	}
 
 	t.Run("test no errors", func(t *testing.T) {
@@ -220,20 +223,24 @@ bench:
 		}
 
 		for i := 0; i < 10; i++ {
-			check(fmt.Sprintf("non-Zero starting [%d]", i),
+			if !check(fmt.Sprintf("non-Zero starting [%d]", i),
 				i,
 				bConfig.TxInfo.Intervals[i],
-			)
+			) {
+				t.FailNow()
+			}
 		}
 
 		intervalValue := 2
 		currentValue := 10
 		for i := 10; i < 40; i++ {
-			check(
+			if !check(
 				fmt.Sprintf("non-Zero start linear rate [%d]", i),
 				currentValue,
 				bConfig.TxInfo.Intervals[i],
-			)
+			) {
+				t.FailNow()
+			}
 			currentValue += intervalValue
 		}
 	})
@@ -249,11 +256,13 @@ bench:
 		}
 
 		for i := 0; i <= 10; i++ {
-			check(
+			if !check(
 				fmt.Sprintf("single-rate send at start"),
 				70,
 				bConfig.TxInfo.Intervals[i],
-			)
+			) {
+				t.FailNow()
+			}
 		}
 
 		check(
@@ -302,52 +311,76 @@ keys:
 
 func TestInvalidTypes(t *testing.T) {
 
-	checkShouldntParse := func(s string) {
+	checkShouldntParse := func(msg string, s string) bool {
 		_, err := parseBenchYaml([]byte(s))
 
 		if err == nil {
-			t.Errorf("Expected to fail on non-valid yaml")
-			t.Fail()
+			t.Errorf("[%s] Expected to fail on non-valid yaml", msg)
+			return false
 		}
-
+		return true
 	}
 
-	checkShouldParse := func(s string) {
+	checkShouldParse := func(msg string, s string) bool {
 		_, err := parseBenchYaml([]byte(s))
 
 		if err != nil {
-			t.Errorf("Expected not to fail on valid yaml")
-			t.Fail()
+			t.Errorf("[%s] Expected not to fail on valid yaml", msg)
+			return false
 		}
+
+		return true
 	}
 
 	t.Run("invalid name", func(t *testing.T) {
-		checkShouldParse(exampleIncorrectName)
-		checkShouldntParse(exampleIncorrectNameTwo)
-		checkShouldntParse(exampleMissingName)
+		if !checkShouldParse("incorrect name", exampleIncorrectName) {
+			t.FailNow()
+		}
+		if !checkShouldntParse("incorrect name 2", exampleIncorrectNameTwo) {
+			t.FailNow()
+		}
+		if !checkShouldntParse("missing name", exampleMissingName) {
+			t.FailNow()
+		}
 	})
 
 	t.Run("invalid description", func(t *testing.T) {
-		checkShouldParse(exampleIncorrectDescription)
-		checkShouldParse(exampleMissingDescription)
+		if !checkShouldParse("incorrect description", exampleIncorrectDescription) {
+			t.FailNow()
+		}
+		if !checkShouldParse("missing description", exampleMissingDescription) {
+			t.FailNow()
+		}
 	})
 
 	t.Run("invalid txType", func(t *testing.T) {
-		checkShouldntParse(exampleIncorrectTxType)
-		checkShouldntParse(exampleIncorrectTxTypeTwo)
+		if !checkShouldntParse("incorrect tx type", exampleIncorrectTxType) {
+			t.FailNow()
+		}
+		if !checkShouldntParse("incorrect tx type 2", exampleIncorrectTxTypeTwo) {
+			t.FailNow()
+		}
 	})
 
 	t.Run("empty tx list", func(t *testing.T) {
-		checkShouldntParse(exampleEmptyTx)
+		if !checkShouldntParse("empty tx type", exampleEmptyTx) {
+			t.FailNow()
+		}
 	})
 
 	t.Run("invalid key for tx", func(t *testing.T) {
-		checkShouldntParse(exampleInvalidKeys)
-		checkShouldntParse(exampleInvalidKeysTwo)
+		if !checkShouldntParse("invalid keys", exampleInvalidKeys) {
+			t.FailNow()
+		}
+		if !checkShouldntParse("invalid keys 2", exampleInvalidKeysTwo) {
+			t.FailNow()
+		}
 	})
 
 	t.Run("negative key for tx", func(t *testing.T) {
-		checkShouldntParse(exampleNegativeTxKey)
+		if !checkShouldntParse("negative keys", exampleNegativeTxKey) {
+			t.FailNow()
+		}
 	})
 
 	// t.Run("invalid value for tps", func(t *testing.T) {
