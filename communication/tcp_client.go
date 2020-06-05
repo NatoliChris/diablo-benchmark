@@ -2,6 +2,7 @@ package communication
 
 import (
 	"fmt"
+	"go.uber.org/zap"
 	"net"
 )
 
@@ -31,7 +32,20 @@ func (c *ConnClient) HandleCommands() {
 			return
 		}
 
-		fmt.Println(cmd)
+		switch cmd[0] {
+		case MsgPrepare[0]:
+			zap.L().Info("Got command from master",
+				zap.String("CMD", "PREPARE"))
+		case MsgWorkload[0]:
+			zap.L().Info("Got command from master",
+				zap.String("CMD", "WORKLOAD"))
+		case MsgRun[0]:
+			zap.L().Info("Got command from master",
+				zap.String("CMD", "RUN"))
+		case MsgResults[0]:
+			zap.L().Info("Got command from master",
+				zap.String("CMD", "RESULTS"))
+		}
 
 		// Send the reply
 		_, err = c.Conn.Write(MsgOk)

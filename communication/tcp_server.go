@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"go.uber.org/zap"
 	"net"
 )
 
@@ -20,10 +21,14 @@ func SetupMasterTCP(addr string, expectedClients int) (*MasterServer, error) {
 	listener, err := net.Listen("tcp", addr)
 
 	// If we can't make a listener, we
-	// should fail graciously but immediately.
+	// should fail gracefully but immediately.
 	if err != nil {
 		return nil, err
 	}
+
+	zap.L().Info("Server Started",
+		zap.String("Addr", addr),
+		zap.Int("Expected Clients", expectedClients))
 
 	return &MasterServer{Listener: listener, ExpectedClients: expectedClients}, nil
 }
@@ -39,6 +44,9 @@ func (s *MasterServer) HandleClients(readyChannel chan bool) {
 			// Log the error here
 			fmt.Println(err)
 		}
+
+		zap.L().Info(fmt.Sprintf("Client %d connected", len(s.Clients)),
+			zap.String("Addr:", c.RemoteAddr().String()))
 
 		s.Clients = append(s.Clients, c)
 
