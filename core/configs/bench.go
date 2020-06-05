@@ -4,6 +4,7 @@ package configs
 type BenchConfig struct {
 	Name        string    `yaml:"name"`                  // Name of the benchmark
 	Description string    `yaml:"description,omitempty"` // Description of what it is
+	Workers     int       `yaml:workers"`                // Number of workers expected
 	TxInfo      BenchInfo `yaml:"bench,flow"`            // Benchmark transaction information
 }
 

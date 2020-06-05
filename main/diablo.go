@@ -50,8 +50,7 @@ func main() {
 			// Parse the arguments
 			args.MasterCommand.Parse(os.Args[2:])
 
-			fmt.Println("HELLO")
-			fmt.Println(args.MasterArgs.ConfigPath)
+			fmt.Println(args.MasterArgs.BenchConfigPath)
 
 			args.MasterArgs.CheckArgs()
 
