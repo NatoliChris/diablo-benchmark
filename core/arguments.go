@@ -18,13 +18,13 @@ type Arguments struct {
 type MasterArgs struct {
 	BenchConfigPath string // Path to the configurations
 	ChainConfigPath string // Path to the chain configuration
-	Port            int    // Port that it should run on (can be provided in config)
+	ListenAddr      string // host:port that it should run on
 }
 
 // Worker arguments
 type WorkerArgs struct {
 	ConfigPath string // Path to the worker config
-	MasterAddr string // Address of the master
+	MasterAddr string // Address of the master (can also be in worker config)
 }
 
 // Initialise the arguments
@@ -45,8 +45,8 @@ func DefineArguments() *Arguments {
 	workerCommand.StringVar(&workerArgs.ConfigPath, "c", "", "-c /path/to/config")
 
 	// Master Arguments
-	masterCommand.IntVar(&masterArgs.Port, "port", 0, "--port=portnumber (e.g. --port=34226)")
-	masterCommand.IntVar(&masterArgs.Port, "p", 0, "-p portnumber (e.g. --p 34226)")
+	masterCommand.StringVar(&masterArgs.ListenAddr, "addr", "", "--addr=addr (e.g. --addr=\"0.0.0.0:8323\")")
+	masterCommand.StringVar(&masterArgs.ListenAddr, "a", "", "-a addr (e.g. -a \":8323\")")
 
 	masterCommand.StringVar(&masterArgs.ChainConfigPath, "chain-config", "", "--chain-config=/path/to/chain/yml (required)")
 	masterCommand.StringVar(&masterArgs.ChainConfigPath, "cc", "", "-cc /path/to/chain/yml")
