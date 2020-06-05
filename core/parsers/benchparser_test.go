@@ -6,7 +6,8 @@ import (
 	"testing"
 )
 
-const sampleConfig = `
+var (
+	sampleConfig = `
 name: "sample"
 description: "descriptions"
 bench:
@@ -17,7 +18,7 @@ bench:
     30: 40
 `
 
-const exampleIncorrectName = `name: 12345
+	exampleIncorrectName = `name: 12345
 description: "descriptions"
 bench:
   type: "simple"
@@ -26,7 +27,7 @@ bench:
     10: 70
     30: 40`
 
-const exampleIncorrectNameTwo = `
+	exampleIncorrectNameTwo = `
 name:
   type: "Hello"
 description: "descriptions"
@@ -37,7 +38,7 @@ bench:
     10: 70
     30: 40`
 
-const exampleMissingName = `
+	exampleMissingName = `
 description: "descriptions"
 bench:
   type: "simple"
@@ -46,7 +47,7 @@ bench:
     10: 70
     30: 40
 `
-const exampleIncorrectDescription = `name: "sample"
+	exampleIncorrectDescription = `name: "sample"
 description: 12371598
 bench:
   type: "simple"
@@ -55,7 +56,7 @@ bench:
     10: 70
     30: 40`
 
-const exampleMissingDescription = `name: "sample"
+	exampleMissingDescription = `name: "sample"
 bench:
   type: "simple"
   txs:
@@ -63,7 +64,7 @@ bench:
     10: 70
     30: 40`
 
-const exampleIncorrectTxType = `name: "sample"
+	exampleIncorrectTxType = `name: "sample"
 description: "descriptions"
 bench:
   type: "transaction"
@@ -72,7 +73,7 @@ bench:
     10: 70
     30: 40`
 
-const exampleIncorrectTxTypeTwo = `name: "sample"
+	exampleIncorrectTxTypeTwo = `name: "sample"
 description: "descriptions"
 bench:
   type: 123123132
@@ -81,13 +82,13 @@ bench:
     10: 70
     30: 40`
 
-const exampleEmptyTx = `name: "sample"
+	exampleEmptyTx = `name: "sample"
 description: "descriptions"
 bench:
   type: "simple"
   txs:`
 
-const exampleInvalidKeys = `name: "sample"
+	exampleInvalidKeys = `name: "sample"
 description: "descriptions"
 bench:
   type: "simple"
@@ -96,7 +97,7 @@ bench:
 	10: 70
 	30: 40`
 
-const exampleInvalidKeysTwo = `name: "sample"
+	exampleInvalidKeysTwo = `name: "sample"
 description: "descriptions"
 bench:
   type: "simple"
@@ -105,14 +106,33 @@ bench:
     - 10: 70
     - 30: 40`
 
-const exampleNegativeTxKey = `name: "sample"
+	exampleNegativeTxKey = `name: "sample"
 description: "descriptions"
 bench:
-	type: "simple"
-	txs:
-		0: 70
-		-10: 70
-		30: 40`
+  type: "simple"
+  txs:
+    0: 70
+    -10: 70
+    30: 40`
+
+	exampleNegativeTPSValue = `name: "sample"
+description: "descriptions"
+bench:
+  type: "simple"
+  txs:
+    0: -20
+    10: 70
+    30: 40`
+
+	exampleInvalidTPSValue = `name: "sample"
+description: "descriptions"
+bench:
+  type: "simple"
+  txs:
+    0: 20
+    10: a7d 
+    30: 40`
+)
 
 func TestParseSampleBenchConfig(t *testing.T) {
 
@@ -318,6 +338,7 @@ func TestInvalidTypes(t *testing.T) {
 			t.Errorf("[%s] Expected to fail on non-valid yaml", msg)
 			return false
 		}
+		fmt.Println(msg, err)
 		return true
 	}
 
@@ -328,6 +349,8 @@ func TestInvalidTypes(t *testing.T) {
 			t.Errorf("[%s] Expected not to fail on valid yaml", msg)
 			return false
 		}
+
+		fmt.Println(msg, err)
 
 		return true
 	}
@@ -383,27 +406,19 @@ func TestInvalidTypes(t *testing.T) {
 		}
 	})
 
-	// t.Run("invalid value for tps", func(t *testing.T) {
+	t.Run("invalid value for tps", func(t *testing.T) {
 
-	// 	exampleInvalidTPS := `name: "sample"
-	// description: "descriptions"
-	// bench:
-	// 	type: "simple"
-	// txs:
-	// 	0: 70
-	// 	10: 70
-	// 	30: 40`
-	// })
+		if !checkShouldntParse("invalid TPS", exampleInvalidTPSValue) {
+			t.FailNow()
+		}
 
-	// t.Run("negative value for tps", func(t *testing.T) {
+	})
 
-	// 	exampleNegativeTPS := `name: "sample"
-	// description: "descriptions"
-	// bench:
-	// 	type: "simple"
-	// txs:
-	// 	0: 70
-	// 	10: 70
-	// 	30: 40`
-	// })
+	t.Run("negative value for tps", func(t *testing.T) {
+
+		if !checkShouldntParse("negative tps", exampleNegativeTPSValue) {
+			t.FailNow()
+		}
+
+	})
 }
