@@ -1,8 +1,10 @@
 package configs
 
 // Transaction types (simple, contract, ...)
-const TxTypeSimple = "simple"
-const TxTypeContract = "contract"
+type BenchTransactionType string
+
+const TxTypeSimple BenchTransactionType = "simple"
+const TxTypeContract BenchTransactionType = "contract"
 
 // Transactions Per Second intervals
 type TPSIntervals map[int]int
