@@ -3,6 +3,7 @@ package main
 import (
 	"diablo-benchmark/communication"
 	"diablo-benchmark/core"
+	"diablo-benchmark/core/configs/parsers"
 	"fmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -32,6 +33,41 @@ func prepareLogger() {
 	zap.ReplaceGlobals(logger)
 }
 
+// Run the master functions
+func runMaster(masterArgs *core.MasterArgs) {
+	// Check the arguments
+	masterArgs.CheckArgs()
+
+	zap.L().Info("loading configs",
+		zap.String("bench config", masterArgs.BenchConfigPath),
+		zap.String("chain config", masterArgs.ChainConfigPath),
+	)
+
+	// Parse the configurations.
+	bConfig, err := parsers.ParseBenchConfig(masterArgs.BenchConfigPath)
+
+	if err != nil {
+		zap.L().Error(err.Error())
+		os.Exit(1)
+	}
+
+	// Initialise the TPC server
+	m := core.InitMaster(masterArgs.ListenAddr, bConfig.Workers)
+
+	// Run the benchmark flow
+	m.Run()
+}
+
+// Run the worker
+func runWorker(workerArgs *core.WorkerArgs) {
+	s, err := communication.SetupClientTCP(workerArgs.MasterAddr)
+	if err != nil {
+		panic(err)
+	}
+	s.HandleCommands()
+}
+
+// Main running function
 func main() {
 	prepareLogger()
 
@@ -39,8 +75,9 @@ func main() {
 
 	if len(os.Args) < 2 {
 		// This is going to be a master
-		zap.L().Info("No subcommand given, running as master!")
+		zap.L().Warn("No subcommand given, running as master!")
 		args.MasterCommand.Parse(os.Args[1:])
+		runMaster(args.MasterArgs)
 	} else {
 		switch os.Args[1] {
 		case "master":
@@ -50,12 +87,7 @@ func main() {
 			// Parse the arguments
 			args.MasterCommand.Parse(os.Args[2:])
 
-			fmt.Println(args.MasterArgs.BenchConfigPath)
-
-			args.MasterArgs.CheckArgs()
-
-			m := core.InitMaster()
-			m.Run()
+			runMaster(args.MasterArgs)
 
 		case "worker":
 			// Print the welcome message
@@ -63,11 +95,8 @@ func main() {
 
 			// Parse the arguments
 			args.WorkerCommand.Parse(os.Args[2:])
-			s, err := communication.SetupClientTCP("localhost:8123")
-			if err != nil {
-				panic(err)
-			}
-			s.HandleCommands()
+
+			runWorker(args.WorkerArgs)
 		}
 	}
 }
