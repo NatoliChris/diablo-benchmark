@@ -338,7 +338,6 @@ func TestInvalidTypes(t *testing.T) {
 			t.Errorf("[%s] Expected to fail on non-valid yaml", msg)
 			return false
 		}
-		fmt.Println(msg, err)
 		return true
 	}
 
@@ -349,8 +348,6 @@ func TestInvalidTypes(t *testing.T) {
 			t.Errorf("[%s] Expected not to fail on valid yaml", msg)
 			return false
 		}
-
-		fmt.Println(msg, err)
 
 		return true
 	}
