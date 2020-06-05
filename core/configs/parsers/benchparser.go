@@ -2,6 +2,7 @@ package parsers
 
 import (
 	"diablo-benchmark/core/configs"
+	"diablo-benchmark/core/configs/validators"
 	"errors"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
@@ -32,6 +33,11 @@ func parseBenchYaml(content []byte) (*configs.BenchConfig, error) {
 	err := yaml.Unmarshal(content, &benchConfig)
 
 	if err != nil {
+		return nil, err
+	}
+
+	// Check validity
+	if ok, err := validators.ValidateBenchConfig(&benchConfig); !ok {
 		return nil, err
 	}
 
