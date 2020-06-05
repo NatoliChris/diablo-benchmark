@@ -9,8 +9,8 @@ type Master struct {
 
 // Initialise the master server and return an instance of the master
 // This will be passed back to the main
-func InitMaster() *Master {
-	s, err := communication.SetupMasterTCP(":8123", 3)
+func InitMaster(listenAddr string, expectedClients int) *Master {
+	s, err := communication.SetupMasterTCP(listenAddr, expectedClients)
 	if err != nil {
 		// TODO remove panic
 		panic(err)
@@ -34,7 +34,11 @@ func (ms *Master) Run() {
 
 	// Run through the benchmark suite
 	// Step 1: send "PREPARE" to clients, make sure we can communicate.
-	ms.Server.PrepareBenchmarkClients()
+	errs := ms.Server.PrepareBenchmarkClients()
+
+	if errs != nil {
+		// We have errors
+	}
 
 	// Step 2: Blockchain type (tells which interface they should be using)
 	ms.Server.SendBlockchainType()
