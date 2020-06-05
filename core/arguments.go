@@ -6,20 +6,25 @@ import (
 	"os"
 )
 
+// All the available arguments
 type Arguments struct {
-	MasterCommand *flag.FlagSet
-	WorkerCommand *flag.FlagSet
-	MasterArgs    *MasterArgs
-	WorkerArgs    *WorkerArgs
+	MasterCommand *flag.FlagSet // Commands related to the master
+	WorkerCommand *flag.FlagSet // Commands related to the workers
+	MasterArgs    *MasterArgs   // Master arguments
+	WorkerArgs    *WorkerArgs   // Worker arguments
 }
 
+// Arguments for the paster
 type MasterArgs struct {
-	ConfigPath string
-	Port       int
+	BenchConfigPath   string // Path to the configurations
+	NetworkConfigPath string // Path to the network configuration
+	Port              int    // Port that it should run on (can be provided in config)
 }
 
+// Worker arguments
 type WorkerArgs struct {
-	ConfigPath string
+	ConfigPath string // Path to the worker config
+	MasterAddr string // Address of the master
 }
 
 // Initialise the arguments
@@ -34,8 +39,8 @@ func DefineArguments() *Arguments {
 	// General arguments
 	// --config
 
-	masterCommand.StringVar(&masterArgs.ConfigPath, "config", "", "--config=/path/to/config (required)")
-	masterCommand.StringVar(&masterArgs.ConfigPath, "c", "", "-c /path/to/config")
+	masterCommand.StringVar(&masterArgs.BenchConfigPath, "config", "", "--config=/path/to/config (required)")
+	masterCommand.StringVar(&masterArgs.BenchConfigPath, "c", "", "-c /path/to/config")
 	workerCommand.StringVar(&workerArgs.ConfigPath, "config", "", "--config=/path/to/config (required)")
 	workerCommand.StringVar(&workerArgs.ConfigPath, "c", "", "-c /path/to/config")
 
@@ -44,6 +49,8 @@ func DefineArguments() *Arguments {
 	masterCommand.IntVar(&masterArgs.Port, "p", 0, "-p portnumber (e.g. --p 34226)")
 
 	// Worker Arguments
+	workerCommand.StringVar(&workerArgs.MasterAddr, "master", "", "--master=<ipaddr>:<port>")
+	workerCommand.StringVar(&workerArgs.MasterAddr, "m", "", "-m <ipaddress>:<port>")
 
 	// Return all the arguments
 	return &Arguments{
@@ -56,12 +63,17 @@ func DefineArguments() *Arguments {
 
 // Check the master arguments conform to specified requirements
 func (ma *MasterArgs) CheckArgs() {
-	if ma.ConfigPath == "" {
+	if ma.BenchConfigPath == "" {
 		zap.L().Error("config not provided")
 		os.Exit(0)
 	}
 }
 
+// Checks that the worker arguments are correct
 func (wa *WorkerArgs) WorkerArgs() {
-
+	// We must have at least one - either the master address or the config
+	if wa.ConfigPath == "" && wa.MasterAddr == "" {
+		zap.L().Error("master information not provided")
+		os.Exit(0)
+	}
 }
