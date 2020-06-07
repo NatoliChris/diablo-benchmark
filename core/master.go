@@ -1,6 +1,9 @@
 package core
 
-import "diablo-benchmark/communication"
+import (
+	"diablo-benchmark/communication"
+	"go.uber.org/zap"
+)
 
 // Master
 type Master struct {
@@ -38,6 +41,10 @@ func (ms *Master) Run() {
 
 	if errs != nil {
 		// We have errors
+		ms.Server.CloseClients()
+		ms.Server.Close()
+		zap.L().Error("Encountered errors in clients",
+			zap.Strings("errors", errs))
 	}
 
 	// Step 2: Blockchain type (tells which interface they should be using)
