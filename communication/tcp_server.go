@@ -101,14 +101,16 @@ func (s *MasterServer) SendAndWaitOKSync(data []byte, client net.Conn) error {
 	return nil
 }
 
-func (s *MasterServer) PrepareBenchmarkClients() []error {
+func (s *MasterServer) PrepareBenchmarkClients() []string {
 
-	errorList := make([]error, 0)
+	errorList := make([]string, 0)
 
 	for _, c := range s.Clients {
 		err := s.SendAndWaitOKSync(MsgPrepare, c)
 		if err != nil {
-			errorList = append(errorList, err)
+			zap.L().Warn("Got an error from client",
+				zap.String("client", c.RemoteAddr().String()))
+			errorList = append(errorList, err.Error())
 		}
 	}
 
