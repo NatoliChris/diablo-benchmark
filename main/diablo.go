@@ -27,7 +27,7 @@ func prepareLogger() {
 	logger, err := config.Build()
 
 	if err != nil {
-		fmt.Errorf("Failed to produce a logger: %s", err.Error())
+		_ = fmt.Errorf("failed to produce a logger: %s", err.Error())
 		os.Exit(1)
 	}
 	zap.ReplaceGlobals(logger)
