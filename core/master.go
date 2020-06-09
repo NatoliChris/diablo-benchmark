@@ -47,6 +47,10 @@ func (ms *Master) Run() {
 			zap.Strings("errors", errs))
 	}
 
+	// Number of clients connected
+	zap.L().Info("Benchmark clients connected.",
+		zap.Int("clients", len(ms.Server.Clients)))
+
 	// Step 2: Blockchain type (tells which interface they should be using)
 	ms.Server.SendBlockchainType()
 
