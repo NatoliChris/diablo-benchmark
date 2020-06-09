@@ -20,3 +20,9 @@ func MatchStringToMessage(configBCType string) (BlockchainTypeMessage, error) {
 		return '\x00', errors.New("Blockchain not supported")
 	}
 }
+
+// Matches the byte received from the master to the interface that is required
+// to interact with the blockchain system we are benchmarking.
+func MatchMessageToInterface(msg byte) {
+	// TODO implement
+}
