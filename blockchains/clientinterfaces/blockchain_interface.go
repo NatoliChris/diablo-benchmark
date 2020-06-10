@@ -31,7 +31,7 @@ type BlockchainInterface interface {
 	GetBlock(index interface{}) (map[string]interface{}, error)
 
 	// Asks for the height of the current block
-	GetBlockHeight() uint
+	GetBlockHeight() (uint, error)
 
 	// Close the connection to the blockchain node
 	Close()

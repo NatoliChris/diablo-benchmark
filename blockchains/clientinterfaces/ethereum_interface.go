@@ -40,6 +40,28 @@ func (e *EthereumInterface) ConnectOne(id int) (bool, error) {
 	return true, nil
 }
 
+func (e *EthereumInterface) DeploySmartContract(contractPath string) (interface{}, error) {
+
+	return nil, nil
+}
+
+func (e *EthereumInterface) SendRawTransaction(b []byte) (bool, error) {
+	return false, nil
+}
+
+func (e *EthereumInterface) SecureRead(call_func, string, call_params []byte) (interface{}, error) {
+
+	return nil, nil
+}
+
+func (e *EthereumInterface) GetBlock(index interface{}) (map[string]interface{}, error) {
+	return nil, nil
+}
+
+func (e *EthereumInterface) GetBlockHeight() (uint, error) {
+	return 0, nil
+}
+
 // Close all the client connections
 func (e *EthereumInterface) Close() {
 	// Close the main client connection
