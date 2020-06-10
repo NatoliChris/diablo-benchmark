@@ -25,13 +25,14 @@ type BlockchainInterface interface {
 
 	// Securely read the value from the chain, this requires the client to connect to _multiple_ nodes and asks
 	// for the value.
-	SecureRead(call_func, string, call_params []byte) (interface{}, error)
+	SecureRead(call_func string, call_params []byte) (interface{}, error)
 
 	// Asks for the block information
-	GetBlock(index interface{}) (map[string]interface{}, error)
+	// TODO: maybe implement getBlockByHash?
+	GetBlockByNumber(index uint64) (map[string]interface{}, error)
 
 	// Asks for the height of the current block
-	GetBlockHeight() (uint, error)
+	GetBlockHeight() (uint64, error)
 
 	// Close the connection to the blockchain node
 	Close()
