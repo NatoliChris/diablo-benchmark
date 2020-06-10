@@ -6,6 +6,6 @@ package blockchains
 type GenericBlock struct {
 	Hash              string // Unique identifier for the block
 	Index             uint64 // Height of the block as an index
-	Timestamp         string // String of the timestamp in ISO8601 format (YYYY-MM-DDTHH:MM:SSZ[+/-]HH:MM)
+	Timestamp         uint64 // Unix timestamp of the block
 	TransactionNumber int    // Number of transactions included in the block
 }
