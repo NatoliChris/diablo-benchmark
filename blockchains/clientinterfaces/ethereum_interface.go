@@ -7,7 +7,6 @@ import (
 	"diablo-benchmark/blockchains"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"strconv"
 	"strings"
@@ -61,9 +60,9 @@ func (e *EthereumInterface) SecureRead(call_func string, call_params []byte) (in
 // Get the block information
 func (e *EthereumInterface) GetBlockByNumber(index uint64) (block blockchains.GenericBlock, error error) {
 
-	var ethBlock types.Block
+	var ethBlock map[string]interface{}
 
-	err := e.PrimaryNode.Call(&ethBlock, "eth_getBlockByNumber", index, true)
+	err := e.PrimaryNode.Call(&ethBlock, "eth_getBlockByNumber", index, false)
 
 	if err != nil {
 		return blockchains.GenericBlock{}, err
@@ -74,19 +73,29 @@ func (e *EthereumInterface) GetBlockByNumber(index uint64) (block blockchains.Ge
 	}
 
 	// If the block fails to decode (Genesis usually causes this error)
-	defer func() {
-		if p := recover(); p != nil {
-			// Return a generic error
-			block = blockchains.GenericBlock{}
-			error = errors.New("failed to decode block")
-		}
-	}()
+	//	defer func() {
+	//		if p := recover(); p != nil {
+	//			// Return a generic error
+	//			block = blockchains.GenericBlock{}
+	//			error = errors.New("failed to decode block")
+	//		}
+	//	}()
+	blockNum, err := strconv.ParseUint(strings.Replace(ethBlock["number"].(string), "0x", "", -1), 16, 64)
+
+	if err != nil {
+		return blockchains.GenericBlock{}, err
+	}
+	timeStamp, err := strconv.ParseUint(strings.Replace(ethBlock["timestamp"].(string), "0x", "", -1), 16, 64)
+
+	if err != nil {
+		return blockchains.GenericBlock{}, err
+	}
 
 	return blockchains.GenericBlock{
-		Hash:              ethBlock.Hash().String(),
-		Index:             ethBlock.NumberU64(),
-		Timestamp:         ethBlock.Time(),
-		TransactionNumber: ethBlock.Transactions().Len(),
+		Hash:              ethBlock["hash"].(string),
+		Index:             blockNum,
+		Timestamp:         timeStamp,
+		TransactionNumber: len(ethBlock["transactions"].([]interface{})),
 	}, nil
 }
 
