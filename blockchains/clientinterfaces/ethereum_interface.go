@@ -43,6 +43,34 @@ func (e *EthereumInterface) ConnectOne(id int) (bool, error) {
 	return true, nil
 }
 
+func (e *EthereumInterface) ConnectAll(primaryId int) (bool, error) {
+	// If our ID is greater than the nodes we know, there's a problem!
+	if primaryId >= len(e.Nodes) {
+		return false, errors.New("invalid client primary ID")
+	}
+
+	// primary connect
+	_, err := e.ConnectOne(primaryId)
+
+	if err != nil {
+		return false, err
+	}
+
+	// Connect all the others
+	for idx, node := range e.Nodes {
+		if idx != primaryId {
+			c, err := rpc.Dial(fmt.Sprintf("ws://%s:%s", node[0], node[1]))
+			if err != nil {
+				return false, err
+			}
+
+			e.SecondaryNodes = append(e.SecondaryNodes, c)
+		}
+	}
+
+	return true, nil
+}
+
 func (e *EthereumInterface) DeploySmartContract(contractPath string) (interface{}, error) {
 
 	return nil, nil
