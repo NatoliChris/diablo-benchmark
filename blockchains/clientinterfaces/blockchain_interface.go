@@ -12,7 +12,7 @@ type BlockchainInterface interface {
 	ConnectOne(id int) (bool, error)
 
 	// Connect to all nodes
-	ConnectAll() (bool, error)
+	ConnectAll(primaryId int) (bool, error)
 
 	// Deploy the smart contract, we will provide the path to the contract to deploy
 	DeploySmartContract(contractPath string) (interface{}, error)
