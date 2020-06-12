@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"math/big"
+	"time"
 )
 
 type EthereumInterface struct {
@@ -79,9 +80,9 @@ func (e *EthereumInterface) DeploySmartContract(contractPath string) (interface{
 }
 
 func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
-
-	txSigned := tx.(types.Transaction)
-	err := e.PrimaryNode.SendTransaction(context.WithTimeout(context.Background(), 1000), &txSigned)
+	txSigned := tx.(*types.Transaction)
+	timoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	err := e.PrimaryNode.SendTransaction(timoutCTX, txSigned)
 
 	return err
 }
