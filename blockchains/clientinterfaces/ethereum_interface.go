@@ -4,18 +4,20 @@ package clientinterfaces
 // https://github.com/ethereum/go-ethereum/blob/master/rpc/client_example_test.go
 
 import (
+	"context"
 	"diablo-benchmark/blockchains"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/rpc"
-	"strconv"
-	"strings"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"math/big"
 )
 
 type EthereumInterface struct {
-	Nodes          [][]string    // List of the nodes host:port combinations
-	PrimaryNode    *rpc.Client   // The primary node connected for this client.
-	SecondaryNodes []*rpc.Client // The other node information (for secure reads etc.)
+	Nodes [][]string // List of the nodes host:port combinations
+	// PrimaryNode    *rpc.Client   // The primary node connected for this client.
+	PrimaryNode *ethclient.Client // The primary node connected for this client.
+	// SecondaryNodes []*rpc.Client // The other node information (for secure reads etc.)
+	SecondaryNodes []*ethclient.Client // The other node information (for secure reads etc.)
 }
 
 // Initialise the list of nodes
@@ -26,12 +28,14 @@ func (e *EthereumInterface) Init(otherHosts [][]string) {
 // Connect to one node with credentials in the ID.
 func (e *EthereumInterface) ConnectOne(id int) (bool, error) {
 	// If our ID is greater than the nodes we know, there's a problem!
+
 	if id >= len(e.Nodes) {
 		return false, errors.New("invalid client ID")
 	}
 
+	c, err := ethclient.Dial(fmt.Sprintf("ws://%s:%s", e.Nodes[id][0], e.Nodes[id][1]))
 	// Connect to the node
-	c, err := rpc.Dial(fmt.Sprintf("ws://%s:%s", e.Nodes[id][0], e.Nodes[id][1]))
+	// c, err := rpc.Dial(fmt.Sprintf("ws://%s:%s", e.Nodes[id][0], e.Nodes[id][1]))
 
 	// If there's an error, raise it.
 	if err != nil {
@@ -43,6 +47,7 @@ func (e *EthereumInterface) ConnectOne(id int) (bool, error) {
 	return true, nil
 }
 
+// Connect to all the nodes with one primary
 func (e *EthereumInterface) ConnectAll(primaryId int) (bool, error) {
 	// If our ID is greater than the nodes we know, there's a problem!
 	if primaryId >= len(e.Nodes) {
@@ -59,7 +64,7 @@ func (e *EthereumInterface) ConnectAll(primaryId int) (bool, error) {
 	// Connect all the others
 	for idx, node := range e.Nodes {
 		if idx != primaryId {
-			c, err := rpc.Dial(fmt.Sprintf("ws://%s:%s", node[0], node[1]))
+			c, err := ethclient.Dial(fmt.Sprintf("ws://%s:%s", node[0], node[1]))
 			if err != nil {
 				return false, err
 			}
@@ -90,7 +95,9 @@ func (e *EthereumInterface) GetBlockByNumber(index uint64) (block blockchains.Ge
 
 	var ethBlock map[string]interface{}
 
-	err := e.PrimaryNode.Call(&ethBlock, "eth_getBlockByNumber", index, false)
+	bigIndex := big.NewInt(0).SetUint64(index)
+
+	b, err := e.PrimaryNode.BlockByNumber(context.Background(), bigIndex)
 
 	if err != nil {
 		return blockchains.GenericBlock{}, err
@@ -108,44 +115,36 @@ func (e *EthereumInterface) GetBlockByNumber(index uint64) (block blockchains.Ge
 	//			error = errors.New("failed to decode block")
 	//		}
 	//	}()
-	blockNum, err := strconv.ParseUint(strings.Replace(ethBlock["number"].(string), "0x", "", -1), 16, 64)
 
-	if err != nil {
-		return blockchains.GenericBlock{}, err
-	}
-	timeStamp, err := strconv.ParseUint(strings.Replace(ethBlock["timestamp"].(string), "0x", "", -1), 16, 64)
+	// blockNum, err := strconv.ParseUint(strings.Replace(ethBlock["number"].(string), "0x", "", -1), 16, 64)
 
-	if err != nil {
-		return blockchains.GenericBlock{}, err
-	}
+	// if err != nil {
+	// 	return blockchains.GenericBlock{}, err
+	// }
+	// timeStamp, err := strconv.ParseUint(strings.Replace(ethBlock["timestamp"].(string), "0x", "", -1), 16, 64)
+
+	// if err != nil {
+	// 	return blockchains.GenericBlock{}, err
+	// }
 
 	return blockchains.GenericBlock{
-		Hash:              ethBlock["hash"].(string),
-		Index:             blockNum,
-		Timestamp:         timeStamp,
-		TransactionNumber: len(ethBlock["transactions"].([]interface{})),
+		Hash:              b.Hash().String(),
+		Index:             b.NumberU64(),
+		Timestamp:         b.Time(),
+		TransactionNumber: b.Transactions().Len(),
 	}, nil
 }
 
 // Get the block height through the RPC interaction.
 func (e *EthereumInterface) GetBlockHeight() (uint64, error) {
 
-	// Get the hex string
-	var num string
-	err := e.PrimaryNode.Call(&num, "eth_blockNumber")
+	h, err := e.PrimaryNode.HeaderByNumber(context.Background(), nil)
 
 	if err != nil {
 		return 0, err
 	}
 
-	// Convert to uint64
-	height, err := strconv.ParseUint(strings.Replace(num, "0x", "", -1), 16, 64)
-
-	if err != nil {
-		return 0, err
-	}
-
-	return height, nil
+	return h.Number.Uint64(), nil
 }
 
 // Close all the client connections
