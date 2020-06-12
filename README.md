@@ -13,3 +13,9 @@ clients performing real-world workloads.
 * Wiki/Website Access
 * Shipping Containers
 * Exchange
+
+
+## Reading Material
+
+* Golang Ethereum Developer Book: https://github.com/miguelmota/ethereum-development-with-go-book
+* Interacting with contracts via raw transaction creation: https://ethereum.stackexchange.com/questions/10486/raw-transaction-data-in-go
