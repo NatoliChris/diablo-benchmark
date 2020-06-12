@@ -8,15 +8,14 @@ import (
 	"diablo-benchmark/blockchains"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"math/big"
 )
 
 type EthereumInterface struct {
-	Nodes [][]string // List of the nodes host:port combinations
-	// PrimaryNode    *rpc.Client   // The primary node connected for this client.
-	PrimaryNode *ethclient.Client // The primary node connected for this client.
-	// SecondaryNodes []*rpc.Client // The other node information (for secure reads etc.)
+	Nodes          [][]string          // List of the nodes host:port combinations
+	PrimaryNode    *ethclient.Client   // The primary node connected for this client.
 	SecondaryNodes []*ethclient.Client // The other node information (for secure reads etc.)
 }
 
@@ -33,9 +32,8 @@ func (e *EthereumInterface) ConnectOne(id int) (bool, error) {
 		return false, errors.New("invalid client ID")
 	}
 
-	c, err := ethclient.Dial(fmt.Sprintf("ws://%s:%s", e.Nodes[id][0], e.Nodes[id][1]))
 	// Connect to the node
-	// c, err := rpc.Dial(fmt.Sprintf("ws://%s:%s", e.Nodes[id][0], e.Nodes[id][1]))
+	c, err := ethclient.Dial(fmt.Sprintf("ws://%s:%s", e.Nodes[id][0], e.Nodes[id][1]))
 
 	// If there's an error, raise it.
 	if err != nil {
@@ -77,12 +75,15 @@ func (e *EthereumInterface) ConnectAll(primaryId int) (bool, error) {
 }
 
 func (e *EthereumInterface) DeploySmartContract(contractPath string) (interface{}, error) {
-
 	return nil, nil
 }
 
-func (e *EthereumInterface) SendRawTransaction(b []byte) (bool, error) {
-	return false, nil
+func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
+
+	txSigned := tx.(types.Transaction)
+	err := e.PrimaryNode.SendTransaction(context.WithTimeout(context.Background(), 1000), &txSigned)
+
+	return err
 }
 
 func (e *EthereumInterface) SecureRead(call_func string, call_params []byte) (interface{}, error) {
@@ -106,26 +107,6 @@ func (e *EthereumInterface) GetBlockByNumber(index uint64) (block blockchains.Ge
 	if &ethBlock == nil {
 		return blockchains.GenericBlock{}, errors.New("nil block returned")
 	}
-
-	// If the block fails to decode (Genesis usually causes this error)
-	//	defer func() {
-	//		if p := recover(); p != nil {
-	//			// Return a generic error
-	//			block = blockchains.GenericBlock{}
-	//			error = errors.New("failed to decode block")
-	//		}
-	//	}()
-
-	// blockNum, err := strconv.ParseUint(strings.Replace(ethBlock["number"].(string), "0x", "", -1), 16, 64)
-
-	// if err != nil {
-	// 	return blockchains.GenericBlock{}, err
-	// }
-	// timeStamp, err := strconv.ParseUint(strings.Replace(ethBlock["timestamp"].(string), "0x", "", -1), 16, 64)
-
-	// if err != nil {
-	// 	return blockchains.GenericBlock{}, err
-	// }
 
 	return blockchains.GenericBlock{
 		Hash:              b.Hash().String(),
