@@ -21,7 +21,7 @@ type BlockchainInterface interface {
 	// It is safe to assume that these bytes will be formatted correctly according to the chosen blockchain.
 	// The transactions are generated through the workload to relieve the signing and encoding during timed
 	// benchmarks
-	SendRawTransaction(b []byte) (bool, error)
+	SendRawTransaction(tx interface{}) error
 
 	// Securely read the value from the chain, this requires the client to connect to _multiple_ nodes and asks
 	// for the value.
