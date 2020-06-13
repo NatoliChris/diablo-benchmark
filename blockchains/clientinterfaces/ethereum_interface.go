@@ -75,8 +75,24 @@ func (e *EthereumInterface) ConnectAll(primaryId int) (bool, error) {
 	return true, nil
 }
 
-func (e *EthereumInterface) DeploySmartContract(contractPath string) (interface{}, error) {
-	return nil, nil
+func (e *EthereumInterface) DeploySmartContract(tx interface{}) (interface{}, error) {
+	txSigned := tx.(*types.Transaction)
+	timeoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
+
+	err := e.PrimaryNode.SendTransaction(timeoutCTX, txSigned)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Wait for transaction receipt
+	r, err := e.PrimaryNode.TransactionReceipt(context.Background(), txSigned.Hash())
+
+	if err != nil {
+		return nil, err
+	}
+
+	return r.ContractAddress, nil
 }
 
 func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
@@ -84,7 +100,20 @@ func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
 	timoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	err := e.PrimaryNode.SendTransaction(timoutCTX, txSigned)
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Wait for receipt
+	r, err := e.PrimaryNode.TransactionReceipt(context.Background(), txSigned.Hash())
+
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(r.BlockHash)
+
+	return nil
 }
 
 func (e *EthereumInterface) SecureRead(call_func string, call_params []byte) (interface{}, error) {

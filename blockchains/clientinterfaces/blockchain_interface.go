@@ -15,6 +15,7 @@ type BlockchainInterface interface {
 	ConnectAll(primaryId int) (bool, error)
 
 	// Deploy the smart contract, we will provide the path to the contract to deploy
+	// Returns the address of the contract deploy
 	DeploySmartContract(contractPath string) (interface{}, error)
 
 	// Send the raw transaction bytes to the blockchain

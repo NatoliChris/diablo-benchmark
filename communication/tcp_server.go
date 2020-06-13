@@ -122,6 +122,8 @@ func (s *MasterServer) PrepareBenchmarkClients() []string {
 }
 
 func (s *MasterServer) SendBlockchainType() error {
+	// Send the blockchain type message
+
 	return nil
 }
 
