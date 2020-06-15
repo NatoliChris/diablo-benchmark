@@ -3,6 +3,9 @@ package workloadgenerators
 import "diablo-benchmark/core/configs"
 
 type WorkloadGenerator interface {
+	// Initialises the information to start the workload generator
+	Init()
+
 	// Creates a transaction to deploy the contract
 	CreateContractDeployTransaction(contractPath string, key configs.ChainKey) ([]byte, error)
 
