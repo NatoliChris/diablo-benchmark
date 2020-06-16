@@ -4,7 +4,7 @@ import "diablo-benchmark/core/configs"
 
 type WorkloadGenerator interface {
 	// Initialises the information to start the workload generator
-	Init()
+	Init(chainConfig configs.ChainConfig, benchConfig configs.BenchConfig) error
 
 	// Creates a transaction to deploy the contract
 	CreateContractDeployTransaction(contractPath string, key configs.ChainKey) ([]byte, error)
