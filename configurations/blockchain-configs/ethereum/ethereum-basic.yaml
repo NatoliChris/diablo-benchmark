@@ -1,11 +1,6 @@
 name: "ethereum"
 nodes:
-  - 127.0.0.1:30303
-  - 127.0.0.1:30304
-  - 127.0.0.1:30305
-  - 127.0.0.1:30306
+  - 127.0.0.1:8545
 keys:
-  - private: "0xf5981d1c9cbdc1e0e570d19d833e0db96af31d3b65f6b67f8e5b2ab7afc5ffc8"
-    address: "0x27c40e0fc653679a205754ca76f3371ec127baba"
-  - private: "0xb33cb58af3686ce54cc081b0ae095242702618d8f9b2b1f421fa523d337fca9c"
-    address: "0x3438d5c33bc1f8c4ef69affb891a58b1d67f8ad7"
+  - private: "4019ff3bdda2101efd4a84afbf375604e24328203d5b5bfb47839bd4c390ad28"
+    address: "0x3fe51231d3cc16f1ed59e9fe255e2813d519ff5b"

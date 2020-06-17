@@ -15,19 +15,19 @@ import (
 )
 
 type EthereumInterface struct {
-	Nodes          [][]string          // List of the nodes host:port combinations
+	Nodes          []string            // List of the nodes host:port combinations
 	PrimaryNode    *ethclient.Client   // The primary node connected for this client.
 	SecondaryNodes []*ethclient.Client // The other node information (for secure reads etc.)
-	WorkloadTxs    []*types.Transaction
+	WorkloadTxs    []types.Transaction
 }
 
 // Initialise the list of nodes
-func (e *EthereumInterface) Init(otherHosts [][]string) {
+func (e *EthereumInterface) Init(otherHosts []string) {
 	e.Nodes = otherHosts
 }
 
 func (e *EthereumInterface) ParseWorkload(workload [][]byte) error {
-	parsedWorkload := make([]*types.Transaction, 0)
+	parsedWorkload := make([]types.Transaction, 0)
 
 	for _, v := range workload {
 		t := types.Transaction{}
@@ -37,7 +37,7 @@ func (e *EthereumInterface) ParseWorkload(workload [][]byte) error {
 			return err
 		}
 
-		parsedWorkload = append(parsedWorkload, &t)
+		parsedWorkload = append(parsedWorkload, t)
 	}
 
 	e.WorkloadTxs = parsedWorkload
@@ -53,7 +53,7 @@ func (e *EthereumInterface) ConnectOne(id int) (bool, error) {
 	}
 
 	// Connect to the node
-	c, err := ethclient.Dial(fmt.Sprintf("ws://%s:%s", e.Nodes[id][0], e.Nodes[id][1]))
+	c, err := ethclient.Dial(fmt.Sprintf("ws://%s", e.Nodes[id]))
 
 	// If there's an error, raise it.
 	if err != nil {
@@ -117,6 +117,19 @@ func (e *EthereumInterface) DeploySmartContract(tx interface{}) (interface{}, er
 func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
 	// NOTE: type conversion might be slow, there might be a better way to send this.
 	txSigned := tx.(*types.Transaction)
+
+	r, s, v := txSigned.RawSignatureValues()
+	fmt.Println(fmt.Sprintf("Printing Transaction: \n Hash: %s,\n Nonce: %d,\n To: %s\n gasPrice: %s\n gasLimit: %s,\n R: %s, S: %s, V: %s",
+		txSigned.Hash().String(),
+		txSigned.Nonce(),
+		txSigned.To().String(),
+		txSigned.GasPrice().String(),
+		txSigned.Gas(),
+		r,
+		s,
+		v))
+
+	fmt.Println(txSigned)
 	timoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	err := e.PrimaryNode.SendTransaction(timoutCTX, txSigned)
 
@@ -125,13 +138,14 @@ func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
 	}
 
 	// Wait for receipt
-	r, err := e.PrimaryNode.TransactionReceipt(context.Background(), txSigned.Hash())
-
-	if err != nil {
-		return err
-	}
-
-	fmt.Println(r.BlockHash)
+	// TODO implement list that will check receipts later
+	//r, err := e.PrimaryNode.TransactionReceipt(context.Background(), txSigned.Hash())
+	//
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//fmt.Println(r.BlockHash)
 
 	return nil
 }
