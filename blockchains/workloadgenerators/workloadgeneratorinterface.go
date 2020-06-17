@@ -16,5 +16,5 @@ type WorkloadGenerator interface {
 	CreateSignedTransaction(to string, value string, data []byte, key configs.ChainKey) ([]byte, error)
 
 	// Generate the workload, returning the slice of transactions. [clientID = [ list of transactions ] ]
-	GenerateWorkload(numClients int, numTransactions int, transactionInformation map[string]interface{}) ([][][]byte, error)
+	GenerateWorkload(numClients int, numTransactionsPerClient int, transactionInformation map[string]interface{}) ([][][]byte, error)
 }
