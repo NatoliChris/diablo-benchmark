@@ -8,6 +8,9 @@ type BlockchainInterface interface {
 	// This will be used for the secure reads.
 	Init(otherHosts [][]string)
 
+	// Handles the workload, converts the bytes to usable transactions.
+	ParseWorkload(workload [][]byte) error
+
 	// Connect to the blockchain node in the array slot of the given array
 	ConnectOne(id int) (bool, error)
 
