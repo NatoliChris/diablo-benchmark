@@ -18,38 +18,56 @@ type EthereumInterface struct {
 	Nodes          []string            // List of the nodes host:port combinations
 	PrimaryNode    *ethclient.Client   // The primary node connected for this client.
 	SecondaryNodes []*ethclient.Client // The other node information (for secure reads etc.)
-	WorkloadTxs    []types.Transaction
+	Transactions   map[string][]time.Time
 }
 
 // Initialise the list of nodes
 func (e *EthereumInterface) Init(otherHosts []string) {
 	e.Nodes = otherHosts
+	e.Transactions = make(map[string][]time.Time, 0)
 }
 
-func (e *EthereumInterface) ParseWorkload(workload [][]byte) error {
-	parsedWorkload := make([]types.Transaction, 0)
+func (e *EthereumInterface) ParseWorkload(workload [][]byte) ([]interface{}, error) {
+	parsedWorkload := make([]interface{}, 0)
 
 	for _, v := range workload {
 		t := types.Transaction{}
 		err := t.UnmarshalJSON(v)
 
 		if err != nil {
+			return nil, err
+		}
+
+		parsedWorkload = append(parsedWorkload, &t)
+	}
+
+	return parsedWorkload, nil
+}
+
+func (e *EthereumInterface) ParseBlocksForTransactions(startNumber uint64, endNumber uint64) error {
+	for i := startNumber; i <= endNumber; i++ {
+		b, err := e.GetBlockByNumber(i)
+
+		if err != nil {
 			return err
 		}
 
-		parsedWorkload = append(parsedWorkload, t)
+		for _, v := range b.TransactionHashes {
+			if _, ok := e.Transactions[v]; ok {
+				e.Transactions[v] = append(e.Transactions[v], time.Unix(int64(b.Timestamp), 0))
+			}
+		}
 	}
 
-	e.WorkloadTxs = parsedWorkload
 	return nil
 }
 
 // Connect to one node with credentials in the ID.
-func (e *EthereumInterface) ConnectOne(id int) (bool, error) {
+func (e *EthereumInterface) ConnectOne(id int) error {
 	// If our ID is greater than the nodes we know, there's a problem!
 
 	if id >= len(e.Nodes) {
-		return false, errors.New("invalid client ID")
+		return errors.New("invalid client ID")
 	}
 
 	// Connect to the node
@@ -57,26 +75,26 @@ func (e *EthereumInterface) ConnectOne(id int) (bool, error) {
 
 	// If there's an error, raise it.
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	e.PrimaryNode = c
 
-	return true, nil
+	return nil
 }
 
 // Connect to all the nodes with one primary
-func (e *EthereumInterface) ConnectAll(primaryId int) (bool, error) {
+func (e *EthereumInterface) ConnectAll(primaryId int) error {
 	// If our ID is greater than the nodes we know, there's a problem!
 	if primaryId >= len(e.Nodes) {
-		return false, errors.New("invalid client primary ID")
+		return errors.New("invalid client primary ID")
 	}
 
 	// primary connect
-	_, err := e.ConnectOne(primaryId)
+	err := e.ConnectOne(primaryId)
 
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	// Connect all the others
@@ -84,14 +102,14 @@ func (e *EthereumInterface) ConnectAll(primaryId int) (bool, error) {
 		if idx != primaryId {
 			c, err := ethclient.Dial(fmt.Sprintf("ws://%s:%s", node[0], node[1]))
 			if err != nil {
-				return false, err
+				return err
 			}
 
 			e.SecondaryNodes = append(e.SecondaryNodes, c)
 		}
 	}
 
-	return true, nil
+	return nil
 }
 
 func (e *EthereumInterface) DeploySmartContract(tx interface{}) (interface{}, error) {
@@ -117,36 +135,15 @@ func (e *EthereumInterface) DeploySmartContract(tx interface{}) (interface{}, er
 func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
 	// NOTE: type conversion might be slow, there might be a better way to send this.
 	txSigned := tx.(*types.Transaction)
-
-	r, s, v := txSigned.RawSignatureValues()
-	fmt.Println(fmt.Sprintf("Printing Transaction: \n Hash: %s,\n Nonce: %d,\n To: %s\n gasPrice: %s\n gasLimit: %s,\n R: %s, S: %s, V: %s",
-		txSigned.Hash().String(),
-		txSigned.Nonce(),
-		txSigned.To().String(),
-		txSigned.GasPrice().String(),
-		txSigned.Gas(),
-		r,
-		s,
-		v))
-
-	fmt.Println(txSigned)
 	timoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	t1 := time.Now()
 	err := e.PrimaryNode.SendTransaction(timoutCTX, txSigned)
-
+	t2 := time.Now()
 	if err != nil {
 		return err
 	}
 
-	// Wait for receipt
-	// TODO implement list that will check receipts later
-	//r, err := e.PrimaryNode.TransactionReceipt(context.Background(), txSigned.Hash())
-	//
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//fmt.Println(r.BlockHash)
-
+	e.Transactions[txSigned.Hash().String()] = []time.Time{t1, t2}
 	return nil
 }
 
@@ -159,6 +156,7 @@ func (e *EthereumInterface) SecureRead(call_func string, call_params []byte) (in
 func (e *EthereumInterface) GetBlockByNumber(index uint64) (block blockchains.GenericBlock, error error) {
 
 	var ethBlock map[string]interface{}
+	var txList []string
 
 	bigIndex := big.NewInt(0).SetUint64(index)
 
@@ -172,11 +170,17 @@ func (e *EthereumInterface) GetBlockByNumber(index uint64) (block blockchains.Ge
 		return blockchains.GenericBlock{}, errors.New("nil block returned")
 	}
 
+	fmt.Println(b.Transactions())
+	for _, v := range b.Transactions() {
+		txList = append(txList, v.Hash().String())
+	}
+
 	return blockchains.GenericBlock{
 		Hash:              b.Hash().String(),
 		Index:             b.NumberU64(),
 		Timestamp:         b.Time(),
 		TransactionNumber: b.Transactions().Len(),
+		TransactionHashes: txList,
 	}, nil
 }
 

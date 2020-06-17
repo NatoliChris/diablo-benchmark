@@ -9,13 +9,13 @@ type BlockchainInterface interface {
 	Init(otherHosts [][]string)
 
 	// Handles the workload, converts the bytes to usable transactions.
-	ParseWorkload(workload [][]byte) error
+	ParseWorkload(workload [][]byte) ([]interface{}, error)
 
 	// Connect to the blockchain node in the array slot of the given array
-	ConnectOne(id int) (bool, error)
+	ConnectOne(id int) error
 
 	// Connect to all nodes
-	ConnectAll(primaryId int) (bool, error)
+	ConnectAll(primaryId int) error
 
 	// Deploy the smart contract, we will provide the path to the contract to deploy
 	// Returns the address of the contract deploy
@@ -37,6 +37,9 @@ type BlockchainInterface interface {
 
 	// Asks for the height of the current block
 	GetBlockHeight() (uint64, error)
+
+	// Parse blocks for transactions
+	ParseBlocksForTransactions(startNumber uint64, endNumber uint64) error
 
 	// Close the connection to the blockchain node
 	Close()
