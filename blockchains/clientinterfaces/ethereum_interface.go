@@ -18,11 +18,30 @@ type EthereumInterface struct {
 	Nodes          [][]string          // List of the nodes host:port combinations
 	PrimaryNode    *ethclient.Client   // The primary node connected for this client.
 	SecondaryNodes []*ethclient.Client // The other node information (for secure reads etc.)
+	WorkloadTxs    []*types.Transaction
 }
 
 // Initialise the list of nodes
 func (e *EthereumInterface) Init(otherHosts [][]string) {
 	e.Nodes = otherHosts
+}
+
+func (e *EthereumInterface) ParseWorkload(workload [][]byte) error {
+	parsedWorkload := make([]*types.Transaction, 0)
+
+	for _, v := range workload {
+		t := types.Transaction{}
+		err := t.UnmarshalJSON(v)
+
+		if err != nil {
+			return err
+		}
+
+		parsedWorkload = append(parsedWorkload, &t)
+	}
+
+	e.WorkloadTxs = parsedWorkload
+	return nil
 }
 
 // Connect to one node with credentials in the ID.
@@ -96,6 +115,7 @@ func (e *EthereumInterface) DeploySmartContract(tx interface{}) (interface{}, er
 }
 
 func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
+	// NOTE: type conversion might be slow, there might be a better way to send this.
 	txSigned := tx.(*types.Transaction)
 	timoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	err := e.PrimaryNode.SendTransaction(timoutCTX, txSigned)
