@@ -98,6 +98,8 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(to string, value str
 		return []byte{}, nil
 	}
 
+	e.Nonces[key.Address] += 1
+
 	// Return the transaction in bytes ready to send to the clients.
 	return signedTx.MarshalJSON()
 }
