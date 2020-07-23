@@ -5,6 +5,9 @@ import (
 	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/core/configs/parsers"
 	"fmt"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"os"
 	"time"
 )
 
@@ -15,6 +18,14 @@ nice charge tank ivory warfare spin deposit ecology beauty unusual comic melt
 */
 
 func main() {
+	config := zap.NewDevelopmentConfig()
+	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	logger, err := config.Build()
+	if err != nil {
+		os.Exit(1)
+	}
+	zap.ReplaceGlobals(logger)
+
 	cc, err := parsers.ParseChainConfig("configurations/blockchain-configs/ethereum/ethereum-basic.yaml")
 	if err != nil {
 		panic(err)
@@ -61,11 +72,11 @@ func main() {
 		panic(err)
 	}
 
-	startNum, err := E.GetBlockHeight()
+	// startNum, err := E.GetBlockHeight()
 
-	if err != nil {
-		panic(err)
-	}
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	for i := 0; i < len(workload); i++ {
 		err = E.SendRawTransaction(parsedWorkload[i])
@@ -74,25 +85,40 @@ func main() {
 		}
 	}
 
-	time.Sleep(5 * time.Second)
+	tNow := time.Now()
 
-	endNum, err := E.GetBlockHeight()
+	for {
+		if E.NumTxDone == uint64(len(workload)) {
+			break
+		}
+		if time.Now().Sub(tNow) > 10*time.Second {
+			break
+		}
 
-	if err != nil {
-		panic(err)
+		fmt.Printf("Sent: %d, Complete: %d\n", E.NumTxSent, E.NumTxDone)
+		time.Sleep(500 * time.Millisecond)
 	}
 
-	err = E.ParseBlocksForTransactions(startNum, endNum)
+	fmt.Println(E.NumTxDone)
+	fmt.Println(E.TransactionInfo)
 
-	if err != nil {
-		panic(err)
-	}
+	// endNum, err := E.GetBlockHeight()
 
-	fmt.Println(E.Transactions)
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	for _, v := range E.Transactions {
-		fmt.Println((v[2].Sub(v[0])).Microseconds())
-	}
+	// err = E.ParseBlocksForTransactions(startNum, endNum)
+
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// fmt.Println(E.Transactions)
+
+	// for _, v := range E.Transactions {
+	// 	fmt.Println((v[2].Sub(v[0])).Microseconds())
+	// }
 
 	fmt.Println("DONE, ALL OK")
 }
