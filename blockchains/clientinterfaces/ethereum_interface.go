@@ -8,38 +8,49 @@ import (
 	"diablo-benchmark/blockchains"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/core/types"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"go.uber.org/zap"
 	"math/big"
+	"sync/atomic"
 	"time"
 )
 
 type EthereumInterface struct {
-	Nodes          []string            // List of the nodes host:port combinations
-	PrimaryNode    *ethclient.Client   // The primary node connected for this client.
-	SecondaryNodes []*ethclient.Client // The other node information (for secure reads etc.)
-	Transactions   map[string][]time.Time
+	Nodes           []string               // List of the nodes host:port combinations
+	PrimaryNode     *ethclient.Client      // The primary node connected for this client.
+	SecondaryNodes  []*ethclient.Client    // The other node information (for secure reads etc.)
+	SubscribeDone   chan bool              // Event channel that will unsub from events
+	TransactionInfo map[string][]time.Time // Transaction information
+	HandlersStarted bool                   // Have the handlers been initiated?
+	NumTxDone       uint64                 // Number of transactions done
+	NumTxSent       uint64                 // Number of transactions currently sent
+	TotalTx         int                    // TotalTx
 }
 
 // Initialise the list of nodes
 func (e *EthereumInterface) Init(otherHosts []string) {
 	e.Nodes = otherHosts
-	e.Transactions = make(map[string][]time.Time, 0)
+	e.TransactionInfo = make(map[string][]time.Time, 0)
+	e.SubscribeDone = make(chan bool)
+	e.HandlersStarted = false
+	e.NumTxDone = 0
 }
 
 func (e *EthereumInterface) ParseWorkload(workload [][]byte) ([]interface{}, error) {
 	parsedWorkload := make([]interface{}, 0)
 
 	for _, v := range workload {
-		t := types.Transaction{}
+		t := ethtypes.Transaction{}
 		err := t.UnmarshalJSON(v)
-
 		if err != nil {
 			return nil, err
 		}
 
 		parsedWorkload = append(parsedWorkload, &t)
 	}
+
+	e.TotalTx = len(parsedWorkload)
 
 	return parsedWorkload, nil
 }
@@ -112,8 +123,9 @@ func (e *EthereumInterface) ConnectAll(primaryId int) error {
 	return nil
 }
 
+// Deploy the smart contract, respond with the contract address.
 func (e *EthereumInterface) DeploySmartContract(tx interface{}) (interface{}, error) {
-	txSigned := tx.(*types.Transaction)
+	txSigned := tx.(*ethtypes.Transaction)
 	timeoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
 
 	err := e.PrimaryNode.SendTransaction(timeoutCTX, txSigned)
@@ -122,6 +134,7 @@ func (e *EthereumInterface) DeploySmartContract(tx interface{}) (interface{}, er
 		return nil, err
 	}
 
+	// TODO: fix to wait for deploy
 	// Wait for transaction receipt
 	r, err := e.PrimaryNode.TransactionReceipt(context.Background(), txSigned.Hash())
 
@@ -134,21 +147,21 @@ func (e *EthereumInterface) DeploySmartContract(tx interface{}) (interface{}, er
 
 func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
 	// NOTE: type conversion might be slow, there might be a better way to send this.
-	txSigned := tx.(*types.Transaction)
+	txSigned := tx.(*ethtypes.Transaction)
 	timoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
-	t1 := time.Now()
+	e.TransactionInfo[txSigned.Hash().String()] = []time.Time{time.Now()}
 	err := e.PrimaryNode.SendTransaction(timoutCTX, txSigned)
-	t2 := time.Now()
+
 	if err != nil {
 		return err
 	}
 
-	e.Transactions[txSigned.Hash().String()] = []time.Time{t1, t2}
+	atomic.AddUint64(&e.NumTxSent, 1)
 	return nil
 }
 
 func (e *EthereumInterface) SecureRead(call_func string, call_params []byte) (interface{}, error) {
-
+	// TODO implement
 	return nil, nil
 }
 
@@ -170,7 +183,6 @@ func (e *EthereumInterface) GetBlockByNumber(index uint64) (block blockchains.Ge
 		return blockchains.GenericBlock{}, errors.New("nil block returned")
 	}
 
-	fmt.Println(b.Transactions())
 	for _, v := range b.Transactions() {
 		txList = append(txList, v.Hash().String())
 	}
