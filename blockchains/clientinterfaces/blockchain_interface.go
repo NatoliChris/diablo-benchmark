@@ -1,5 +1,7 @@
 package clientinterfaces
 
+import "diablo-benchmark/core/results"
+
 // This struct provides the basic funcitonality that will be tested with the blockchains.
 // It _should_ cover most interaction, but will be extendible in the event that more
 // complex functionality is created with blockchains.
@@ -7,6 +9,10 @@ type BlockchainInterface interface {
 	// Provides the client with the list of all hosts, this is the pair of (host, port) in an array.
 	// This will be used for the secure reads.
 	Init(otherHosts [][]string)
+
+	// Finishes up and performs any post-benchmark operations.
+	// Can be used to format the results to parse back
+	Cleanup() results.Results
 
 	// Handles the workload, converts the bytes to usable transactions.
 	ParseWorkload(workload [][]byte) ([]interface{}, error)
