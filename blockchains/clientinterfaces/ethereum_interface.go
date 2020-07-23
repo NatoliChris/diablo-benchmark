@@ -6,6 +6,7 @@ package clientinterfaces
 import (
 	"context"
 	"diablo-benchmark/blockchains"
+	"diablo-benchmark/core/results"
 	"errors"
 	"fmt"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -37,6 +38,35 @@ func (e *EthereumInterface) Init(otherHosts []string) {
 	e.NumTxDone = 0
 }
 
+// Cleans up and formats the results
+func (e *EthereumInterface) Cleanup() results.Results {
+	// clean up connections and format results
+	if e.HandlersStarted {
+		e.SubscribeDone <- true
+	}
+
+	txLatencies := make([]float64, 0)
+	var avgLatency float64 = 0
+
+	for _, v := range e.TransactionInfo {
+		if len(v) > 1 {
+			txLatency := v[1].Sub(v[0]).Seconds()
+			txLatencies = append(txLatencies, txLatency)
+			avgLatency += txLatency
+		}
+	}
+
+	// Throughput
+	throughput := float64(e.NumTxDone) /
+
+	return results.Results{
+		TxLatencies: txLatencies,
+		AverageLatency: avgLatency / float64(len(txLatencies)),
+		Throughput:
+	}
+}
+
+// Parses the workload and convert into the type for the benchmark.
 func (e *EthereumInterface) ParseWorkload(workload [][]byte) ([]interface{}, error) {
 	parsedWorkload := make([]interface{}, 0)
 
@@ -55,6 +85,50 @@ func (e *EthereumInterface) ParseWorkload(workload [][]byte) ([]interface{}, err
 	return parsedWorkload, nil
 }
 
+func (e *EthereumInterface) parseBlocksForTransactions(blockNumber *big.Int) {
+	block, err := e.PrimaryNode.BlockByNumber(context.Background(), blockNumber)
+
+	if err != nil {
+		zap.L().Warn(err.Error())
+		return
+	}
+
+	tNow := time.Now()
+	for _, v := range block.Transactions() {
+		tHash := v.Hash().String()
+		if _, ok := e.TransactionInfo[tHash]; ok {
+			e.TransactionInfo[tHash] = append(e.TransactionInfo[tHash], tNow)
+		}
+	}
+
+	atomic.AddUint64(&e.NumTxDone, uint64(len(block.Transactions())))
+}
+
+// Handles the incoming information about the Transactions
+func (e *EthereumInterface) EventHandler() {
+	// Channel for the events
+	eventCh := make(chan *ethtypes.Header)
+
+	sub, err := e.PrimaryNode.SubscribeNewHead(context.Background(), eventCh)
+	if err != nil {
+		zap.Error(err)
+		return
+	}
+
+	for {
+		select {
+		case <-e.SubscribeDone:
+			sub.Unsubscribe()
+			return
+		case header := <-eventCh:
+			// Got a head
+			go e.parseBlocksForTransactions(header.Number)
+		case err := <-sub.Err():
+			zap.L().Warn(err.Error())
+		}
+	}
+}
+
 func (e *EthereumInterface) ParseBlocksForTransactions(startNumber uint64, endNumber uint64) error {
 	for i := startNumber; i <= endNumber; i++ {
 		b, err := e.GetBlockByNumber(i)
@@ -64,8 +138,8 @@ func (e *EthereumInterface) ParseBlocksForTransactions(startNumber uint64, endNu
 		}
 
 		for _, v := range b.TransactionHashes {
-			if _, ok := e.Transactions[v]; ok {
-				e.Transactions[v] = append(e.Transactions[v], time.Unix(int64(b.Timestamp), 0))
+			if _, ok := e.TransactionInfo[v]; ok {
+				e.TransactionInfo[v] = append(e.TransactionInfo[v], time.Unix(int64(b.Timestamp), 0))
 			}
 		}
 	}
@@ -90,6 +164,11 @@ func (e *EthereumInterface) ConnectOne(id int) error {
 	}
 
 	e.PrimaryNode = c
+
+	if !e.HandlersStarted {
+		go e.EventHandler()
+		e.HandlersStarted = true
+	}
 
 	return nil
 }
