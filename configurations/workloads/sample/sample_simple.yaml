@@ -1,6 +1,7 @@
 name: "sample benchmark config"
 description: "The description of the benchmark"
-workers: 3
+clients: 3
+workers: 1
 bench:
   type: "simple"
   txs:
