@@ -52,7 +52,7 @@ func runMaster(masterArgs *core.MasterArgs) {
 	}
 
 	// Initialise the TPC server
-	m := core.InitMaster(masterArgs.ListenAddr, bConfig.Workers)
+	m := core.InitMaster(masterArgs.ListenAddr, bConfig.Clients)
 
 	// Run the benchmark flow
 	m.Run()
