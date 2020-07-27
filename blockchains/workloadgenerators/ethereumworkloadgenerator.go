@@ -105,7 +105,7 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(to string, value str
 }
 
 // Generate the workload, returning the slice of transactions. [clientID = [ list of transactions ] ]
-func (e *EthereumWorkloadGenerator) GenerateWorkload(numClients int, numTransactionsPerClient int, transactionInformation map[string]interface{}) ([][][]byte, error) {
+func (e *EthereumWorkloadGenerator) GenerateWorkload(numClients int, numTransactionsPerClient int, transactionInformation map[string]interface{}, isContractr bool) ([][][]byte, error) {
 	clientWorkloads := make([][][]byte, 0)
 
 	return clientWorkloads, nil
