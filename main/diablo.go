@@ -51,8 +51,20 @@ func runMaster(masterArgs *core.MasterArgs) {
 		os.Exit(1)
 	}
 
-	// Initialise the TPC server
-	m := core.InitMaster(masterArgs.ListenAddr, bConfig.Clients)
+	cConfig, err := parsers.ParseChainConfig(masterArgs.ChainConfigPath)
+
+	if err != nil {
+		os.Exit(1)
+	}
+
+	wg, err := parsers.GetWorkloadGenerator(cConfig)
+
+	if err != nil {
+		os.Exit(1)
+	}
+
+	// Initialise the TCP server
+	m := core.InitMaster(masterArgs.ListenAddr, bConfig.Clients, wg)
 
 	// Run the benchmark flow
 	m.Run()

@@ -1,25 +1,27 @@
 package core
 
 import (
+	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/communication"
 	"go.uber.org/zap"
 )
 
 // Master
 type Master struct {
-	Server *communication.MasterServer // TCP server identified with the master for all clients to connect to
+	Server            *communication.MasterServer // TCP server identified with the master for all clients to connect to
+	workloadGenerator workloadgenerators.WorkloadGenerator
 }
 
 // Initialise the master server and return an instance of the master
 // This will be passed back to the main
-func InitMaster(listenAddr string, expectedClients int) *Master {
+func InitMaster(listenAddr string, expectedClients int, wg workloadgenerators.WorkloadGenerator) *Master {
 	s, err := communication.SetupMasterTCP(listenAddr, expectedClients)
 	if err != nil {
 		// TODO remove panic
 		panic(err)
 	}
 
-	return &Master{Server: s}
+	return &Master{Server: s, workloadGenerator: wg}
 }
 
 // Main functionality to run
@@ -48,7 +50,7 @@ func (ms *Master) Run() {
 	}
 
 	// Number of clients connected
-	zap.L().Info("Benchmark clients connected.",
+	zap.L().Info("Benchmark clients all connected.",
 		zap.Int("clients", len(ms.Server.Clients)))
 
 	// Step 2: Blockchain type (tells which interface they should be using)
@@ -72,4 +74,10 @@ func (ms *Master) Run() {
 	// Step 8: Close all connections
 	ms.Server.CloseClients()
 	ms.Server.Close()
+}
+
+func (ms *Master) GenerateWorkloads() ([][]byte, error) {
+	// 1/ work out the total number of clients.
+
+	return nil, nil
 }
