@@ -26,6 +26,8 @@ func main() {
 	}
 	zap.ReplaceGlobals(logger)
 
+	testSize := 1000
+
 	cc, err := parsers.ParseChainConfig("configurations/blockchain-configs/ethereum/ethereum-basic.yaml")
 	if err != nil {
 		panic(err)
@@ -52,7 +54,7 @@ func main() {
 	}
 
 	var workload [][]byte
-	for i := 0; i < 10; i++ {
+	for i := 0; i < testSize; i++ {
 		txByte, err := G.CreateSignedTransaction(
 			"0x9e3cf23f6fc76b77d2113db93ef388e057c8cc12",
 			"1000000",
@@ -96,11 +98,10 @@ func main() {
 		}
 
 		fmt.Printf("Sent: %d, Complete: %d\n", E.NumTxSent, E.NumTxDone)
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(1000 * time.Millisecond)
 	}
 
-	fmt.Println(E.NumTxDone)
-	fmt.Println(E.TransactionInfo)
+	res := E.Cleanup()
 
 	// endNum, err := E.GetBlockHeight()
 
@@ -116,9 +117,13 @@ func main() {
 
 	// fmt.Println(E.Transactions)
 
+	fmt.Printf("LATENCY: %.2f ms\n", res.AverageLatency)
+	fmt.Printf("Throughput %.2f tps\n", res.Throughput)
+
 	// for _, v := range E.Transactions {
 	// 	fmt.Println((v[2].Sub(v[0])).Microseconds())
 	// }
 
 	fmt.Println("DONE, ALL OK")
+	E.Close()
 }
