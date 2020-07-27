@@ -48,21 +48,29 @@ func (e *EthereumInterface) Cleanup() results.Results {
 	txLatencies := make([]float64, 0)
 	var avgLatency float64 = 0
 
+	startTime := time.Now()
+	var endTime time.Time
+
 	for _, v := range e.TransactionInfo {
 		if len(v) > 1 {
-			txLatency := v[1].Sub(v[0]).Seconds()
-			txLatencies = append(txLatencies, txLatency)
-			avgLatency += txLatency
+			txLatency := v[1].Sub(v[0]).Milliseconds()
+			txLatencies = append(txLatencies, float64(txLatency))
+			avgLatency += float64(txLatency)
+			if v[1].After(endTime) {
+				endTime = v[1]
+			}
+		}
+		if startTime.After(v[0]) {
+			startTime = v[0]
 		}
 	}
 
-	// Throughput
-	throughput := float64(e.NumTxDone) /
+	throughput := float64(e.NumTxDone) / (endTime.Sub(startTime).Seconds())
 
 	return results.Results{
-		TxLatencies: txLatencies,
+		TxLatencies:    txLatencies,
 		AverageLatency: avgLatency / float64(len(txLatencies)),
-		Throughput:
+		Throughput:     throughput,
 	}
 }
 
