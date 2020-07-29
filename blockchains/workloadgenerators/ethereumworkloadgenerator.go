@@ -17,16 +17,35 @@ import (
 type EthereumWorkloadGenerator struct {
 	ActiveConn        *ethclient.Client
 	SuggestedGasPrice *big.Int
-	BenchConfig       configs.BenchConfig
+	BenchConfig       *configs.BenchConfig
+	ChainConfig       *configs.ChainConfig
 	Nonces            map[string]uint64
 	ChainID           *big.Int
+	KnownAccounts     []configs.ChainKey
+}
+
+// Returns a new instance of the generator
+func (e *EthereumWorkloadGenerator) NewGenerator(chainConfig *configs.ChainConfig, benchConfig *configs.BenchConfig) *EthereumWorkloadGenerator {
+	return &EthereumWorkloadGenerator{BenchConfig: benchConfig, ChainConfig: chainConfig}
+}
+
+// Set up the blockchain nodes
+func (e *EthereumWorkloadGenerator) BlockchainSetup() error {
+	// TODO implement
+	// 1 - create N accounts
+	if len(e.ChainConfig.Keys) > 0 {
+		e.KnownAccounts = e.ChainConfig.Keys
+	}
+	// 2 - fund with genesis block, write to genesis location
+	// 3 - copy genesis to blockchain nodes
+	return nil
 }
 
 // Sets the suggested gas price and sets up a small connection to get information from the blockchain.
-func (e *EthereumWorkloadGenerator) Init(chainConfig *configs.ChainConfig, benchConfig *configs.BenchConfig) error {
+func (e *EthereumWorkloadGenerator) InitParams() error {
 
 	// Connect to the blockchain
-	c, err := ethclient.Dial(fmt.Sprintf("ws://%s", chainConfig.Nodes[0]))
+	c, err := ethclient.Dial(fmt.Sprintf("ws://%s", e.ChainConfig.Nodes[0]))
 
 	if err != nil {
 		return err
@@ -50,7 +69,7 @@ func (e *EthereumWorkloadGenerator) Init(chainConfig *configs.ChainConfig, bench
 	// nonces
 	e.Nonces = make(map[string]uint64, 0)
 
-	for _, key := range chainConfig.Keys {
+	for _, key := range e.KnownAccounts {
 		v, err := e.ActiveConn.PendingNonceAt(context.Background(), common.HexToAddress(key.Address))
 		if err != nil {
 			return err
@@ -60,6 +79,23 @@ func (e *EthereumWorkloadGenerator) Init(chainConfig *configs.ChainConfig, bench
 	}
 
 	return nil
+}
+
+// Generic account creation to return the private key
+func (e *EthereumWorkloadGenerator) CreateAccount() (interface{}, error) {
+	privKey, err := crypto.GenerateKey()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return privKey, nil
+}
+
+// Deploy the contract
+func (e *EthereumWorkloadGenerator) DeployContract(fromPivKey []byte, contractPath string) (string, error) {
+	// TODO implement
+	return "", nil
 }
 
 // Creates a transaction to deploy the contract
@@ -105,8 +141,6 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(to string, value str
 }
 
 // Generate the workload, returning the slice of transactions. [clientID = [ list of transactions ] ]
-func (e *EthereumWorkloadGenerator) GenerateWorkload(numClients int, numTransactionsPerClient int, transactionInformation map[string]interface{}, isContractr bool) ([][][]byte, error) {
-	clientWorkloads := make([][][]byte, 0)
-
-	return clientWorkloads, nil
+func (e *EthereumWorkloadGenerator) GenerateWorkload() (Workload, error) {
+	return nil, nil
 }
