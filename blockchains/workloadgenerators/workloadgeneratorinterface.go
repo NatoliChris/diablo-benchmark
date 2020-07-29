@@ -5,30 +5,36 @@ import (
 	"math/big"
 )
 
+type Workload [][][]byte
+
 type WorkloadGenerator interface {
-	// Initialises the information to start the workload generator
-	Init(chainConfig *configs.ChainConfig, benchConfig *configs.BenchConfig) error
+	// Creates a new instance of the workload generator for the specific type of blockchain
+	NewGenerator(chainConfig *configs.ChainConfig, benchConfig *configs.BenchConfig) WorkloadGenerator
 
-	// Creates a transaction to deploy the contract
-	CreateContractDeployTransaction(contractPath string, key configs.ChainKey) ([]byte, error)
+	// Sets up the blockchain, creates necessary genesis, starts the blockchain through SSH commands, etc.
+	BlockchainSetup() error
 
-	// Creates a genesis block with the specified params
-	CreateGenesisBlock(addresses []string, balance *big.Int, otherParams map[string]interface{})
+	// Initialises useful params for generation of the workloads
+	// For example, set up a connection to a node to get gas price / chainID, ... etc.
+	InitParams() error
 
-	// Create the accounts
-	// TODO: should this be configs.types.chainKey?
-	CreateNewAccount() (interface{}, error)
+	// Creates an account and returns the <bytes(privateKey), address>
+	// TODO: should this be chainKey, or interface{} for a blockchain account of their own?
+	// CreateAccount() (configs.ChainKey, error)
+	CreateAccount() (interface{}, error)
 
-	// Creates an interaction with the contract
-	CreateContractInteraction(contractAddress string, contractFunction string, params map[string]interface{}) ([]byte, error)
+	// Deploys the contract and returns the contract address used in the chain.
+	DeployContract(fromPrivKey []byte, contractPath string) (string, error)
 
-	// Create a signed transaction that returns the bytes
-	CreateSignedTransaction(to string, value string, data []byte, key configs.ChainKey) ([]byte, error)
+	// Creates the raw signed transaction that will deploy a contract
+	CreateContractDeployTX(fromPrivKey []byte, contractPath string) ([]byte, error)
 
-	// TODO add contaracts
-	GenerateWorkloadAndAccounts(numClients int, numTransactionsPerClient int, transactionInformation map[string]interface{}) ([][][]byte, error)
+	// Create a signed transaction that performs actions on a smart contract at the given address
+	CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams map[string]interface{}) ([]byte, error)
 
-	// Generate the workload, returning the slice of transactions. [clientID = [ list of transactions ] ]
-	// TODO: add contracts
-	GenerateWorkload(numClients int, numTransactionsPerClient int, transactionInformation map[string]interface{}, accounts []configs.ChainKey) ([][][]byte, error)
+	// Creates a transaction that is signed and ready to send from the given private key.
+	CreateSignedTransaction(fromPrivKey []byte, toAddress string, value *big.Int) ([]byte, error)
+
+	// Generates the workload specified in the chain configurations.
+	GenerateWorkload() Workload
 }
