@@ -64,7 +64,7 @@ func runMaster(masterArgs *core.MasterArgs) {
 	}
 
 	// Initialise the TCP server
-	m := core.InitMaster(masterArgs.ListenAddr, bConfig.Clients, wg)
+	m := core.InitMaster(masterArgs.ListenAddr, bConfig.Clients, wg, bConfig, cConfig)
 
 	// Run the benchmark flow
 	m.Run()

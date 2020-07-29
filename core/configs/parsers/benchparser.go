@@ -112,3 +112,14 @@ func generateFullIntervals(intervals configs.TPSIntervals) (configs.TPSIntervals
 
 	return finalIntervals, nil
 }
+
+// Gets the total number of transactions in total for the intervals
+func GetTotalNumberOfTransactions(config *configs.BenchConfig) (int, error) {
+	totalNumberOfTransactions := 0
+
+	for _, v := range config.TxInfo.Intervals {
+		totalNumberOfTransactions += v
+	}
+
+	return totalNumberOfTransactions, nil
+}
