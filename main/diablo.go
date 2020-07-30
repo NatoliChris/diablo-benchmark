@@ -1,6 +1,7 @@
 package main
 
 import (
+	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/communication"
 	"diablo-benchmark/core"
 	"diablo-benchmark/core/configs/parsers"
@@ -57,11 +58,15 @@ func runMaster(masterArgs *core.MasterArgs) {
 		os.Exit(1)
 	}
 
-	wg, err := parsers.GetWorkloadGenerator(cConfig)
+	generatorClass, err := workloadgenerators.GetWorkloadGenerator(cConfig)
 
 	if err != nil {
+		zap.L().Error("failed to get workload generators",
+			zap.String("error", err.Error()))
 		os.Exit(1)
 	}
+
+	wg := generatorClass.NewGenerator(cConfig, bConfig)
 
 	// Initialise the TCP server
 	m := core.InitMaster(masterArgs.ListenAddr, bConfig.Clients, wg, bConfig, cConfig)
