@@ -36,5 +36,5 @@ type WorkloadGenerator interface {
 	CreateSignedTransaction(fromPrivKey []byte, toAddress string, value *big.Int) ([]byte, error)
 
 	// Generates the workload specified in the chain configurations.
-	GenerateWorkload() Workload
+	GenerateWorkload() (Workload, error)
 }
