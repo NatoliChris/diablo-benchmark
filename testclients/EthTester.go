@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"math/big"
 	"os"
 	"time"
 )
@@ -26,7 +27,7 @@ func main() {
 	}
 	zap.ReplaceGlobals(logger)
 
-	testSize := 1000
+	testSize := 100
 
 	cc, err := parsers.ParseChainConfig("configurations/blockchain-configs/ethereum/ethereum-basic.yaml")
 	if err != nil {
@@ -34,11 +35,14 @@ func main() {
 	}
 
 	bc, err := parsers.ParseBenchConfig("configurations/workloads/sample/sample_simple.yaml")
+
 	if err != nil {
 		panic(err)
 	}
 
-	G := workloadgenerators.EthereumWorkloadGenerator{}
+	var G workloadgenerators.WorkloadGenerator
+	intermediate := workloadgenerators.EthereumWorkloadGenerator{}
+	G = intermediate.NewGenerator(cc, bc)
 	E := clientinterfaces.EthereumInterface{}
 	E.Init(cc.Nodes)
 	err = E.ConnectOne(0)
@@ -47,7 +51,12 @@ func main() {
 		panic(err)
 	}
 
-	err = G.Init(cc, bc)
+	err = G.BlockchainSetup()
+	if err != nil {
+		panic(err)
+	}
+
+	err = G.InitParams()
 
 	if err != nil {
 		panic(err)
@@ -55,13 +64,12 @@ func main() {
 
 	var workload [][]byte
 	for i := 0; i < testSize; i++ {
+		bN, _ := big.NewInt(0).SetString("10000000", 10)
 		txByte, err := G.CreateSignedTransaction(
+			cc.Keys[0].PrivateKey,
 			"0x9e3cf23f6fc76b77d2113db93ef388e057c8cc12",
-			"1000000",
-			[]byte{},
-			cc.Keys[0],
+			bN,
 		)
-
 		if err != nil {
 			panic(err)
 		}

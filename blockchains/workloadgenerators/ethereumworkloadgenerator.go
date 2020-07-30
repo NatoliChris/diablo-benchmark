@@ -128,7 +128,7 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, 
 	toConverted := common.HexToAddress(toAddress)
 	gasLimit := uint64(21000)
 
-	zap.L().Info("transaction params",
+	zap.L().Debug("transaction params",
 		zap.String("addrFrom", addrFrom.String()),
 		zap.String("addrTo", toAddress),
 	)
