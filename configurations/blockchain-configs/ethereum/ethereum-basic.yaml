@@ -1,6 +1,9 @@
 name: "ethereum"
 nodes:
   - 127.0.0.1:8545
+  - 127.0.0.1:8545
+  - 127.0.0.1:8545
+  - 127.0.0.1:8545
 keys:
   - private: "4019ff3bdda2101efd4a84afbf375604e24328203d5b5bfb47839bd4c390ad28"
     address: "0x3fe51231d3cc16f1ed59e9fe255e2813d519ff5b"
