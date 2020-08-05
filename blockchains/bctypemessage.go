@@ -1,7 +1,14 @@
+// TODO implement this module
+// This functionality was designed to provide a generic "diablo worker" that runs on a machine, but is not tied
+// to a blockchain, but can dynamically change the blockchain. This allows for a worker to run multiple tests
+// for different blockchains without having to start the worker again.
+// Just a potential ease-of-use feature, nothing more than convenience, but most likely a bad idea.
 package blockchains
 
 import (
+	"diablo-benchmark/blockchains/clientinterfaces"
 	"errors"
+	"go.uber.org/zap"
 	"strings"
 )
 
@@ -23,6 +30,12 @@ func MatchStringToMessage(configBCType string) (BlockchainTypeMessage, error) {
 
 // Matches the byte received from the master to the interface that is required
 // to interact with the blockchain system we are benchmarking.
-func MatchMessageToInterface(msg byte) {
-	// TODO implement
+func MatchMessageToInterface(msg byte) (clientinterfaces.BlockchainInterface, error) {
+	switch BlockchainTypeMessage(msg) {
+	case BCEthereum:
+		zap.L().Info("Match message to Ethereum blockchain")
+		return &clientinterfaces.EthereumInterface{}, nil
+	default:
+		return nil, errors.New("unsupported blockchain")
+	}
 }
