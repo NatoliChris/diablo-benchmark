@@ -81,6 +81,10 @@ func (e *EthereumWorkloadGenerator) InitParams() error {
 		e.Nonces[key.Address] = v
 	}
 
+	zap.L().Info("Client contacted and got params",
+		zap.String("gasPrice", e.SuggestedGasPrice.String()),
+		zap.String("chainID", e.ChainID.String()))
+
 	return nil
 }
 
@@ -150,26 +154,33 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, 
 func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 	// get the known accounts
 	var totalWorkload [][][]byte
+	totalNumTxPerWorker, err := parsers.GetTotalNumberOfTransactions(e.BenchConfig)
+	if err != nil {
+		return nil, err
+	}
 	for clientNum := 0; clientNum < e.BenchConfig.Clients; clientNum++ {
 		clientWorkload := make([][]byte, 0)
 		for worker := 0; worker < e.BenchConfig.Workers; worker++ {
-			// Initial assumption: there's as many accounts as transactions
-			// TODO allow for more intricate transaction generation, such as A->B, A->C, etc.
-			txVal, ok := big.NewInt(0).SetString("1000000", 10)
-			if !ok {
-				return nil, errors.New("failed to set TX value")
-			}
-			tx, err := e.CreateSignedTransaction(
-				e.KnownAccounts[clientNum+worker].PrivateKey,
-				e.KnownAccounts[((clientNum+worker)+1)%len(e.KnownAccounts)].Address,
-				txVal,
-			)
+			for it := 0; it < totalNumTxPerWorker; it++ {
+				// Initial assumption: there's as many accounts as transactions
+				// TODO allow for more intricate transaction generation, such as A->B, A->C, etc.
+				txVal, ok := big.NewInt(0).SetString("1000000", 10)
+				if !ok {
+					return nil, errors.New("failed to set TX value")
+				}
+				tx, err := e.CreateSignedTransaction(
+					e.KnownAccounts[(clientNum+worker)%len(e.KnownAccounts)].PrivateKey,
+					e.KnownAccounts[((clientNum+worker)+1)%len(e.KnownAccounts)].Address,
+					txVal,
+				)
 
-			if err != nil {
-				return nil, err
-			}
+				if err != nil {
+					return nil, err
+				}
+				zap.L().Debug("making transaction")
 
-			clientWorkload = append(clientWorkload, tx)
+				clientWorkload = append(clientWorkload, tx)
+			}
 		}
 
 		totalWorkload = append(totalWorkload, clientWorkload)
