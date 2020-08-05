@@ -1,6 +1,8 @@
 package clientinterfaces
 
-import "diablo-benchmark/core/results"
+import (
+	"diablo-benchmark/core/results"
+)
 
 // This struct provides the basic funcitonality that will be tested with the blockchains.
 // It _should_ cover most interaction, but will be extendible in the event that more
@@ -8,7 +10,7 @@ import "diablo-benchmark/core/results"
 type BlockchainInterface interface {
 	// Provides the client with the list of all hosts, this is the pair of (host, port) in an array.
 	// This will be used for the secure reads.
-	Init(otherHosts [][]string)
+	Init(otherHosts []string)
 
 	// Finishes up and performs any post-benchmark operations.
 	// Can be used to format the results to parse back
@@ -25,7 +27,7 @@ type BlockchainInterface interface {
 
 	// Deploy the smart contract, we will provide the path to the contract to deploy
 	// Returns the address of the contract deploy
-	DeploySmartContract(contractPath string) (interface{}, error)
+	DeploySmartContract(tx interface{}) (interface{}, error)
 
 	// Send the raw transaction bytes to the blockchain
 	// It is safe to assume that these bytes will be formatted correctly according to the chosen blockchain.
@@ -39,7 +41,7 @@ type BlockchainInterface interface {
 
 	// Asks for the block information
 	// TODO: maybe implement getBlockByHash?
-	GetBlockByNumber(index uint64) (map[string]interface{}, error)
+	GetBlockByNumber(index uint64) (GenericBlock, error)
 
 	// Asks for the height of the current block
 	GetBlockHeight() (uint64, error)

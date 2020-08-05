@@ -5,7 +5,6 @@ package clientinterfaces
 
 import (
 	"context"
-	"diablo-benchmark/blockchains"
 	"diablo-benchmark/core/results"
 	"errors"
 	"fmt"
@@ -198,7 +197,7 @@ func (e *EthereumInterface) ConnectAll(primaryId int) error {
 	// Connect all the others
 	for idx, node := range e.Nodes {
 		if idx != primaryId {
-			c, err := ethclient.Dial(fmt.Sprintf("ws://%s:%s", node[0], node[1]))
+			c, err := ethclient.Dial(fmt.Sprintf("ws://%s", node))
 			if err != nil {
 				return err
 			}
@@ -253,7 +252,7 @@ func (e *EthereumInterface) SecureRead(call_func string, call_params []byte) (in
 }
 
 // Get the block information
-func (e *EthereumInterface) GetBlockByNumber(index uint64) (block blockchains.GenericBlock, error error) {
+func (e *EthereumInterface) GetBlockByNumber(index uint64) (block GenericBlock, error error) {
 
 	var ethBlock map[string]interface{}
 	var txList []string
@@ -263,18 +262,18 @@ func (e *EthereumInterface) GetBlockByNumber(index uint64) (block blockchains.Ge
 	b, err := e.PrimaryNode.BlockByNumber(context.Background(), bigIndex)
 
 	if err != nil {
-		return blockchains.GenericBlock{}, err
+		return GenericBlock{}, err
 	}
 
 	if &ethBlock == nil {
-		return blockchains.GenericBlock{}, errors.New("nil block returned")
+		return GenericBlock{}, errors.New("nil block returned")
 	}
 
 	for _, v := range b.Transactions() {
 		txList = append(txList, v.Hash().String())
 	}
 
-	return blockchains.GenericBlock{
+	return GenericBlock{
 		Hash:              b.Hash().String(),
 		Index:             b.NumberU64(),
 		Timestamp:         b.Time(),
