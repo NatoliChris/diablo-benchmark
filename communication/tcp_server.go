@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"diablo-benchmark/blockchains"
 	"diablo-benchmark/blockchains/workloadgenerators"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"go.uber.org/zap"
@@ -79,7 +80,7 @@ func (s *MasterServer) sendAndWaitOKAsync(data []byte, client net.Conn, doneCh c
 		doneCh <- 1
 	}
 
-	fmt.Println("GOT REPLY FROM %s", client.RemoteAddr().String())
+	fmt.Printf("GOT REPLY FROM %s\n", client.RemoteAddr().String())
 
 	// If we got an error reply - it means
 	// something failed on the client machine
@@ -104,9 +105,9 @@ func (s *MasterServer) SendAndWaitOKSync(data []byte, client net.Conn) error {
 		}
 	}
 
-	reply := make([]byte, 1)
+	reply := make([]byte, 1024)
 
-	_, err := client.Read(reply)
+	n, err := client.Read(reply)
 
 	if err != nil {
 		// TODO: Log client got an error
@@ -116,15 +117,15 @@ func (s *MasterServer) SendAndWaitOKSync(data []byte, client net.Conn) error {
 		}
 	}
 
-	fmt.Println("GOT REPLY FROM %s", client.RemoteAddr().String())
+	fmt.Printf("GOT REPLY FROM %s\n", client.RemoteAddr().String())
 
 	// If we got an error reply - it means
 	// something failed on the client machine
-	if bytes.Equal(MsgErr, reply) {
+	if reply[0] == MsgErr[0] {
 		// TODO: Add a "get X bytes for the error reason"
 		return &ClientErrorReply{
 			Info: client.RemoteAddr().String(),
-			Err:  errors.New("client error received"),
+			Err:  fmt.Errorf("error from client %s", string(reply[1:n])),
 		}
 	}
 
@@ -135,8 +136,9 @@ func (s *MasterServer) PrepareBenchmarkClients() ClientReplyErrors {
 
 	var errorList []string
 
-	for _, c := range s.Clients {
-		err := s.SendAndWaitOKSync(MsgPrepare, c)
+	for i, c := range s.Clients {
+		payload := append(MsgPrepare, byte(i))
+		err := s.SendAndWaitOKSync(payload, c)
 		if err != nil {
 			zap.L().Warn("Got an error from client",
 				zap.String("client", c.RemoteAddr().String()))
@@ -178,14 +180,25 @@ func (s *MasterServer) SendWorkload(workloads workloadgenerators.Workload) Clien
 	for i, c := range s.Clients {
 		data := MsgWorkload
 
-		enc, err := EncodeWorkload(workloads[i])
+		payload, err := EncodeWorkload(workloads[i])
 		if err != nil {
 			errorList = append(errorList, err)
 			continue
 		}
 
-		data = append(data, enc...)
+		// format: cmd, len, payload
+		payloadLen := uint32(len(payload))
+		payloadLenBytes := make([]byte, 4)
+		binary.BigEndian.PutUint32(payloadLenBytes, payloadLen)
+
+		data = append(data, payloadLenBytes...)
+		data = append(data, payload...)
 		err = s.SendAndWaitOKSync(data, c)
+		fmt.Println("sending data")
+		fmt.Println(data[0:6])
+		fmt.Println(payloadLen)
+		fmt.Println(binary.BigEndian.Uint32(data[1:5]))
+		fmt.Println("---")
 		if err != nil {
 			errorList = append(errorList, err)
 		}
@@ -249,9 +262,16 @@ func (s *MasterServer) RunBenchmark() ClientReplyErrors {
 	return errorList
 }
 
-func (s *MasterServer) GetResults() error {
+func (s *MasterServer) GetResults() ClientReplyErrors {
 	// TODO implement
 	return nil
+}
+
+// Send the final GOODBYE message and then close the connection
+func (s *MasterServer) SendFin() {
+	for _, c := range s.Clients {
+		_ = s.SendAndWaitOKSync(MsgFin, c)
+	}
 }
 
 // Master method to close all things
