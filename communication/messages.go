@@ -12,6 +12,7 @@ var (
 	MsgWorkload = []byte("\x03") // Workload message
 	MsgRun      = []byte("\x04") // Start the benchmark
 	MsgResults  = []byte("\x05") // Return the result request
+	MsgFin      = []byte("\x06") // Finish and close the connection.
 	MsgOk       = []byte("\x99") // Everything is OK
 	MsgErr      = []byte("\x98") // There was an error on the client
 )
