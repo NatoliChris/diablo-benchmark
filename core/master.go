@@ -5,7 +5,9 @@ import (
 	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/communication"
 	"diablo-benchmark/core/configs"
+	"fmt"
 	"go.uber.org/zap"
+	"time"
 )
 
 // Master
@@ -109,16 +111,28 @@ func (ms *Master) Run() {
 	}
 
 	// Step 4: Distribute benchmark
-	ms.Server.SendWorkload(workload)
+	errs = ms.Server.SendWorkload(workload)
+	if errs != nil {
+		fmt.Println(errs)
+	}
 
 	// Step 5: run the bench
-	ms.Server.RunBenchmark()
+	errs = ms.Server.RunBenchmark()
+	if errs != nil {
+		fmt.Println(errs)
+	}
 
 	// Step 6 (once all have completed) - get the results
-	ms.Server.GetResults()
+	// Need to store the results
+	errs = ms.Server.GetResults()
+	if errs != nil {
+		fmt.Println(errs)
+	}
 
 	// Step 7 - store results
-	// TODO: store results
+	ms.Server.SendFin()
+
+	time.Sleep(2 * time.Second)
 
 	// Step 8: Close all connections
 	ms.Server.CloseClients()

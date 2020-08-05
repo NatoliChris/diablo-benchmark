@@ -2,7 +2,6 @@ package main
 
 import (
 	"diablo-benchmark/blockchains/workloadgenerators"
-	"diablo-benchmark/communication"
 	"diablo-benchmark/core"
 	"diablo-benchmark/core/configs/parsers"
 	"fmt"
@@ -77,11 +76,24 @@ func runMaster(masterArgs *core.MasterArgs) {
 
 // Run the worker
 func runWorker(workerArgs *core.WorkerArgs) {
-	s, err := communication.SetupClientTCP(workerArgs.MasterAddr)
+	workerArgs.WorkerArgs()
+
+	chainConfiguration, err := parsers.ParseChainConfig(workerArgs.ChainConfigPath)
+
 	if err != nil {
-		panic(err)
+		zap.L().Error("failed to parse config",
+			zap.Error(err))
+		os.Exit(1)
 	}
-	s.HandleCommands()
+
+	worker, err := core.NewWorker(chainConfiguration, workerArgs.MasterAddr)
+
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	worker.Run()
 }
 
 // Main running function
@@ -111,8 +123,12 @@ func main() {
 			printWelcome(false)
 
 			// Parse the arguments
-			args.WorkerCommand.Parse(os.Args[2:])
-
+			err := args.WorkerCommand.Parse(os.Args[2:])
+			if err != nil {
+				zap.L().Error("error parsing",
+					zap.Error(err))
+				os.Exit(1)
+			}
 			runWorker(args.WorkerArgs)
 		}
 	}
