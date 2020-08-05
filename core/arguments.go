@@ -23,8 +23,9 @@ type MasterArgs struct {
 
 // Worker arguments
 type WorkerArgs struct {
-	ConfigPath string // Path to the worker config
-	MasterAddr string // Address of the master (can also be in worker config)
+	ConfigPath      string // Path to the worker config
+	ChainConfigPath string // Path to the blockchain configuration
+	MasterAddr      string // Address of the master (can also be in worker config)
 }
 
 // Initialise the arguments
@@ -55,6 +56,9 @@ func DefineArguments() *Arguments {
 	workerCommand.StringVar(&workerArgs.MasterAddr, "master", "", "--master=<ipaddr>:<port>")
 	workerCommand.StringVar(&workerArgs.MasterAddr, "m", "", "-m <ipaddress>:<port>")
 
+	workerCommand.StringVar(&workerArgs.ChainConfigPath, "chain-config", "", "--chain-config=/path/to/chain/yml (required)")
+	workerCommand.StringVar(&workerArgs.ChainConfigPath, "cc", "", "-cc /path/to/chain/yml")
+
 	// Return all the arguments
 	return &Arguments{
 		MasterCommand: masterCommand, // The master command FlagSet
@@ -83,5 +87,10 @@ func (wa *WorkerArgs) WorkerArgs() {
 	if wa.ConfigPath == "" && wa.MasterAddr == "" {
 		zap.L().Error("master information not provided")
 		os.Exit(0)
+	}
+
+	if wa.ChainConfigPath == "" {
+		zap.L().Error("no chain config provided")
+		os.Exit(1)
 	}
 }
