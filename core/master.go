@@ -66,7 +66,7 @@ func (ms *Master) Run() {
 
 	// Run through the benchmark suite
 	// Step 1: send "PREPARE" to clients, make sure we can communicate.
-	errs := ms.Server.PrepareBenchmarkClients()
+	errs := ms.Server.PrepareBenchmarkClients(uint32(ms.benchmarkConfig.Workers))
 
 	if errs != nil {
 		// We have errors
