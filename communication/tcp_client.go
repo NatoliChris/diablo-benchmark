@@ -14,11 +14,9 @@ type ConnClient struct {
 // The amount to read on first read
 // byte 0 : cmd
 // byte 1 : aux / len
-// byte 2 : len
-// byte 3 : len
-// byte 4 : len
+// byte 2-9 will be the uint64
 // 3 byte (16 bit number to represent size to read of payload)
-const READ_LENGTH int = 5
+const READ_LENGTH int = 9
 
 func SetupClientTCP(addr string) (*ConnClient, error) {
 	conn, err := net.Dial("tcp", addr)
@@ -64,7 +62,7 @@ func (c *ConnClient) InitialRead() ([]byte, error) {
 	return buf, nil
 }
 
-func (c *ConnClient) ReadSplit(totalSize uint32) ([]byte, error) {
+func (c *ConnClient) ReadSplit(totalSize uint64) ([]byte, error) {
 	fullData := make([]byte, 0)
 	buffer := make([]byte, 1024)
 	readLen := 0
@@ -81,7 +79,7 @@ func (c *ConnClient) ReadSplit(totalSize uint32) ([]byte, error) {
 		fullData = append(fullData, buffer[:numRead]...)
 		readLen += numRead
 
-		if uint32(readLen) >= totalSize {
+		if uint64(readLen) >= totalSize {
 			break
 		}
 	}
@@ -90,7 +88,7 @@ func (c *ConnClient) ReadSplit(totalSize uint32) ([]byte, error) {
 }
 
 // Read to the given size
-func (c *ConnClient) ReadSize(size uint32) ([]byte, error) {
+func (c *ConnClient) ReadSize(size uint64) ([]byte, error) {
 
 	if size > 65500 {
 		// split read

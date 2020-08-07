@@ -132,12 +132,17 @@ func (s *MasterServer) SendAndWaitOKSync(data []byte, client net.Conn) error {
 	return nil
 }
 
-func (s *MasterServer) PrepareBenchmarkClients() ClientReplyErrors {
+func (s *MasterServer) PrepareBenchmarkClients(numThreads uint32) ClientReplyErrors {
 
 	var errorList []string
 
+	threadBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(threadBytes, numThreads)
+
 	for i, c := range s.Clients {
+		// TODO: we might need to rework for > 255 clients!
 		payload := append(MsgPrepare, byte(i))
+		payload = append(payload, threadBytes...)
 		err := s.SendAndWaitOKSync(payload, c)
 		if err != nil {
 			zap.L().Warn("Got an error from client",
@@ -187,17 +192,17 @@ func (s *MasterServer) SendWorkload(workloads workloadgenerators.Workload) Clien
 		}
 
 		// format: cmd, len, payload
-		payloadLen := uint32(len(payload))
-		payloadLenBytes := make([]byte, 4)
-		binary.BigEndian.PutUint32(payloadLenBytes, payloadLen)
+		payloadLen := uint64(len(payload))
+		payloadLenBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(payloadLenBytes, payloadLen)
 
 		data = append(data, payloadLenBytes...)
 		data = append(data, payload...)
 		err = s.SendAndWaitOKSync(data, c)
 		fmt.Println("sending data")
-		fmt.Println(data[0:6])
+		fmt.Println(data[0:9])
 		fmt.Println(payloadLen)
-		fmt.Println(binary.BigEndian.Uint32(data[1:5]))
+		fmt.Println(binary.BigEndian.Uint64(data[1:9]))
 		fmt.Println("---")
 		if err != nil {
 			errorList = append(errorList, err)
