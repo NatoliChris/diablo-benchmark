@@ -1,6 +1,7 @@
 package communication
 
 import (
+	"encoding/binary"
 	"fmt"
 	"go.uber.org/zap"
 	"io"
@@ -28,6 +29,10 @@ func SetupClientTCP(addr string) (*ConnClient, error) {
 	return &ConnClient{Conn: conn}, nil
 }
 
+//////////////////////////
+// Writing Response
+//////////////////////////
+
 // Reply with an OK, just an ACK to say we got the message and all is well
 func (c *ConnClient) ReplyOK() {
 	_, err := c.Conn.Write(MsgOk)
@@ -48,6 +53,31 @@ func (c *ConnClient) ReplyERR(msg string) {
 		return
 	}
 }
+
+// send; OK + DATA to the master
+func (c *ConnClient) SendDataOK(data []byte) {
+	// msg OK
+	payload := MsgOk
+
+	// Length = uint64
+	dataLen := make([]byte, 8)
+	binary.BigEndian.PutUint64(dataLen, uint64(len(data)))
+
+	payload = append(payload, dataLen...)
+	payload = append(payload, data...)
+
+	_, err := c.Conn.Write(payload)
+
+	if err != nil {
+		fmt.Println(err)
+		_ = c.Conn.Close()
+		return
+	}
+}
+
+//////////////////////////
+// Reading
+//////////////////////////
 
 // Initial read, always reads 4 bytes long
 // gets command, length or aux value
