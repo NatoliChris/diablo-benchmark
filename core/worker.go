@@ -154,28 +154,3 @@ func (w *Worker) Run() {
 	}
 
 }
-
-// func (w *Worker) runBench() []error {
-// 	var errs []error
-// 	for i := 0; i < len(w.Workload); i++ {
-// 		err := w.Blockchain.SendRawTransaction(w.Workload[i])
-// 		errs = append(errs, err)
-// 	}
-//
-// 	//tNow := time.Now()
-// 	//for {
-// 	//	if w.Blockchain.NumTxDone == uint64(len(w.Workload)) {
-// 	//		break
-// 	//	}
-// 	//	if time.Now().Sub(tNow) > 10*time.Second {
-// 	//		break
-// 	//	}
-// 	//
-// 	//	fmt.Printf("Sent: %d, Complete: %d\n", w.Blockchain.NumTxSent, w.Blockchain.NumTxDone)
-// 	//	time.Sleep(1000 * time.Millisecond)
-// 	//}
-// 	//
-// 	//res := w.Blockchain.Cleanup()
-//
-// 	return nil
-// }
