@@ -140,8 +140,9 @@ func (s *MasterServer) PrepareBenchmarkClients(numThreads uint32) ClientReplyErr
 	binary.BigEndian.PutUint32(threadBytes, numThreads)
 
 	for i, c := range s.Clients {
-		// TODO: we might need to rework for > 255 clients!
-		payload := append(MsgPrepare, byte(i))
+		clientID := make([]byte, 4)
+		binary.BigEndian.PutUint32(clientID, uint32(i))
+		payload := append(MsgPrepare, clientID...)
 		payload = append(payload, threadBytes...)
 		err := s.SendAndWaitOKSync(payload, c)
 		if err != nil {
