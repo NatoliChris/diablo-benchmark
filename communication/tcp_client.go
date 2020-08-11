@@ -66,6 +66,11 @@ func (c *ConnClient) SendDataOK(data []byte) {
 	payload = append(payload, dataLen...)
 	payload = append(payload, data...)
 
+	zap.L().Debug("Sending data to master",
+		zap.Int("dataLen", len(data)))
+
+	fmt.Println(dataLen)
+
 	_, err := c.Conn.Write(payload)
 
 	if err != nil {
