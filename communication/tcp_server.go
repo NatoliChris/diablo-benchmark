@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"diablo-benchmark/blockchains"
 	"diablo-benchmark/blockchains/workloadgenerators"
+	"diablo-benchmark/core/results"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"go.uber.org/zap"
+	"io"
 	"net"
 )
 
@@ -130,6 +133,86 @@ func (s *MasterServer) SendAndWaitOKSync(data []byte, client net.Conn) error {
 	}
 
 	return nil
+}
+
+// Send a message to a client and wait for the OK and data, or errors
+func (s *MasterServer) sendAndWaitData(data []byte, client net.Conn) (*results.Results, error) {
+	if _, err := client.Write(data); err != nil {
+		// TODO log that we can't communicate with client
+		return nil, &ClientCommError{
+			ClientInfo: client.RemoteAddr().String(),
+			Err:        err,
+		}
+	}
+
+	// Read the reply AND response error (if it's an error, 1024 is to
+	// encapsulate any error string passed with the data).
+	initialReply := make([]byte, 1024)
+
+	n, err := client.Read(initialReply)
+
+	zap.L().Debug("Got client reply from RES message")
+
+	if err != nil {
+		// TODO: Log client got an error
+		return nil, &ClientCommError{
+			ClientInfo: client.RemoteAddr().String(),
+			Err:        err,
+		}
+	}
+
+	// If we got an error reply - it means
+	// something failed on the client machine
+	if initialReply[0] == MsgErr[0] {
+		// TODO: Add a "get X bytes for the error reason"
+		return nil, &ClientErrorReply{
+			Info: client.RemoteAddr().String(),
+			Err:  fmt.Errorf("error from client %s", string(initialReply[1:n])),
+		}
+	}
+
+	// Now we have to read through the data until we end.
+	// Get the length
+	dataLen := binary.BigEndian.Uint64(initialReply[1:9])
+	fullReply := initialReply[9:]
+	fmt.Println("Got ", dataLen, fullReply)
+	buffer := make([]byte, 1024)
+	readLen := n - 9
+
+	for {
+		n, err := client.Read(buffer)
+		zap.L().Debug(fmt.Sprintf("Client %s read %d, total %d", client.RemoteAddr().String(), n, readLen))
+		if err != nil {
+			if err != io.EOF {
+				return nil, &ClientCommError{
+					ClientInfo: client.RemoteAddr().String(),
+					Err:        err,
+				}
+			}
+			break
+		}
+
+		fullReply = append(fullReply, buffer[:n]...)
+		readLen += n
+
+		if uint64(readLen) >= dataLen {
+			break
+		}
+	}
+
+	zap.L().Info("Read client reply",
+		zap.String("client", client.RemoteAddr().String()),
+		zap.Int("numbytes", readLen))
+
+	var res results.Results
+	err = json.Unmarshal(fullReply[:dataLen], &res)
+
+	if err != nil {
+		zap.L().Error("failed to unmarshal bytes of result reply from client",
+			zap.Error(err))
+		return nil, err
+	}
+	return &res, nil
 }
 
 func (s *MasterServer) PrepareBenchmarkClients(numThreads uint32) ClientReplyErrors {
@@ -268,9 +351,23 @@ func (s *MasterServer) RunBenchmark() ClientReplyErrors {
 	return errorList
 }
 
-func (s *MasterServer) GetResults() ClientReplyErrors {
-	// TODO implement
-	return nil
+func (s *MasterServer) GetResults() ([]results.Results, ClientReplyErrors) {
+	var allResults []results.Results
+	var errs ClientReplyErrors
+
+	for _, c := range s.Clients {
+		// Send the RES command, wait for the results to come back
+		clientRes, err := s.sendAndWaitData(MsgResults, c)
+
+		if err != nil {
+			errs = append(errs, err.Error())
+			continue
+		}
+
+		allResults = append(allResults, *clientRes)
+	}
+
+	return allResults, errs
 }
 
 // Send the final GOODBYE message and then close the connection
