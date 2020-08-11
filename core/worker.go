@@ -8,6 +8,7 @@ import (
 	"diablo-benchmark/core/handlers"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"go.uber.org/zap"
 )
 
@@ -141,9 +142,17 @@ func (w *Worker) Run() {
 		case communication.MsgResults[0]:
 			zap.L().Info("Got command from master",
 				zap.String("CMD", "RESULTS"))
+			res := w.WorkloadHandler.HandleCleanup()
+			resBytes, err := json.Marshal(res)
+			if err != nil {
+				w.MasterComms.ReplyERR("failed to convert results to bytes")
+			}
+			fmt.Println(resBytes)
+			w.MasterComms.SendDataOK(resBytes)
 		case communication.MsgFin[0]:
 			zap.L().Info("Got command from master",
 				zap.String("CMD", "FIN"))
+			w.WorkloadHandler.CloseAll()
 			return
 		default:
 			w.MasterComms.ReplyERR("no matching command")

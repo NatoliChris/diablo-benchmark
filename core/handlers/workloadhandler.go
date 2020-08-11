@@ -158,6 +158,11 @@ func (wh *WorkloadHandler) HandleCleanup() results.Results {
 		avgLatency += res.AverageLatency
 	}
 
+	zap.L().Debug("Cleanup results",
+		zap.Float64("avg throughput", avgThroughput/float64(wh.numThread)),
+		zap.Float64("avg latency", avgLatency/float64(wh.numThread)),
+		zap.Float64s("latencies", allLatencies))
+
 	// Return the aggregated results
 	return results.Results{
 		AverageLatency: avgLatency / float64(wh.numThread),

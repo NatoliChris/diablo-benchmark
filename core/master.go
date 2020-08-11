@@ -5,6 +5,8 @@ import (
 	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/communication"
 	"diablo-benchmark/core/configs"
+	"diablo-benchmark/core/results"
+	"encoding/json"
 	"fmt"
 	"go.uber.org/zap"
 	"time"
@@ -122,12 +124,20 @@ func (ms *Master) Run() {
 		fmt.Println(errs)
 	}
 
+	// Wait until everyone is done
+	time.Sleep(10 * time.Second)
+
 	// Step 6 (once all have completed) - get the results
-	// Need to store the results
-	errs = ms.Server.GetResults()
+	// TODO: Need to store the results
+	rawResults, errs := ms.Server.GetResults()
 	if errs != nil {
 		fmt.Println(errs)
 	}
+
+	aggregatedResults := results.CalculateAggregatedResults(rawResults)
+
+	a, _ := json.Marshal(aggregatedResults)
+	fmt.Println(string(a))
 
 	// Step 7 - store results
 	ms.Server.SendFin()
