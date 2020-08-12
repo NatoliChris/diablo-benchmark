@@ -110,6 +110,18 @@ func (wh *WorkloadHandler) runner(blockchainInterface clientinterfaces.Blockchai
 	// TODO handle errors
 }
 
+// Periodically adds the workloads to the channels, allowing for a "curve" of
+// transactions to be sent (rate-limiting the sending of transactions)
+func (wh *WorkloadHandler) txAdder(workloads chan interface{}, ready chan bool) {
+	// TODO - channel for every second, adds more to the workload channel one
+	// at a time - then checks if the channel has ended.
+	// Changes to implement
+	// - workload is now [][][]byte - allows for per-second intervals
+	// - blockchain interface must take ^ for parseworkload
+	// - sending / receiving the workload through master must also be handled
+	// - workload generation must return [][][]byte
+}
+
 func (wh *WorkloadHandler) statusPrinter(stopCh chan bool) {
 	var timer *time.Timer = time.NewTimer(5 * time.Second)
 	for {
