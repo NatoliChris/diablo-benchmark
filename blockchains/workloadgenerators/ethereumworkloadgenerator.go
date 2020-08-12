@@ -169,8 +169,8 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 					return nil, errors.New("failed to set TX value")
 				}
 				tx, err := e.CreateSignedTransaction(
-					e.KnownAccounts[(clientNum+worker)%len(e.KnownAccounts)].PrivateKey,
-					e.KnownAccounts[((clientNum+worker)+1)%len(e.KnownAccounts)].Address,
+					e.KnownAccounts[(clientNum)%len(e.KnownAccounts)].PrivateKey,
+					e.KnownAccounts[((clientNum)+1)%len(e.KnownAccounts)].Address,
 					txVal,
 				)
 
