@@ -5,6 +5,7 @@ package clientinterfaces
 
 import (
 	"context"
+	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/core/results"
 	"errors"
 	"fmt"
@@ -74,17 +75,21 @@ func (e *EthereumInterface) Cleanup() results.Results {
 }
 
 // Parses the workload and convert into the type for the benchmark.
-func (e *EthereumInterface) ParseWorkload(workload [][]byte) ([]interface{}, error) {
-	parsedWorkload := make([]interface{}, 0)
+func (e *EthereumInterface) ParseWorkload(workload workloadgenerators.WorkerWorkload) ([][]interface{}, error) {
+	parsedWorkload := make([][]interface{}, 0)
 
 	for _, v := range workload {
-		t := ethtypes.Transaction{}
-		err := t.UnmarshalJSON(v)
-		if err != nil {
-			return nil, err
-		}
+		intervalTxs := make([]interface{}, 0)
+		for _, txBytes := range v {
+			t := ethtypes.Transaction{}
+			err := t.UnmarshalJSON(txBytes)
+			if err != nil {
+				return nil, err
+			}
 
-		parsedWorkload = append(parsedWorkload, &t)
+			intervalTxs = append(intervalTxs, &t)
+		}
+		parsedWorkload = append(parsedWorkload, intervalTxs)
 	}
 
 	e.TotalTx = len(parsedWorkload)

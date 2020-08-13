@@ -1,6 +1,7 @@
 package clientinterfaces
 
 import (
+	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/core/results"
 )
 
@@ -17,7 +18,8 @@ type BlockchainInterface interface {
 	Cleanup() results.Results
 
 	// Handles the workload, converts the bytes to usable transactions.
-	ParseWorkload(workload [][]byte) ([]interface{}, error)
+	// This takes the worker's workload - and transitions to transactions
+	ParseWorkload(workload workloadgenerators.WorkerWorkload) ([][]interface{}, error)
 
 	// Connect to the blockchain node in the array slot of the given array
 	ConnectOne(id int) error
