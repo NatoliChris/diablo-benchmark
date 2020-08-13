@@ -151,38 +151,57 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, 
 	return signedTx.MarshalJSON()
 }
 
+// Generate a simple transaction value transfer workload
+// returns: Workload ([client][worker][time][tx]) -> [][][][]byte
 func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
+
 	// get the known accounts
-	var totalWorkload [][][]byte
-	totalNumTxPerWorker, err := parsers.GetTotalNumberOfTransactions(e.BenchConfig)
-	if err != nil {
-		return nil, err
-	}
+	var totalWorkload [][][][][]byte
+
 	for clientNum := 0; clientNum < e.BenchConfig.Clients; clientNum++ {
-		clientWorkload := make([][]byte, 0)
+		// client = [worker][interval][tx=[]byte]
+		// [][][][]byte
+		clientWorkload := make([][][][]byte, 0)
 		for worker := 0; worker < e.BenchConfig.Workers; worker++ {
-			for it := 0; it < totalNumTxPerWorker; it++ {
-				// Initial assumption: there's as many accounts as transactions
-				// TODO allow for more intricate transaction generation, such as A->B, A->C, etc.
-				txVal, ok := big.NewInt(0).SetString("1000000", 10)
-				if !ok {
-					return nil, errors.New("failed to set TX value")
-				}
-				tx, err := e.CreateSignedTransaction(
-					e.KnownAccounts[(clientNum+worker)%len(e.KnownAccounts)].PrivateKey,
-					e.KnownAccounts[((clientNum+worker)+1)%len(e.KnownAccounts)].Address,
-					txVal,
-				)
+			// Worker workload = list of transactions in intervals
+			// [interval][tx] = [][][]byte
+			workerWorkload := make([][][]byte, 0)
+			// for each worker, generate the intervals of transactions.
+			for interval, txnum := range e.BenchConfig.TxInfo.Intervals {
+				// Debug print for each interval to monitor correctness
+				zap.L().Debug("Making workload ",
+					zap.Int("client", clientNum),
+					zap.Int("worker", worker),
+					zap.Int("interval", interval),
+					zap.Int("value", txnum))
 
-				if err != nil {
-					return nil, err
-				}
-				zap.L().Debug("making transaction")
+				// Time interval = list of transactions
+				// [tx] = [][]byte
+				intervalWorkload := make([][]byte, 0)
+				for txIt := 0; txIt < txnum; txIt++ {
 
-				clientWorkload = append(clientWorkload, tx)
+					// Initial assumption: there's as many accounts as transactions
+					// TODO allow for more intricate transaction generation, such as A->B, A->C, etc.
+					txVal, ok := big.NewInt(0).SetString("1000000", 10)
+					if !ok {
+						return nil, errors.New("failed to set TX value")
+					}
+					tx, err := e.CreateSignedTransaction(
+						e.KnownAccounts[(clientNum+worker)%len(e.KnownAccounts)].PrivateKey,
+						e.KnownAccounts[((clientNum+worker)+1)%len(e.KnownAccounts)].Address,
+						txVal,
+					)
+
+					if err != nil {
+						return nil, err
+					}
+
+					intervalWorkload = append(intervalWorkload, tx)
+				}
+				workerWorkload = append(workerWorkload, intervalWorkload)
 			}
+			clientWorkload = append(clientWorkload, workerWorkload)
 		}
-
 		totalWorkload = append(totalWorkload, clientWorkload)
 	}
 
