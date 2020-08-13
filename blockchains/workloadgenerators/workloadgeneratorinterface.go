@@ -5,7 +5,8 @@ import (
 	"math/big"
 )
 
-type Workload [][][]byte
+// Workload = [clientID][worker][time][txs = []byte]
+type Workload [][][][][]byte
 
 type WorkloadGenerator interface {
 	// Creates a new instance of the workload generator for the specific type of blockchain
