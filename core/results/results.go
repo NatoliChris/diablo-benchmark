@@ -11,6 +11,7 @@ type Results struct {
 
 type AggregatedResults struct {
 	ClientResults     []Results // All results from clients
+	TotalThroughput   float64   // Total cumulative throughput
 	MaxThroughput     float64   // maximum throughput observed
 	MinThroughput     float64   // minimum throughput observed
 	AverageThroughput float64   // average throughput
@@ -30,6 +31,7 @@ func CalculateAggregatedResults(clientResults []Results) AggregatedResults {
 	var averageThroughput float64 = 0
 	var maxThroughput float64 = 0
 	minThroughput := clientResults[0].Throughput
+	var totalThroughput float64 = 0
 
 	var allLatencies []float64
 	var averageLatency float64 = 0
@@ -40,6 +42,7 @@ func CalculateAggregatedResults(clientResults []Results) AggregatedResults {
 		// Averages
 		averageLatency += res.AverageLatency
 		averageThroughput += res.Throughput
+		totalThroughput += res.Throughput
 
 		// Maximum and minimums
 		if res.Throughput > maxThroughput {
@@ -70,6 +73,7 @@ func CalculateAggregatedResults(clientResults []Results) AggregatedResults {
 
 	return AggregatedResults{
 		ClientResults:     clientResults,
+		TotalThroughput:   totalThroughput,
 		MaxThroughput:     maxThroughput,
 		MinThroughput:     minThroughput,
 		AverageThroughput: averageThroughput,

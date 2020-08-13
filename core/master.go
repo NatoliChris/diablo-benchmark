@@ -141,10 +141,11 @@ func (ms *Master) Run() {
 		"Benchmark Complete\n" +
 		"---------------\n" +
 		fmt.Sprintf(
-			"[*] Throughput: %.2f, (Min: %.2f ; Max %.2f)\n",
-			aggregatedResults.AverageThroughput,
+			"[*] Throughput: Total %.2f, (Min: %.2f ; Max %.2f; Avg: %.2f)\n",
+			aggregatedResults.TotalThroughput,
 			aggregatedResults.MinThroughput,
 			aggregatedResults.MaxThroughput,
+			aggregatedResults.AverageThroughput,
 		) +
 		fmt.Sprintf(
 			"[*] Latency: %.2f, (Min: %.2f ; Max %.2f; Median %2.f)\n",

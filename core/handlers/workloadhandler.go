@@ -23,6 +23,7 @@ type WorkloadHandler struct {
 	wg                   *sync.WaitGroup                        // All threads done
 	numTx                uint64                                 // number of transactions sent
 	numErrors            uint64                                 // Number of errors during workload
+	StartEnd             []time.Time                            // Start and end of the benchmark
 }
 
 func NewWorkloadHandler(numThread uint32, clients []clientinterfaces.BlockchainInterface) *WorkloadHandler {
@@ -175,6 +176,7 @@ func (wh *WorkloadHandler) statusPrinter(stopCh chan bool) {
 
 // Run the benchmark()
 func (wh *WorkloadHandler) RunBench() error {
+	wh.StartEnd = append(wh.StartEnd, time.Now())
 	stopPrinting := make(chan bool, 0)
 
 	go wh.statusPrinter(stopPrinting)
@@ -186,6 +188,11 @@ func (wh *WorkloadHandler) RunBench() error {
 	wh.wg.Wait()
 	stopPrinting <- true
 
+	wh.StartEnd = append(wh.StartEnd, time.Now())
+	zap.L().Info("Benchmark complete:",
+		zap.Time("start", wh.StartEnd[0]),
+		zap.Time("end", wh.StartEnd[1]),
+		zap.Duration("duration", wh.StartEnd[1].Sub(wh.StartEnd[0])))
 	// TODO get errors
 	// add error channel to runner so that it can append the errors
 	return nil
@@ -207,14 +214,14 @@ func (wh *WorkloadHandler) HandleCleanup() results.Results {
 	}
 
 	zap.L().Debug("Cleanup results",
-		zap.Float64("avg throughput", avgThroughput/float64(wh.numThread)),
+		zap.Float64("avg throughput", avgThroughput),
 		zap.Float64("avg latency", avgLatency/float64(wh.numThread)),
 		zap.Float64s("latencies", allLatencies))
 
 	// Return the aggregated results
 	return results.Results{
 		AverageLatency: avgLatency / float64(wh.numThread),
-		Throughput:     avgThroughput / float64(wh.numThread),
+		Throughput:     avgThroughput,
 		TxLatencies:    allLatencies,
 	}
 }

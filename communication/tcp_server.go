@@ -53,7 +53,7 @@ func (s *MasterServer) HandleClients(readyChannel chan bool) {
 			fmt.Println(err)
 		}
 
-		zap.L().Info(fmt.Sprintf("Client %d connected", len(s.Clients)),
+		zap.L().Info(fmt.Sprintf("Client %d / %d connected", len(s.Clients), s.ExpectedClients),
 			zap.String("Addr:", c.RemoteAddr().String()))
 
 		s.Clients = append(s.Clients, c)
@@ -147,7 +147,7 @@ func (s *MasterServer) sendAndWaitData(data []byte, client net.Conn) (*results.R
 
 	// Read the reply AND response error (if it's an error, 1024 is to
 	// encapsulate any error string passed with the data).
-	initialReply := make([]byte, 1024)
+	initialReply := make([]byte, 512)
 
 	n, err := client.Read(initialReply)
 
@@ -174,12 +174,24 @@ func (s *MasterServer) sendAndWaitData(data []byte, client net.Conn) (*results.R
 	// Now we have to read through the data until we end.
 	// Get the length
 	dataLen := binary.BigEndian.Uint64(initialReply[1:9])
+
+	if dataLen == 0 {
+		return &results.Results{
+			AverageLatency: 0,
+			Throughput:     0,
+			TxLatencies:    []float64{},
+		}, nil
+	}
+
 	fullReply := initialReply[9:]
 	fmt.Println("Got ", dataLen, fullReply)
 	buffer := make([]byte, 1024)
 	readLen := n - 9
 
 	for {
+		if uint64(readLen) >= dataLen {
+			break
+		}
 		n, err := client.Read(buffer)
 		zap.L().Debug(fmt.Sprintf("Client %s read %d, total %d", client.RemoteAddr().String(), n, readLen))
 		if err != nil {
@@ -194,10 +206,6 @@ func (s *MasterServer) sendAndWaitData(data []byte, client net.Conn) (*results.R
 
 		fullReply = append(fullReply, buffer[:n]...)
 		readLen += n
-
-		if uint64(readLen) >= dataLen {
-			break
-		}
 	}
 
 	zap.L().Info("Read client reply",
