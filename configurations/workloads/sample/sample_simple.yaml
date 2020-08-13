@@ -5,6 +5,5 @@ workers: 1
 bench:
   type: "simple"
   txs:
-    0: 70
-    10: 70
-    30: 40
+    0: 10
+    10: 10

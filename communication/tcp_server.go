@@ -283,11 +283,6 @@ func (s *MasterServer) SendWorkload(workloads workloadgenerators.Workload) Clien
 		data = append(data, payloadLenBytes...)
 		data = append(data, payload...)
 		err = s.SendAndWaitOKSync(data, c)
-		fmt.Println("sending data")
-		fmt.Println(data[0:9])
-		fmt.Println(payloadLen)
-		fmt.Println(binary.BigEndian.Uint64(data[1:9]))
-		fmt.Println("---")
 		if err != nil {
 			errorList = append(errorList, err)
 		}
@@ -297,6 +292,7 @@ func (s *MasterServer) SendWorkload(workloads workloadgenerators.Workload) Clien
 }
 
 func (s *MasterServer) RunBenchmark() ClientReplyErrors {
+	zap.L().Info("\n------------\nStarting Benchmark\n------------\n")
 
 	var errorList ClientReplyErrors
 
@@ -386,7 +382,7 @@ func (s *MasterServer) CloseAll() {
 // Close the client connections
 func (s *MasterServer) CloseClients() {
 	for i, c := range s.Clients {
-		fmt.Println(fmt.Sprintf("Closing Client %d @ %s", i, c.RemoteAddr().String()))
+		zap.L().Info(fmt.Sprintf("Closing Client %d @ %s", i, c.RemoteAddr().String()))
 		c.Close()
 	}
 }

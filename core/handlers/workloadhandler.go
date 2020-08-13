@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"diablo-benchmark/blockchains/clientinterfaces"
+	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/core/results"
 	"errors"
 	"fmt"
@@ -17,7 +18,7 @@ type WorkloadHandler struct {
 	numThread            uint32                                 // Number of workers
 	workerThreadChannels []chan interface{}                     // Channels between the threads to have the workload from
 	activeClients        []clientinterfaces.BlockchainInterface // Number of client threads that are run
-	FullWorkload         []interface{}                          // Workload
+	FullWorkload         [][][]interface{}                      // Workload
 	readyChannels        []chan bool                            // channels that signal ready to start
 	wg                   *sync.WaitGroup                        // All threads done
 	numTx                uint64                                 // number of transactions sent
@@ -51,54 +52,90 @@ func (wh *WorkloadHandler) Connect(nodes []string, ID int) error {
 }
 
 // Parse the workloads on each client, populate the channels
-func (wh *WorkloadHandler) ParseWorkloads(rawWorkload [][]byte) error {
-	// Should be able to parse the workloads from transactions into
-	// bytes
-	fullWorkload, err := wh.activeClients[0].ParseWorkload(rawWorkload)
-
-	if err != nil {
-		return err
-	}
-
-	wh.FullWorkload = fullWorkload
-	perThreadWL := len(fullWorkload) / int(wh.numThread)
+func (wh *WorkloadHandler) ParseWorkloads(rawWorkload workloadgenerators.ClientWorkload) error {
 
 	// Set up the workload channels
 	var readyChannels []chan bool
 	var wg sync.WaitGroup
 
-	// Distribute the workload into the channels
-	for i := 0; i < int(wh.numThread); i++ {
-		// Set up
-		rch := make(chan bool, 0)
-		readyChannels = append(readyChannels, rch)
-		workerChannel := make(chan interface{}, len(rawWorkload))
-		for _, v := range fullWorkload[i*perThreadWL : (i+1)*perThreadWL] {
-			workerChannel <- v
+	var fullWorkload [][][]interface{}
+
+	for i, workerWorkload := range rawWorkload {
+		// Should be able to parse the workloads from transactions into bytes
+		parsedWorkerWorkload, err := wh.activeClients[0].ParseWorkload(workerWorkload)
+		if err != nil {
+			return err
 		}
-		close(workerChannel)
-		// Distribute and start the goroutine
+
+		channelSize := 0
+		for _, v := range parsedWorkerWorkload {
+			channelSize += len(v)
+		}
+
+		readyChannel := make(chan bool, 0)
+		readyChannels = append(readyChannels, readyChannel)
+
+		workerChannel := make(chan interface{}, channelSize)
 		wg.Add(1)
-		go wh.runner(
+		// Make my consumer
+		go wh.runnerConsumer(
 			wh.activeClients[i],
 			workerChannel,
 			&wg,
-			rch,
 		)
+
+		// Start the worker producer
+		go wh.workloadProducer(
+			parsedWorkerWorkload,
+			workerChannel,
+			readyChannel,
+			i,
+		)
+
+		fullWorkload = append(fullWorkload, parsedWorkerWorkload)
 	}
+
+	wh.FullWorkload = fullWorkload
 	wh.readyChannels = readyChannels
 	wh.wg = &wg
 	return nil
 }
 
+// Worker producer, handles the transaction per second producing into the queue.
+func (wh *WorkloadHandler) workloadProducer(workload [][]interface{}, workerChan chan interface{}, ready chan bool, id int) {
+	zap.L().Debug(fmt.Sprintf("producer %d ready", id))
+	<-ready
+	currentIterator := 1
+	for _, v := range workload[0] {
+		workerChan <- v
+	}
+
+	// Set up the timer
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			for _, v := range workload[currentIterator] {
+				workerChan <- v
+			}
+			currentIterator++
+			if currentIterator >= len(workload) {
+				close(workerChan)
+				return
+			}
+		}
+	}
+
+}
+
 // Runner for the thread
-func (wh *WorkloadHandler) runner(blockchainInterface clientinterfaces.BlockchainInterface, workload chan interface{}, wg *sync.WaitGroup, ready chan bool) {
+func (wh *WorkloadHandler) runnerConsumer(blockchainInterface clientinterfaces.BlockchainInterface, workload chan interface{}, wg *sync.WaitGroup) {
 	var errs []error
 	defer wg.Done()
 
 	// Wait for the signal to go
-	<-ready
-	zap.L().Info("ready")
 	for tx := range workload {
 		e := blockchainInterface.SendRawTransaction(tx)
 		if e != nil {
