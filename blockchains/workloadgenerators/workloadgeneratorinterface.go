@@ -5,8 +5,10 @@ import (
 	"math/big"
 )
 
+// Workload definitions for ease of use
 type Workload [][][][][]byte     // Workload: [client][worker][time][txlist][txbytes]
 type ClientWorkload [][][][]byte // Client workload: [worker][time][txlist][txbytes]
+type WorkerWorkload [][][]byte   // Worker workload: [time][txlist][txbytes]
 
 type WorkloadGenerator interface {
 	// Creates a new instance of the workload generator for the specific type of blockchain

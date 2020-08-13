@@ -156,16 +156,16 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, 
 func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 
 	// get the known accounts
-	var totalWorkload [][][][][]byte
+	var totalWorkload Workload
 
 	for clientNum := 0; clientNum < e.BenchConfig.Clients; clientNum++ {
 		// client = [worker][interval][tx=[]byte]
 		// [][][][]byte
-		clientWorkload := make([][][][]byte, 0)
+		clientWorkload := make(ClientWorkload, 0)
 		for worker := 0; worker < e.BenchConfig.Workers; worker++ {
 			// Worker workload = list of transactions in intervals
 			// [interval][tx] = [][][]byte
-			workerWorkload := make([][][]byte, 0)
+			workerWorkload := make(WorkerWorkload, 0)
 			// for each worker, generate the intervals of transactions.
 			for interval, txnum := range e.BenchConfig.TxInfo.Intervals {
 				// Debug print for each interval to monitor correctness

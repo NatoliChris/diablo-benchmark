@@ -3,6 +3,7 @@ package core
 import (
 	"diablo-benchmark/blockchains"
 	"diablo-benchmark/blockchains/clientinterfaces"
+	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/communication"
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/handlers"
@@ -111,7 +112,7 @@ func (w *Worker) Run() {
 				continue
 			}
 
-			var unmarshaledWorkload [][]byte
+			var unmarshaledWorkload workloadgenerators.ClientWorkload
 			err = json.Unmarshal(wl, &unmarshaledWorkload)
 
 			if err != nil {
