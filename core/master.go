@@ -6,7 +6,6 @@ import (
 	"diablo-benchmark/communication"
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/results"
-	"encoding/json"
 	"fmt"
 	"go.uber.org/zap"
 	"time"
@@ -136,8 +135,29 @@ func (ms *Master) Run() {
 
 	aggregatedResults := results.CalculateAggregatedResults(rawResults)
 
-	a, _ := json.Marshal(aggregatedResults)
-	fmt.Println(string(a))
+	// Print the benchmark information
+	zap.L().Info("\n" +
+		"---------------\n" +
+		"Benchmark Complete\n" +
+		"---------------\n" +
+		fmt.Sprintf(
+			"[*] Throughput: %.2f, (Min: %.2f ; Max %.2f)\n",
+			aggregatedResults.AverageThroughput,
+			aggregatedResults.MinThroughput,
+			aggregatedResults.MaxThroughput,
+		) +
+		fmt.Sprintf(
+			"[*] Latency: %.2f, (Min: %.2f ; Max %.2f; Median %2.f)\n",
+			aggregatedResults.AverageLatency,
+			aggregatedResults.MinLatency,
+			aggregatedResults.MaxLatency,
+			aggregatedResults.MedianLatency,
+		),
+	)
+
+	// Temporary printing
+	//a, _ := json.Marshal(aggregatedResults)
+	//fmt.Println(string(a))
 
 	// Step 7 - store results
 	ms.Server.SendFin()
