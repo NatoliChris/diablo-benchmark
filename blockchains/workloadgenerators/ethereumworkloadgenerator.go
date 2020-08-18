@@ -116,7 +116,7 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 }
 
 // Create a signed transaction that returns the bytes
-func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, toAddress string, value *big.Int) ([]byte, error) {
+func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, toAddress string, value *big.Int, data []byte) ([]byte, error) {
 
 	// Get the private key
 	priv, err := crypto.HexToECDSA(hex.EncodeToString(fromPrivKey))
@@ -138,7 +138,7 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, 
 	)
 
 	// Make and sign the transaction
-	tx := types.NewTransaction(e.Nonces[addrFrom.String()], toConverted, value, gasLimit, e.SuggestedGasPrice, []byte{})
+	tx := types.NewTransaction(e.Nonces[addrFrom.String()], toConverted, value, gasLimit, e.SuggestedGasPrice, data)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(e.ChainID), priv)
 	if err != nil {
 		return []byte{}, nil
@@ -190,6 +190,7 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 						e.KnownAccounts[(clientNum+worker)%len(e.KnownAccounts)].PrivateKey,
 						e.KnownAccounts[((clientNum+worker)+1)%len(e.KnownAccounts)].Address,
 						txVal,
+						[]byte{},
 					)
 
 					if err != nil {

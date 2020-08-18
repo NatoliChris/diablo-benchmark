@@ -36,7 +36,7 @@ type WorkloadGenerator interface {
 	CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams map[string]interface{}) ([]byte, error)
 
 	// Creates a transaction that is signed and ready to send from the given private key.
-	CreateSignedTransaction(fromPrivKey []byte, toAddress string, value *big.Int) ([]byte, error)
+	CreateSignedTransaction(fromPrivKey []byte, toAddress string, value *big.Int, data []byte) ([]byte, error)
 
 	// Generates the workload specified in the chain configurations.
 	GenerateWorkload() (Workload, error)
