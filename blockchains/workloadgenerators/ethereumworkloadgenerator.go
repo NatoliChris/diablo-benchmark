@@ -5,8 +5,10 @@ import (
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/configs/parsers"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/compiler"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -15,6 +17,7 @@ import (
 	"go.uber.org/zap"
 	"math/big"
 	"os"
+	"time"
 )
 
 // Generates the workload for the Ethereum blockchain
@@ -101,10 +104,43 @@ func (e *EthereumWorkloadGenerator) CreateAccount() (interface{}, error) {
 	return privKey, nil
 }
 
-// Deploy the contract
+// Deploy the contract - returns the address of the contract
 func (e *EthereumWorkloadGenerator) DeployContract(fromPivKey []byte, contractPath string) (string, error) {
-	// TODO implement
-	return "", nil
+	tx, err := e.CreateContractDeployTX(fromPivKey, contractPath)
+	if err != nil {
+		return "", err
+	}
+
+	// Convert back to the transaction type
+	var parsedTx types.Transaction
+	err = json.Unmarshal(tx, parsedTx)
+	if err != nil {
+		return "", err
+	}
+
+	// Deploy the transaction
+	err = e.ActiveConn.SendTransaction(context.Background(), &parsedTx)
+	if err != nil {
+		return "", err
+	}
+
+	// Wait for the transaction information to come through with the
+	// transaction receipt
+	for {
+		time.Sleep(1 * time.Second)
+
+		txReceipt, err := e.ActiveConn.TransactionReceipt(context.Background(), parsedTx.Hash())
+
+		if err == nil {
+			// No error, return the receipt
+			return txReceipt.ContractAddress.String(), nil
+		}
+		if err == ethereum.NotFound {
+			continue
+		} else {
+			return "", err
+		}
+	}
 }
 
 // Creates a transaction to deploy the contract
