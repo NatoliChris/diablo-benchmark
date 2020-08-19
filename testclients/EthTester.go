@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common/compiler"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -112,19 +113,22 @@ func main() {
 			os.Exit(1)
 		}
 
-		time.Sleep(3 * time.Second)
+		for {
+			r, err := cli.TransactionReceipt(context.Background(), signedTx.Hash())
 
-		r, err := cli.TransactionReceipt(context.Background(), signedTx.Hash())
+			if err == nil {
+				fmt.Println(r.ContractAddress)
+				fmt.Println(r.ContractAddress)
+				return
+			}
 
-		if err != nil {
-			fmt.Println(err)
-			zap.L().Error("err", zap.Error(err))
-			os.Exit(1)
+			if err == ethereum.NotFound {
+				time.Sleep(1 * time.Second)
+				continue
+			} else {
+				break
+			}
 		}
-
-		fmt.Println(r.ContractAddress)
-
-		fmt.Println(r.ContractAddress)
 	}
 
 	//
