@@ -8,11 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/compiler"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"go.uber.org/zap"
 	"math/big"
+	"os"
 )
 
 // Generates the workload for the Ethereum blockchain
@@ -107,7 +109,66 @@ func (e *EthereumWorkloadGenerator) DeployContract(fromPivKey []byte, contractPa
 
 // Creates a transaction to deploy the contract
 func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, contractPath string) ([]byte, error) {
-	return []byte{}, nil
+
+	// Generate the relevant account information from the private key
+	priv, err := crypto.HexToECDSA(hex.EncodeToString(fromPrivKey))
+	if err != nil {
+		return []byte{}, err
+	}
+
+	addrFrom := crypto.PubkeyToAddress(priv.PublicKey)
+
+	// Check for the existence of the contract
+	if _, err := os.Stat(contractPath); err == nil {
+		// Path exists, compile the contract and prepare the transaction
+		// TODO: check the 'solc' string
+		contracts, err := compiler.CompileSolidity("", contractPath)
+		if err != nil {
+			return []byte{}, err
+		}
+
+		// TODO handle case where number of contracts is greater than one
+		if len(contracts) > 1 {
+			zap.L().Warn("multiple contracts compiled, only deploying first")
+		}
+
+		for k, v := range contracts {
+			zap.L().Info("contract deploy transaction",
+				zap.String("contract", k))
+
+			bytecodeBytes, err := hex.DecodeString(v.Code)
+
+			if err != nil {
+				return []byte{}, err
+			}
+
+			// TODO maybe estimate gas rather than have an upper bound
+			gasLimit := uint64(300000)
+			tx := types.NewContractCreation(
+				e.Nonces[addrFrom.String()],
+				big.NewInt(0),
+				gasLimit,
+				e.SuggestedGasPrice,
+				bytecodeBytes,
+			)
+			signedTx, err := types.SignTx(tx, types.NewEIP155Signer(e.ChainID), priv)
+
+			// Update nonce
+			e.Nonces[addrFrom.String()]++
+
+			return signedTx.MarshalJSON()
+		}
+
+	} else if os.IsNotExist(err) {
+		// Path doesn't exist - return an error
+		return []byte{}, fmt.Errorf("contract does not exist: %s", contractPath)
+	} else {
+		// Corner case, it's another error - so we should handle it
+		// like an error state
+		return []byte{}, err
+	}
+
+	return []byte{}, errors.New("failed to create deploy tx")
 }
 
 // Creates an interaction with the contract
@@ -145,7 +206,7 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, 
 	}
 
 	// Update the nonce (if we are using multiple transactions from the same account)
-	e.Nonces[addrFrom.String()] += 1
+	e.Nonces[addrFrom.String()]++
 
 	// Return the transaction in bytes ready to send to the clients.
 	return signedTx.MarshalJSON()

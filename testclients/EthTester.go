@@ -93,7 +93,7 @@ func main() {
 		fmt.Println(v.Code)
 		fmt.Println(v.RuntimeCode)
 		fmt.Println(v.Info)
-		s, err := hex.DecodeString(v.RuntimeCode)
+		s, err := hex.DecodeString(v.Code)
 		fmt.Println(s)
 		tx := types.NewContractCreation(nonce, big.NewInt(0), gasLimit, price, s)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), priv)
