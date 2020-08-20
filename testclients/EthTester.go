@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/compiler"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -34,7 +37,10 @@ func main() {
 	// get the contract path
 	contractPath := "contracts/Store.sol"
 
-	c, err := compiler.CompileSolidity("", contractPath)
+	c, err := compiler.CompileSolidity("solc", contractPath)
+
+	fmt.Println("---- LEN")
+	fmt.Println(len(c))
 
 	if err != nil {
 		fmt.Println(err)
@@ -89,13 +95,17 @@ func main() {
 	//toConverted := common.HexToAddress(addrTo)
 	gasLimit := uint64(300000)
 
+	fmt.Println(c)
+
 	// Make and sign the transaction
 	for _, v := range c {
 		fmt.Println(v.Code)
 		fmt.Println(v.RuntimeCode)
 		fmt.Println(v.Info)
-		s, err := hex.DecodeString(v.Code)
-		fmt.Println(s)
+		s, err := hex.DecodeString(v.Code[2:])
+		if err != nil {
+			panic(err)
+		}
 		tx := types.NewContractCreation(nonce, big.NewInt(0), gasLimit, price, s)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), priv)
 
@@ -106,6 +116,67 @@ func main() {
 		}
 
 		err = cli.SendTransaction(context.Background(), signedTx)
+		nonce++
+
+		if err != nil {
+			fmt.Println(err)
+			zap.L().Error("err", zap.Error(err))
+			os.Exit(1)
+		}
+
+		var contractAddress common.Address
+
+		for {
+			r, err := cli.TransactionReceipt(context.Background(), signedTx.Hash())
+
+			if err == nil {
+				fmt.Println(r.ContractAddress)
+				fmt.Println(r.ContractAddress)
+				contractAddress = r.ContractAddress
+				break
+			}
+
+			if err == ethereum.NotFound {
+				time.Sleep(1 * time.Second)
+				continue
+			} else {
+				break
+			}
+		}
+		funcHash := v.Hashes["storeVal(uint32)"]
+		fmt.Println("Func Hash: ", funcHash)
+		funcHashBytes, err := hex.DecodeString(funcHash)
+		if err != nil {
+			panic(err)
+		}
+
+		// Store the number
+		buf := new(bytes.Buffer)
+		n := uint32(8)
+		fmt.Println("Num: ", n)
+		binary.Write(buf, binary.BigEndian, n)
+		bts := buf.Bytes()
+
+		pad := make([]byte, 28)
+		payload := append(funcHashBytes, pad...)
+		payload = append(payload, bts...)
+		fmt.Println("payload", payload)
+		fmt.Println(hex.EncodeToString(payload))
+
+		// add := common.HexToAddress("0x7ee82060e8ea5f5daede2c16e0a7524072e3f147")
+
+		// cAddr := common.HexToAddress("0x1f840420B74471B674e0c86C77D43A32E367ED95")
+		_ = contractAddress
+		tx2 := types.NewTransaction(nonce, contractAddress, nil, gasLimit, price, payload)
+		signedTx, err = types.SignTx(tx2, types.NewEIP155Signer(chainID), priv)
+		if err != nil {
+			fmt.Println(err)
+			zap.L().Error("err", zap.Error(err))
+			os.Exit(1)
+		}
+
+		err = cli.SendTransaction(context.Background(), signedTx)
+		nonce++
 
 		if err != nil {
 			fmt.Println(err)
@@ -115,11 +186,9 @@ func main() {
 
 		for {
 			r, err := cli.TransactionReceipt(context.Background(), signedTx.Hash())
-
 			if err == nil {
-				fmt.Println(r.ContractAddress)
-				fmt.Println(r.ContractAddress)
-				return
+				fmt.Println(r)
+				break
 			}
 
 			if err == ethereum.NotFound {
