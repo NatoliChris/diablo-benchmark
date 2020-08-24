@@ -2,7 +2,7 @@ package results
 
 import "sort"
 
-// Generic result structure that will be encoded and sent back to the master and combined
+// Generic result structure that will be encoded and sent back to the primary and combined
 type Results struct {
 	TxLatencies    []float64 `json:TxLatencies`    // Latency of each transaction, can be used in CDF
 	AverageLatency float64   `json:AverageLatency` // Averaged latency of the transactions

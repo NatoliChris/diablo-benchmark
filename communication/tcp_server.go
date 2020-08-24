@@ -14,18 +14,18 @@ import (
 	"net"
 )
 
-// Master server struct that contains the listener and the
+// Primary server struct that contains the listener and the
 // list of all the clients.
-type MasterServer struct {
+type PrimaryServer struct {
 	Listener        net.Listener // TCP listener listening for incoming clients
-	Clients         []net.Conn   // Any connected clients so that they can communicate with the master
+	Clients         []net.Conn   // Any connected clients so that they can communicate with the Primary
 	ExpectedClients int          // The number of expected clients to connect
 }
 
 type ClientReplyErrors []string
 
 // Generates a new "Listener" by creating the TCP server.
-func SetupMasterTCP(addr string, expectedClients int) (*MasterServer, error) {
+func SetupPrimaryTCP(addr string, expectedClients int) (*PrimaryServer, error) {
 	listener, err := net.Listen("tcp", addr)
 
 	// If we can't make a listener, we
@@ -38,12 +38,12 @@ func SetupMasterTCP(addr string, expectedClients int) (*MasterServer, error) {
 		zap.String("Addr", addr),
 		zap.Int("Expected Clients", expectedClients))
 
-	return &MasterServer{Listener: listener, ExpectedClients: expectedClients}, nil
+	return &PrimaryServer{Listener: listener, ExpectedClients: expectedClients}, nil
 }
 
 // A listener that will run in a thread to
 // handle any client connections.
-func (s *MasterServer) HandleClients(readyChannel chan bool) {
+func (s *PrimaryServer) HandleClients(readyChannel chan bool) {
 
 	for {
 		c, err := s.Listener.Accept()
@@ -67,7 +67,7 @@ func (s *MasterServer) HandleClients(readyChannel chan bool) {
 
 // // This function is used to send and wait for the OK byte to be
 // // received. This takes a channel and replies on the channel once OK or err is received.
-func (s *MasterServer) sendAndWaitOKAsync(data []byte, client net.Conn, doneCh chan int, errCh chan error) {
+func (s *PrimaryServer) sendAndWaitOKAsync(data []byte, client net.Conn, doneCh chan int, errCh chan error) {
 	if _, err := client.Write(data); err != nil {
 		// TODO: Log that we can't communicate with client
 		errCh <- err
@@ -99,7 +99,7 @@ func (s *MasterServer) sendAndWaitOKAsync(data []byte, client net.Conn, doneCh c
 
 // Send a message to a client and wait for the okay without
 // the use of a channel (synchronous sending).
-func (s *MasterServer) SendAndWaitOKSync(data []byte, client net.Conn) error {
+func (s *PrimaryServer) SendAndWaitOKSync(data []byte, client net.Conn) error {
 	if _, err := client.Write(data); err != nil {
 		// TODO: Log that we can't communicate with client
 		return &ClientCommError{
@@ -136,7 +136,7 @@ func (s *MasterServer) SendAndWaitOKSync(data []byte, client net.Conn) error {
 }
 
 // Send a message to a client and wait for the OK and data, or errors
-func (s *MasterServer) sendAndWaitData(data []byte, client net.Conn) (*results.Results, error) {
+func (s *PrimaryServer) sendAndWaitData(data []byte, client net.Conn) (*results.Results, error) {
 	if _, err := client.Write(data); err != nil {
 		// TODO log that we can't communicate with client
 		return nil, &ClientCommError{
@@ -223,7 +223,7 @@ func (s *MasterServer) sendAndWaitData(data []byte, client net.Conn) (*results.R
 	return &res, nil
 }
 
-func (s *MasterServer) PrepareBenchmarkClients(numThreads uint32) ClientReplyErrors {
+func (s *PrimaryServer) PrepareBenchmarkClients(numThreads uint32) ClientReplyErrors {
 
 	var errorList []string
 
@@ -250,7 +250,7 @@ func (s *MasterServer) PrepareBenchmarkClients(numThreads uint32) ClientReplyErr
 	return errorList
 }
 
-func (s *MasterServer) SendBlockchainType(bcType blockchains.BlockchainTypeMessage) ClientReplyErrors {
+func (s *PrimaryServer) SendBlockchainType(bcType blockchains.BlockchainTypeMessage) ClientReplyErrors {
 	// Send the blockchain type message
 	var errorList []string
 
@@ -271,7 +271,7 @@ func (s *MasterServer) SendBlockchainType(bcType blockchains.BlockchainTypeMessa
 	return errorList
 }
 
-func (s *MasterServer) SendWorkload(workloads workloadgenerators.Workload) ClientReplyErrors {
+func (s *PrimaryServer) SendWorkload(workloads workloadgenerators.Workload) ClientReplyErrors {
 	var errorList []error
 
 	for i, c := range s.Clients {
@@ -299,7 +299,7 @@ func (s *MasterServer) SendWorkload(workloads workloadgenerators.Workload) Clien
 	return nil
 }
 
-func (s *MasterServer) RunBenchmark() ClientReplyErrors {
+func (s *PrimaryServer) RunBenchmark() ClientReplyErrors {
 	zap.L().Info("\n------------\nStarting Benchmark\n------------\n")
 
 	var errorList ClientReplyErrors
@@ -355,7 +355,7 @@ func (s *MasterServer) RunBenchmark() ClientReplyErrors {
 	return errorList
 }
 
-func (s *MasterServer) GetResults() ([]results.Results, ClientReplyErrors) {
+func (s *PrimaryServer) GetResults() ([]results.Results, ClientReplyErrors) {
 	var allResults []results.Results
 	var errs ClientReplyErrors
 
@@ -375,20 +375,20 @@ func (s *MasterServer) GetResults() ([]results.Results, ClientReplyErrors) {
 }
 
 // Send the final GOODBYE message and then close the connection
-func (s *MasterServer) SendFin() {
+func (s *PrimaryServer) SendFin() {
 	for _, c := range s.Clients {
 		_ = s.SendAndWaitOKSync(MsgFin, c)
 	}
 }
 
-// Master method to close all things
-func (s *MasterServer) CloseAll() {
+// Primary method to close all things
+func (s *PrimaryServer) CloseAll() {
 	s.CloseClients()
 	s.CloseAll()
 }
 
 // Close the client connections
-func (s *MasterServer) CloseClients() {
+func (s *PrimaryServer) CloseClients() {
 	for i, c := range s.Clients {
 		zap.L().Info(fmt.Sprintf("Closing Client %d @ %s", i, c.RemoteAddr().String()))
 		c.Close()
@@ -396,6 +396,6 @@ func (s *MasterServer) CloseClients() {
 }
 
 // Close the listener and exit
-func (s *MasterServer) Close() {
+func (s *PrimaryServer) Close() {
 	s.Listener.Close()
 }

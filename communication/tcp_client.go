@@ -54,7 +54,7 @@ func (c *ConnClient) ReplyERR(msg string) {
 	}
 }
 
-// send; OK + DATA to the master
+// send; OK + DATA to the Primary
 func (c *ConnClient) SendDataOK(data []byte) {
 	// msg OK
 	payload := MsgOk
@@ -66,7 +66,7 @@ func (c *ConnClient) SendDataOK(data []byte) {
 	payload = append(payload, dataLen...)
 	payload = append(payload, data...)
 
-	zap.L().Debug("Sending data to master",
+	zap.L().Debug("Sending data to primary",
 		zap.Int("dataLen", len(data)))
 
 	fmt.Println(dataLen)

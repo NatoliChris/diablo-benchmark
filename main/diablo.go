@@ -10,13 +10,13 @@ import (
 	"os"
 )
 
-func printWelcome(isMaster bool) {
+func printWelcome(isPrimary bool) {
 	fmt.Println("=====================")
 	fmt.Println("  Welcome to Diablo  ")
-	if isMaster {
-		fmt.Println("    MASTER SERVER")
+	if isPrimary {
+		fmt.Println("    PRIMARY SERVER")
 	} else {
-		fmt.Println("    CLIENT WORKER")
+		fmt.Println("    SECONDARY CLIENT")
 	}
 	fmt.Println("=====================")
 }
@@ -33,25 +33,25 @@ func prepareLogger() {
 	zap.ReplaceGlobals(logger)
 }
 
-// Run the master functions
-func runMaster(masterArgs *core.MasterArgs) {
+// Run the primary functions
+func runPrimary(primaryArgs *core.PrimaryArgs) {
 	// Check the arguments
-	masterArgs.CheckArgs()
+	primaryArgs.CheckArgs()
 
 	zap.L().Info("loading configs",
-		zap.String("bench config", masterArgs.BenchConfigPath),
-		zap.String("chain config", masterArgs.ChainConfigPath),
+		zap.String("bench config", primaryArgs.BenchConfigPath),
+		zap.String("chain config", primaryArgs.ChainConfigPath),
 	)
 
 	// Parse the configurations.
-	bConfig, err := parsers.ParseBenchConfig(masterArgs.BenchConfigPath)
+	bConfig, err := parsers.ParseBenchConfig(primaryArgs.BenchConfigPath)
 
 	if err != nil {
 		zap.L().Error(err.Error())
 		os.Exit(1)
 	}
 
-	cConfig, err := parsers.ParseChainConfig(masterArgs.ChainConfigPath)
+	cConfig, err := parsers.ParseChainConfig(primaryArgs.ChainConfigPath)
 
 	if err != nil {
 		os.Exit(1)
@@ -68,7 +68,7 @@ func runMaster(masterArgs *core.MasterArgs) {
 	wg := generatorClass.NewGenerator(cConfig, bConfig)
 
 	// Initialise the TCP server
-	m := core.InitMaster(masterArgs.ListenAddr, bConfig.Clients, wg, bConfig, cConfig)
+	m := core.InitPrimary(primaryArgs.ListenAddr, bConfig.Clients, wg, bConfig, cConfig)
 
 	// Run the benchmark flow
 	m.Run()
@@ -86,7 +86,7 @@ func runWorker(workerArgs *core.WorkerArgs) {
 		os.Exit(1)
 	}
 
-	worker, err := core.NewWorker(chainConfiguration, workerArgs.MasterAddr)
+	worker, err := core.NewWorker(chainConfiguration, workerArgs.PrimaryAddr)
 
 	if err != nil {
 		fmt.Println(err)
@@ -103,20 +103,20 @@ func main() {
 	args := core.DefineArguments()
 
 	if len(os.Args) < 2 {
-		// This is going to be a master
-		zap.L().Warn("No subcommand given, running as master!")
-		args.MasterCommand.Parse(os.Args[1:])
-		runMaster(args.MasterArgs)
+		// This is going to be a primary
+		zap.L().Warn("No subcommand given, running as primary!")
+		args.PrimaryCommand.Parse(os.Args[1:])
+		runPrimary(args.PrimaryArgs)
 	} else {
 		switch os.Args[1] {
-		case "master":
+		case "primary":
 			// Print the welcome message
 			printWelcome(true)
 
 			// Parse the arguments
-			args.MasterCommand.Parse(os.Args[2:])
+			args.PrimaryCommand.Parse(os.Args[2:])
 
-			runMaster(args.MasterArgs)
+			runPrimary(args.PrimaryArgs)
 
 		case "worker":
 			// Print the welcome message
