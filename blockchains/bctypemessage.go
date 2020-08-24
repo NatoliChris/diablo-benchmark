@@ -28,7 +28,7 @@ func MatchStringToMessage(configBCType string) (BlockchainTypeMessage, error) {
 	}
 }
 
-// Matches the byte received from the master to the interface that is required
+// Matches the byte received from the primary to the interface that is required
 // to interact with the blockchain system we are benchmarking.
 func MatchMessageToInterface(msg byte) (clientinterfaces.BlockchainInterface, error) {
 	switch BlockchainTypeMessage(msg) {

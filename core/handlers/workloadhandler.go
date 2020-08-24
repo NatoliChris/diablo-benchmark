@@ -156,7 +156,7 @@ func (wh *WorkloadHandler) txAdder(workloads chan interface{}, ready chan bool) 
 	// Changes to implement
 	// - workload is now [][][]byte - allows for per-second intervals
 	// - blockchain interface must take ^ for parseworkload
-	// - sending / receiving the workload through master must also be handled
+	// - sending / receiving the workload through primary must also be handled
 	// - workload generation must return [][][]byte
 }
 
