@@ -47,7 +47,7 @@ The secondary clients are acting as clients interacting with the blockchain. Eac
 ### Installation
 
 1. Clone this repository
-2. Run `go get` in this repository to install dependencies.
+2. Run `go mod download` in this repository to install dependencies.
 3. Build the benchmark using the `Makefile` or directly calling ``go build main/diablo.go``
 
 ### Running the Benchmark
@@ -63,7 +63,7 @@ for example:
 
 2. Once you see the "ready to connect", start the secondaries on their respective machines:
 ```sh
-./diablo secondary -m "<master IP>:<port>" -cc /path/to/chain/config
+./diablo secondary -m "<Primary IP>:<port>" -cc /path/to/chain/config
 ```
 for example:
 ```sh
