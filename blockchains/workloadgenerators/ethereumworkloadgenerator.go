@@ -296,7 +296,10 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 			padding := make([]byte, 31)
 			payloadBytes = append(payloadBytes, padding...)
 			buf := new(bytes.Buffer)
-			binary.Write(buf, binary.BigEndian, int8(num))
+			err = binary.Write(buf, binary.BigEndian, int8(num))
+			if err != nil {
+				return nil, err
+			}
 			payloadBytes = append(payloadBytes, buf.Bytes()...)
 			break
 		case "int32":
@@ -309,7 +312,10 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 			padding := make([]byte, 28)
 			payloadBytes = append(payloadBytes, padding...)
 			buf := new(bytes.Buffer)
-			binary.Write(buf, binary.BigEndian, int32(num))
+			err = binary.Write(buf, binary.BigEndian, int32(num))
+			if err != nil {
+				return nil, err
+			}
 			payloadBytes = append(payloadBytes, buf.Bytes()...)
 			break
 		case "int64":
@@ -322,7 +328,10 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 			padding := make([]byte, 24)
 			payloadBytes = append(payloadBytes, padding...)
 			buf := new(bytes.Buffer)
-			binary.Write(buf, binary.BigEndian, num)
+			err = binary.Write(buf, binary.BigEndian, num)
+			if err != nil {
+				return nil, err
+			}
 			payloadBytes = append(payloadBytes, buf.Bytes()...)
 			break
 		case "int256", "int":
