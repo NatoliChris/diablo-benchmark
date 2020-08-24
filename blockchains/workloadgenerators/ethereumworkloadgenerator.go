@@ -1,9 +1,11 @@
 package workloadgenerators
 
 import (
+	"bytes"
 	"context"
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/configs/parsers"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -17,6 +19,7 @@ import (
 	"go.uber.org/zap"
 	"math/big"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -29,6 +32,7 @@ type EthereumWorkloadGenerator struct {
 	Nonces            map[string]uint64
 	ChainID           *big.Int
 	KnownAccounts     []configs.ChainKey
+	CompiledContract  *compiler.Contract
 }
 
 // Returns a new instance of the generator
@@ -86,7 +90,7 @@ func (e *EthereumWorkloadGenerator) InitParams() error {
 		e.Nonces[key.Address] = v
 	}
 
-	zap.L().Info("Client contacted and got params",
+	zap.L().Info("Blockchain client contacted and got params",
 		zap.String("gasPrice", e.SuggestedGasPrice.String()),
 		zap.String("chainID", e.ChainID.String()))
 
@@ -172,7 +176,7 @@ func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, c
 			zap.L().Info("contract deploy transaction",
 				zap.String("contract", k))
 
-			bytecodeBytes, err := hex.DecodeString(v.Code)
+			bytecodeBytes, err := hex.DecodeString(v.Code[2:])
 
 			if err != nil {
 				return []byte{}, err
@@ -191,6 +195,7 @@ func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, c
 
 			// Update nonce
 			e.Nonces[addrFrom.String()]++
+			e.CompiledContract = v
 
 			return signedTx.MarshalJSON()
 		}
@@ -208,7 +213,154 @@ func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, c
 }
 
 // Creates an interaction with the contract
-func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams map[string]interface{}) ([]byte, error) {
+func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []ContractParam) ([]byte, error) {
+	// Check that the contract has been compiled, if nto - then it's difficult to get the hashes from the ABI.
+	if e.CompiledContract == nil {
+		return nil, fmt.Errorf("contract does not exist in known generator")
+	}
+
+	// next - get the function hash
+	var funcHash string
+	if val, ok := e.CompiledContract.Hashes[functionName]; !ok {
+		return nil, fmt.Errorf("contract does not contain function: %s", functionName)
+	} else {
+		funcHash = val
+	}
+
+	// Now we need to parse the arguments to get them into the correct padding
+	payloadBytes, err := hex.DecodeString(funcHash)
+	if err != nil {
+		return nil, err
+	}
+
+	// Then go through and convert the params
+	// Types taken from: https://solidity.readthedocs.io/en/develop/abi-spec.html#types
+	// NOTE: need to pad to 32 bytes
+	for _, v := range contractParams {
+		switch v.Type {
+		// uints
+		case "uint8":
+			// uint 8 = 1 byte
+			// padding = 31 bytes
+			num, err := strconv.ParseUint(v.Value, 10, 8)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
+			}
+			padding := make([]byte, 31)
+			payloadBytes = append(payloadBytes, padding...)
+			payloadBytes = append(payloadBytes, uint8(num))
+			break
+		case "uint32":
+			// uint 32 = 4 bytes
+			// padding = 28 bytes
+			num, err := strconv.ParseUint(v.Value, 10, 32)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
+			}
+			padding := make([]byte, 28)
+			payloadBytes = append(payloadBytes, padding...)
+			numBytes := make([]byte, 4)
+			binary.BigEndian.PutUint32(numBytes, uint32(num))
+			payloadBytes = append(payloadBytes, numBytes...)
+			break
+		case "uint64":
+			// uint 64 = 8 bytes
+			// padding = 24 bytes
+			num, err := strconv.ParseUint(v.Value, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
+			}
+			padding := make([]byte, 24)
+			payloadBytes = append(payloadBytes, padding...)
+			numBytes := make([]byte, 8)
+			binary.BigEndian.PutUint64(numBytes, num)
+			payloadBytes = append(payloadBytes, numBytes...)
+			break
+		case "uint256", "uint":
+			// uint 256 = 64 bytes
+			//  padding = 0
+			num, ok := big.NewInt(0).SetString(v.Value, 10)
+			if !ok {
+				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
+			}
+			payloadBytes = append(payloadBytes, num.Bytes()...)
+			break
+		// ints
+		case "int8":
+			// int 8 = 1 byte
+			// padding = 31 bytes
+			num, err := strconv.ParseInt(v.Value, 10, 8)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
+			}
+			padding := make([]byte, 31)
+			payloadBytes = append(payloadBytes, padding...)
+			buf := new(bytes.Buffer)
+			binary.Write(buf, binary.BigEndian, int8(num))
+			payloadBytes = append(payloadBytes, buf.Bytes()...)
+			break
+		case "int32":
+			// int 32 = 4 bytes
+			// padding = 28 bytes
+			num, err := strconv.ParseInt(v.Value, 10, 32)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
+			}
+			padding := make([]byte, 28)
+			payloadBytes = append(payloadBytes, padding...)
+			buf := new(bytes.Buffer)
+			binary.Write(buf, binary.BigEndian, int32(num))
+			payloadBytes = append(payloadBytes, buf.Bytes()...)
+			break
+		case "int64":
+			// int 32 = 4 bytes
+			// padding = 28 bytes
+			num, err := strconv.ParseInt(v.Value, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
+			}
+			padding := make([]byte, 24)
+			payloadBytes = append(payloadBytes, padding...)
+			buf := new(bytes.Buffer)
+			binary.Write(buf, binary.BigEndian, num)
+			payloadBytes = append(payloadBytes, buf.Bytes()...)
+			break
+		case "int256", "int":
+			num, ok := big.NewInt(0).SetString(v.Value, 10)
+			if !ok {
+				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
+			}
+			payloadBytes = append(payloadBytes, num.Bytes()...)
+			break
+		// bool
+		case "bool":
+			var bVal uint8
+			if v.Value == "true" {
+				bVal = 1
+			} else if v.Value == "false" {
+				bVal = 0
+			} else {
+				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
+			}
+			padding := make([]byte, 31)
+			payloadBytes = append(payloadBytes, padding...)
+			payloadBytes = append(payloadBytes, bVal)
+			break
+		// address
+		case "address":
+			// uint160
+			break
+		// bytes
+		case "bytes24":
+			break
+		case "bytes32":
+			break
+			// Default
+		default:
+			return nil, fmt.Errorf("invalid arg type: %s", v.Type)
+		}
+	}
+
 	return []byte{}, nil
 }
 
@@ -244,31 +396,31 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, 
 	// Update the nonce (if we are using multiple transactions from the same account)
 	e.Nonces[addrFrom.String()]++
 
-	// Return the transaction in bytes ready to send to the clients.
+	// Return the transaction in bytes ready to send to the secondaries and threads.
 	return signedTx.MarshalJSON()
 }
 
 // Generate a simple transaction value transfer workload
-// returns: Workload ([client][worker][time][tx]) -> [][][][]byte
+// returns: Workload ([secondary][threads][time][tx]) -> [][][][]byte
 func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 
 	// get the known accounts
 	var totalWorkload Workload
 
-	for clientNum := 0; clientNum < e.BenchConfig.Clients; clientNum++ {
-		// client = [worker][interval][tx=[]byte]
+	for secondaryNum := 0; secondaryNum < e.BenchConfig.Secondaries; secondaryNum++ {
+		// secondaryWorkload = [thread][interval][tx=[]byte]
 		// [][][][]byte
-		clientWorkload := make(ClientWorkload, 0)
-		for worker := 0; worker < e.BenchConfig.Workers; worker++ {
-			// Worker workload = list of transactions in intervals
+		secondaryWorkload := make(SecondaryWorkload, 0)
+		for thread := 0; thread < e.BenchConfig.Threads; thread++ {
+			// Thread workload = list of transactions in intervals
 			// [interval][tx] = [][][]byte
-			workerWorkload := make(WorkerWorkload, 0)
-			// for each worker, generate the intervals of transactions.
+			threadWorkload := make(WorkerThreadWorkload, 0)
+			// for each thread, generate the intervals of transactions.
 			for interval, txnum := range e.BenchConfig.TxInfo.Intervals {
 				// Debug print for each interval to monitor correctness
 				zap.L().Debug("Making workload ",
-					zap.Int("client", clientNum),
-					zap.Int("worker", worker),
+					zap.Int("secondary", secondaryNum),
+					zap.Int("thread", thread),
 					zap.Int("interval", interval),
 					zap.Int("value", txnum))
 
@@ -284,8 +436,8 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 						return nil, errors.New("failed to set TX value")
 					}
 					tx, err := e.CreateSignedTransaction(
-						e.KnownAccounts[(clientNum+worker)%len(e.KnownAccounts)].PrivateKey,
-						e.KnownAccounts[((clientNum+worker)+1)%len(e.KnownAccounts)].Address,
+						e.KnownAccounts[(secondaryNum+thread)%len(e.KnownAccounts)].PrivateKey,
+						e.KnownAccounts[((secondaryNum+thread)+1)%len(e.KnownAccounts)].Address,
 						txVal,
 						[]byte{},
 					)
@@ -296,11 +448,11 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 
 					intervalWorkload = append(intervalWorkload, tx)
 				}
-				workerWorkload = append(workerWorkload, intervalWorkload)
+				threadWorkload = append(threadWorkload, intervalWorkload)
 			}
-			clientWorkload = append(clientWorkload, workerWorkload)
+			secondaryWorkload = append(secondaryWorkload, threadWorkload)
 		}
-		totalWorkload = append(totalWorkload, clientWorkload)
+		totalWorkload = append(totalWorkload, secondaryWorkload)
 	}
 
 	return totalWorkload, nil
@@ -310,10 +462,10 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 	return nil, nil
 }
 
-// Generate the workload, returning the slice of transactions. [clientID = [ list of transactions ] ]
+// Generate the workload, returning the slice of transactions. [secondaryID = [ list of transactions ] ]
 func (e *EthereumWorkloadGenerator) GenerateWorkload() (Workload, error) {
-	// 1/ work out the total number of clients.
-	numberOfWorkingClients := e.BenchConfig.Clients * e.BenchConfig.Workers
+	// 1/ work out the total number of secondarys.
+	numberOfWorkingSecondaries := e.BenchConfig.Secondaries * e.BenchConfig.Threads
 
 	// Get the number of transactions to be created
 	numberOfTransactions, err := parsers.GetTotalNumberOfTransactions(e.BenchConfig)
@@ -323,13 +475,13 @@ func (e *EthereumWorkloadGenerator) GenerateWorkload() (Workload, error) {
 	}
 
 	// Total transactions
-	totalTx := numberOfTransactions * numberOfWorkingClients
+	totalTx := numberOfTransactions * numberOfWorkingSecondaries
 
 	zap.L().Info(
 		"Generating workload",
 		zap.String("workloadType", string(e.BenchConfig.TxInfo.TxType)),
-		zap.Int("clients", numberOfWorkingClients),
-		zap.Int("transactionsPerClient", numberOfTransactions),
+		zap.Int("secondaries", numberOfWorkingSecondaries),
+		zap.Int("transactionsPerSecondary", numberOfTransactions),
 		zap.Int("totalTransactions", totalTx),
 	)
 
