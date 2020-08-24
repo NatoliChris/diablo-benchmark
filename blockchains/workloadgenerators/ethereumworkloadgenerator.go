@@ -357,12 +357,15 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 			break
 		// address
 		case "address":
+			// TODO implement
 			// uint160
 			break
 		// bytes
 		case "bytes24":
+			// TODO implement
 			break
 		case "bytes32":
+			// TODO implement
 			break
 			// Default
 		default:
