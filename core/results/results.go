@@ -10,7 +10,7 @@ type Results struct {
 }
 
 type AggregatedResults struct {
-	ClientResults     []Results // All results from clients
+	SecondaryResults  []Results // All results from secondaries
 	TotalThroughput   float64   // Total cumulative throughput
 	MaxThroughput     float64   // maximum throughput observed
 	MinThroughput     float64   // minimum throughput observed
@@ -21,22 +21,22 @@ type AggregatedResults struct {
 	MedianLatency     float64   // median latency
 }
 
-func CalculateAggregatedResults(clientResults []Results) AggregatedResults {
+func CalculateAggregatedResults(secondaryResults []Results) AggregatedResults {
 
-	if len(clientResults) == 0 {
+	if len(secondaryResults) == 0 {
 		return AggregatedResults{}
 	}
 
 	// First, we want to get all the information
 	var averageThroughput float64 = 0
 	var maxThroughput float64 = 0
-	minThroughput := clientResults[0].Throughput
+	minThroughput := secondaryResults[0].Throughput
 	var totalThroughput float64 = 0
 
 	var allLatencies []float64
 	var averageLatency float64 = 0
 
-	for _, res := range clientResults {
+	for _, res := range secondaryResults {
 		allLatencies = append(allLatencies, res.TxLatencies...)
 
 		// Averages
@@ -59,8 +59,8 @@ func CalculateAggregatedResults(clientResults []Results) AggregatedResults {
 	}
 
 	sort.Float64s(allLatencies)
-	averageThroughput = averageThroughput / float64(len(clientResults))
-	averageLatency = averageLatency / float64(len(clientResults))
+	averageThroughput = averageThroughput / float64(len(secondaryResults))
+	averageLatency = averageLatency / float64(len(secondaryResults))
 	var medianLatency float64 = 0
 
 	// If it's even
@@ -72,7 +72,7 @@ func CalculateAggregatedResults(clientResults []Results) AggregatedResults {
 	}
 
 	return AggregatedResults{
-		ClientResults:     clientResults,
+		SecondaryResults:  secondaryResults,
 		TotalThroughput:   totalThroughput,
 		MaxThroughput:     maxThroughput,
 		MinThroughput:     minThroughput,

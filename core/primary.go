@@ -13,7 +13,7 @@ import (
 
 // Primary
 type Primary struct {
-	Server            *communication.PrimaryServer // TCP server identified with the primary for all clients to connect to
+	Server            *communication.PrimaryServer // TCP server identified with the primary for all secondaries to connect to
 	workloadGenerator workloadgenerators.WorkloadGenerator
 	benchmarkConfig   *configs.BenchConfig
 	chainConfig       *configs.ChainConfig
@@ -21,8 +21,8 @@ type Primary struct {
 
 // Initialise the primary server and return an instance of the primary
 // This will be passed back to the main
-func InitPrimary(listenAddr string, expectedClients int, wg workloadgenerators.WorkloadGenerator, bConfig *configs.BenchConfig, cConfig *configs.ChainConfig) *Primary {
-	s, err := communication.SetupPrimaryTCP(listenAddr, expectedClients)
+func InitPrimary(listenAddr string, expectedSecondaries int, wg workloadgenerators.WorkloadGenerator, bConfig *configs.BenchConfig, cConfig *configs.ChainConfig) *Primary {
+	s, err := communication.SetupPrimaryTCP(listenAddr, expectedSecondaries)
 	if err != nil {
 		// TODO remove panic
 		panic(err)
@@ -56,30 +56,30 @@ func (p *Primary) Run() {
 		return
 	}
 
-	// Get the client connections ready
-	clientReadyChannel := make(chan bool, 1)
-	go p.Server.HandleClients(clientReadyChannel)
-	<-clientReadyChannel
-	close(clientReadyChannel)
+	// Get the secondary connections ready
+	secondaryReadyChannel := make(chan bool, 1)
+	go p.Server.HandleSecondaries(secondaryReadyChannel)
+	<-secondaryReadyChannel
+	close(secondaryReadyChannel)
 
 	// Parse the config files
 	// Run all preparation
 
 	// Run through the benchmark suite
-	// Step 1: send "PREPARE" to clients, make sure we can communicate.
-	errs := p.Server.PrepareBenchmarkClients(uint32(p.benchmarkConfig.Workers))
+	// Step 1: send "PREPARE" to secondaries, make sure we can communicate.
+	errs := p.Server.PrepareBenchmarkSecondaries(uint32(p.benchmarkConfig.Threads))
 
 	if errs != nil {
 		// We have errors
-		p.Server.CloseClients()
+		p.Server.CloseSecondaries()
 		p.Server.Close()
-		zap.L().Error("Encountered errors in clients",
+		zap.L().Error("Encountered errors in secondaries",
 			zap.Strings("errors", errs))
 	}
 
-	// Number of clients connected
-	zap.L().Info("Benchmark clients all connected.",
-		zap.Int("clients", len(p.Server.Clients)))
+	// Number of secondaries connected
+	zap.L().Info("Benchmark secondaries all connected.",
+		zap.Int("secondaries", len(p.Server.Secondaries)))
 
 	// Set up the blockchain information
 
@@ -88,7 +88,7 @@ func (p *Primary) Run() {
 	bcMessage, err := blockchains.MatchStringToMessage(p.chainConfig.Name)
 
 	if err != nil {
-		p.Server.CloseClients()
+		p.Server.CloseSecondaries()
 		p.Server.Close()
 	}
 
@@ -97,7 +97,7 @@ func (p *Primary) Run() {
 	if errs != nil {
 		zap.L().Error("failed to send blockchain type",
 			zap.Strings("errors", errs))
-		p.Server.CloseClients()
+		p.Server.CloseSecondaries()
 		p.Server.Close()
 		return
 	}
@@ -166,6 +166,6 @@ func (p *Primary) Run() {
 	time.Sleep(2 * time.Second)
 
 	// Step 8: Close all connections
-	p.Server.CloseClients()
+	p.Server.CloseSecondaries()
 	p.Server.Close()
 }

@@ -68,17 +68,17 @@ func runPrimary(primaryArgs *core.PrimaryArgs) {
 	wg := generatorClass.NewGenerator(cConfig, bConfig)
 
 	// Initialise the TCP server
-	m := core.InitPrimary(primaryArgs.ListenAddr, bConfig.Clients, wg, bConfig, cConfig)
+	m := core.InitPrimary(primaryArgs.ListenAddr, bConfig.Secondaries, wg, bConfig, cConfig)
 
 	// Run the benchmark flow
 	m.Run()
 }
 
-// Run the worker
-func runWorker(workerArgs *core.WorkerArgs) {
-	workerArgs.WorkerArgs()
+// Run the secondary
+func runSecondary(secondaryArgs *core.SecondaryArgs) {
+	secondaryArgs.SecondaryArgs()
 
-	chainConfiguration, err := parsers.ParseChainConfig(workerArgs.ChainConfigPath)
+	chainConfiguration, err := parsers.ParseChainConfig(secondaryArgs.ChainConfigPath)
 
 	if err != nil {
 		zap.L().Error("failed to parse config",
@@ -86,14 +86,14 @@ func runWorker(workerArgs *core.WorkerArgs) {
 		os.Exit(1)
 	}
 
-	worker, err := core.NewWorker(chainConfiguration, workerArgs.PrimaryAddr)
+	secondary, err := core.NewSecondary(chainConfiguration, secondaryArgs.PrimaryAddr)
 
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	worker.Run()
+	secondary.Run()
 }
 
 // Main running function
@@ -118,18 +118,18 @@ func main() {
 
 			runPrimary(args.PrimaryArgs)
 
-		case "worker":
+		case "secondary":
 			// Print the welcome message
 			printWelcome(false)
 
 			// Parse the arguments
-			err := args.WorkerCommand.Parse(os.Args[2:])
+			err := args.SecondaryCommand.Parse(os.Args[2:])
 			if err != nil {
 				zap.L().Error("error parsing",
 					zap.Error(err))
 				os.Exit(1)
 			}
-			runWorker(args.WorkerArgs)
+			runSecondary(args.SecondaryArgs)
 		}
 	}
 }

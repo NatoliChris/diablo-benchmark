@@ -6,9 +6,15 @@ import (
 )
 
 // Workload definitions for ease of use
-type Workload [][][][][]byte     // Workload: [client][worker][time][txlist][txbytes]
-type ClientWorkload [][][][]byte // Client workload: [worker][time][txlist][txbytes]
-type WorkerWorkload [][][]byte   // Worker workload: [time][txlist][txbytes]
+type Workload [][][][][]byte         // Workload: [secondary][worker][time][txlist][txbytes]
+type SecondaryWorkload [][][][]byte  // Secondary workload: [worker][time][txlist][txbytes]
+type WorkerThreadWorkload [][][]byte // Worker workload: [time][txlist][txbytes]
+
+// Definitions
+type ContractParam struct {
+	Type  string // The argument type
+	Value string // The value of the argument (as interface for easy conversion)
+}
 
 type WorkloadGenerator interface {
 	// Creates a new instance of the workload generator for the specific type of blockchain

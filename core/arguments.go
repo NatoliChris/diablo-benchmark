@@ -8,10 +8,10 @@ import (
 
 // All the available arguments
 type Arguments struct {
-	PrimaryCommand *flag.FlagSet // Commands related to the primary
-	WorkerCommand  *flag.FlagSet // Commands related to the workers
-	PrimaryArgs    *PrimaryArgs  // Primary arguments
-	WorkerArgs     *WorkerArgs   // Worker arguments
+	PrimaryCommand   *flag.FlagSet  // Commands related to the primary
+	SecondaryCommand *flag.FlagSet  // Commands related to the secondarys
+	PrimaryArgs      *PrimaryArgs   // Primary arguments
+	SecondaryArgs    *SecondaryArgs // Secondary arguments
 }
 
 // Arguments for the paster
@@ -21,29 +21,29 @@ type PrimaryArgs struct {
 	ListenAddr      string // host:port that it should run on
 }
 
-// Worker arguments
-type WorkerArgs struct {
-	ConfigPath      string // Path to the worker config
+// Secondary arguments
+type SecondaryArgs struct {
+	ConfigPath      string // Path to the secondary config
 	ChainConfigPath string // Path to the blockchain configuration
-	PrimaryAddr     string // Address of the primary (can also be in worker config)
+	PrimaryAddr     string // Address of the primary (can also be in secondary config)
 }
 
 // Initialise the arguments
 func DefineArguments() *Arguments {
 
 	primaryCommand := flag.NewFlagSet("primary", flag.ExitOnError)
-	workerCommand := flag.NewFlagSet("worker", flag.ExitOnError)
+	secondaryCommand := flag.NewFlagSet("secondary", flag.ExitOnError)
 
 	primaryArgs := PrimaryArgs{}
-	workerArgs := WorkerArgs{}
+	secondaryArgs := SecondaryArgs{}
 
 	// General arguments
 	// --config
 
 	primaryCommand.StringVar(&primaryArgs.BenchConfigPath, "config", "", "--config=/path/to/config (required)")
 	primaryCommand.StringVar(&primaryArgs.BenchConfigPath, "c", "", "-c /path/to/config")
-	workerCommand.StringVar(&workerArgs.ConfigPath, "config", "", "--config=/path/to/config (required)")
-	workerCommand.StringVar(&workerArgs.ConfigPath, "c", "", "-c /path/to/config")
+	secondaryCommand.StringVar(&secondaryArgs.ConfigPath, "config", "", "--config=/path/to/config (required)")
+	secondaryCommand.StringVar(&secondaryArgs.ConfigPath, "c", "", "-c /path/to/config")
 
 	// Primary Arguments
 	primaryCommand.StringVar(&primaryArgs.ListenAddr, "addr", "", "--addr=addr (e.g. --addr=\"0.0.0.0:8323\")")
@@ -52,19 +52,19 @@ func DefineArguments() *Arguments {
 	primaryCommand.StringVar(&primaryArgs.ChainConfigPath, "chain-config", "", "--chain-config=/path/to/chain/yml (required)")
 	primaryCommand.StringVar(&primaryArgs.ChainConfigPath, "cc", "", "-cc /path/to/chain/yml")
 
-	// Worker Arguments
-	workerCommand.StringVar(&workerArgs.PrimaryAddr, "primary", "", "--primary=<ipaddr>:<port>")
-	workerCommand.StringVar(&workerArgs.PrimaryAddr, "m", "", "-m <ipaddress>:<port>")
+	// Secondary Arguments
+	secondaryCommand.StringVar(&secondaryArgs.PrimaryAddr, "primary", "", "--primary=<ipaddr>:<port>")
+	secondaryCommand.StringVar(&secondaryArgs.PrimaryAddr, "m", "", "-m <ipaddress>:<port>")
 
-	workerCommand.StringVar(&workerArgs.ChainConfigPath, "chain-config", "", "--chain-config=/path/to/chain/yml (required)")
-	workerCommand.StringVar(&workerArgs.ChainConfigPath, "cc", "", "-cc /path/to/chain/yml")
+	secondaryCommand.StringVar(&secondaryArgs.ChainConfigPath, "chain-config", "", "--chain-config=/path/to/chain/yml (required)")
+	secondaryCommand.StringVar(&secondaryArgs.ChainConfigPath, "cc", "", "-cc /path/to/chain/yml")
 
 	// Return all the arguments
 	return &Arguments{
-		PrimaryCommand: primaryCommand, // The primary command FlagSet
-		WorkerCommand:  workerCommand,  // The worker command FlagSet
-		PrimaryArgs:    &primaryArgs,   // The primary argument list, contains config and other args
-		WorkerArgs:     &workerArgs,    // The worker argument list, contains config and other args
+		PrimaryCommand:   primaryCommand,   // The primary command FlagSet
+		SecondaryCommand: secondaryCommand, // The secondary command FlagSet
+		PrimaryArgs:      &primaryArgs,     // The primary argument list, contains config and other args
+		SecondaryArgs:    &secondaryArgs,   // The secondary argument list, contains config and other args
 	}
 }
 
@@ -81,15 +81,15 @@ func (pa *PrimaryArgs) CheckArgs() {
 	}
 }
 
-// Checks that the worker arguments are correct
-func (wa *WorkerArgs) WorkerArgs() {
+// Checks that the secondary arguments are correct
+func (sa *SecondaryArgs) SecondaryArgs() {
 	// We must have at least one - either the primary address or the config
-	if wa.ConfigPath == "" && wa.PrimaryAddr == "" {
+	if sa.ConfigPath == "" && sa.PrimaryAddr == "" {
 		zap.L().Error("primary information not provided")
 		os.Exit(0)
 	}
 
-	if wa.ChainConfigPath == "" {
+	if sa.ChainConfigPath == "" {
 		zap.L().Error("no chain config provided")
 		os.Exit(1)
 	}

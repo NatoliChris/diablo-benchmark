@@ -53,7 +53,7 @@ func (wh *WorkloadHandler) Connect(nodes []string, ID int) error {
 }
 
 // Parse the workloads on each client, populate the channels
-func (wh *WorkloadHandler) ParseWorkloads(rawWorkload workloadgenerators.ClientWorkload) error {
+func (wh *WorkloadHandler) ParseWorkloads(rawWorkload workloadgenerators.SecondaryWorkload) error {
 
 	// Set up the workload channels
 	var readyChannels []chan bool

@@ -4,8 +4,8 @@ package configs
 type BenchConfig struct {
 	Name        string    `yaml:"name"`                  // Name of the benchmark
 	Description string    `yaml:"description,omitempty"` // Description of what it is
-	Workers     int       `yaml:"workers"`               // Number of workers per client expected
-	Clients     int       `yaml:"clients"`               // Number of client machines
+	Threads     int       `yaml:"threads"`               // Number of threads per secondary expected
+	Secondaries int       `yaml:"secondaries"`           // Number of secondary machines
 	TxInfo      BenchInfo `yaml:"bench,flow"`            // Benchmark transaction information
 }
 
