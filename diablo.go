@@ -1,4 +1,6 @@
-package main
+// DIABLO provides a unique blockchain benchmark framework focusing on analysis
+// of real-world workloads with distributed clients from the core.
+package diablo_benchmark
 
 import (
 	"diablo-benchmark/blockchains/workloadgenerators"
