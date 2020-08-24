@@ -75,7 +75,7 @@ func (e *EthereumInterface) Cleanup() results.Results {
 }
 
 // Parses the workload and convert into the type for the benchmark.
-func (e *EthereumInterface) ParseWorkload(workload workloadgenerators.WorkerWorkload) ([][]interface{}, error) {
+func (e *EthereumInterface) ParseWorkload(workload workloadgenerators.WorkerThreadWorkload) ([][]interface{}, error) {
 	parsedWorkload := make([][]interface{}, 0)
 
 	for _, v := range workload {

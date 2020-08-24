@@ -17,9 +17,9 @@ type ConnClient struct {
 // byte 1 : aux / len
 // byte 2-9 will be the uint64
 // 3 byte (16 bit number to represent size to read of payload)
-const READ_LENGTH int = 9
+const READLENGTH int = 9
 
-func SetupClientTCP(addr string) (*ConnClient, error) {
+func SetupSecondaryTCP(addr string) (*ConnClient, error) {
 	conn, err := net.Dial("tcp", addr)
 
 	if err != nil {
@@ -87,7 +87,7 @@ func (c *ConnClient) SendDataOK(data []byte) {
 // Initial read, always reads 4 bytes long
 // gets command, length or aux value
 func (c *ConnClient) InitialRead() ([]byte, error) {
-	buf := make([]byte, READ_LENGTH)
+	buf := make([]byte, READLENGTH)
 
 	_, err := c.Conn.Read(buf)
 	if err != nil {
