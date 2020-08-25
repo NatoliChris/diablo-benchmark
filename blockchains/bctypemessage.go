@@ -1,9 +1,10 @@
+package blockchains
+
 // TODO implement this module
 // This functionality was designed to provide a generic "diablo secondary" that runs on a machine, but is not tied
 // to a blockchain, but can dynamically change the blockchain. This allows for a secondary to run multiple tests
 // for different blockchains without having to start the secondary again.
 // Just a potential ease-of-use feature, nothing more than convenience, but most likely a bad idea.
-package blockchains
 
 import (
 	"diablo-benchmark/blockchains/clientinterfaces"

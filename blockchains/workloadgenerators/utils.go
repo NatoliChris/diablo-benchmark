@@ -6,6 +6,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// Matches the workload generator with the name provided of the chain in the configuration
+// If there is no match, there is an error returned. This is defined in the
+// chain configuration.
 func GetWorkloadGenerator(config *configs.ChainConfig) (WorkloadGenerator, error) {
 	var wg WorkloadGenerator
 
