@@ -25,14 +25,14 @@ import (
 
 // Generates the workload for the Ethereum blockchain
 type EthereumWorkloadGenerator struct {
-	ActiveConn        *ethclient.Client
-	SuggestedGasPrice *big.Int
-	BenchConfig       *configs.BenchConfig
-	ChainConfig       *configs.ChainConfig
-	Nonces            map[string]uint64
-	ChainID           *big.Int
-	KnownAccounts     []configs.ChainKey
-	CompiledContract  *compiler.Contract
+	ActiveConn        *ethclient.Client    // Active connection to a blockchain node for information
+	SuggestedGasPrice *big.Int             // Suggested gas price on the network
+	BenchConfig       *configs.BenchConfig // Benchmark configuration for workload intervals / type
+	ChainConfig       *configs.ChainConfig // Chain configuration to get number of transactions to make
+	Nonces            map[string]uint64    // Nonce of the known accounts
+	ChainID           *big.Int             // ChainID for transactions, provided through the ethereum API
+	KnownAccounts     []configs.ChainKey   // Known accounds, public:private key pair
+	CompiledContract  *compiler.Contract   // Compiled contract bytecode for the contract used in complex workloads
 }
 
 // Returns a new instance of the generator
@@ -40,7 +40,16 @@ func (e *EthereumWorkloadGenerator) NewGenerator(chainConfig *configs.ChainConfi
 	return &EthereumWorkloadGenerator{BenchConfig: benchConfig, ChainConfig: chainConfig}
 }
 
-// Set up the blockchain nodes
+// Set up the blockchain nodes with relevant information.
+// This is the function that can be used to create and generate a genesis block
+// as well as deliver the genesis block to the blockchain nodes and run the
+// setup command. By the end of this function, there should be:
+//  * Blockchain network of nodes running the blockchain
+//  * Valid genesis block running on the blockchains
+//  * List of accounts that are funded and known
+//
+// The main aspect of the blockchain setup is to provide a step to start the
+// blockchain nodes
 func (e *EthereumWorkloadGenerator) BlockchainSetup() error {
 	// TODO implement
 	// 1 - create N accounts only if we don't have accounts
@@ -65,6 +74,7 @@ func (e *EthereumWorkloadGenerator) InitParams() error {
 
 	e.ActiveConn = c
 
+	// Get the suggested gas price from the network using a client connected
 	e.SuggestedGasPrice, err = e.ActiveConn.SuggestGasPrice(context.Background())
 
 	if err != nil {
@@ -99,6 +109,7 @@ func (e *EthereumWorkloadGenerator) InitParams() error {
 
 // Generic account creation to return the private key
 func (e *EthereumWorkloadGenerator) CreateAccount() (interface{}, error) {
+	// Generate a private key
 	privKey, err := crypto.GenerateKey()
 
 	if err != nil {
@@ -470,7 +481,12 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 	return totalWorkload, nil
 }
 
+// Generates the workload for smart contract integration (or deployment)
+// NOTE: Future implementations can have a separation to test both
+// smart contract deployment and interaction in the same benchmark
+// This can simulate a very realistic blockchain trace to replay existing chains?
 func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error) {
+	// TODO implement
 	return nil, nil
 }
 

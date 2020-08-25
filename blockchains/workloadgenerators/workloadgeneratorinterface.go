@@ -1,3 +1,7 @@
+// Package workloadgenerators provides the workload generators for the
+// DIABLO benchmark. It handles the deployment and compilation of smart
+// contracts and the generation/creation of transactions that will be used
+// to send the information through to the blockchain network.
 package workloadgenerators
 
 import (
@@ -16,6 +20,9 @@ type ContractParam struct {
 	Value string // The value of the argument (as interface for easy conversion)
 }
 
+// Interface and basic functionality to generate a workload given the configurations.
+// The workload generator handles the creation of the transactions and additionally sets
+// up the blockchain and starts the blockchain nodes.
 type WorkloadGenerator interface {
 	// Creates a new instance of the workload generator for the specific type of blockchain
 	NewGenerator(chainConfig *configs.ChainConfig, benchConfig *configs.BenchConfig) WorkloadGenerator

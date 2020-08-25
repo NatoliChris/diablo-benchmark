@@ -17,6 +17,8 @@ import (
 	"time"
 )
 
+// The Ethereum implementation of the client interface
+// Provides functionality to interaact with the Ethereum blockchain
 type EthereumInterface struct {
 	Nodes           []string               // List of the nodes host:port combinations
 	PrimaryNode     *ethclient.Client      // The primary node connected for this client.
@@ -26,7 +28,7 @@ type EthereumInterface struct {
 	HandlersStarted bool                   // Have the handlers been initiated?
 	NumTxDone       uint64                 // Number of transactions done
 	NumTxSent       uint64                 // Number of transactions currently sent
-	TotalTx         int                    // TotalTx
+	TotalTx         int                    // Total number of transactions
 }
 
 // Initialise the list of nodes
@@ -97,6 +99,7 @@ func (e *EthereumInterface) ParseWorkload(workload workloadgenerators.WorkerThre
 	return parsedWorkload, nil
 }
 
+// Parse the blocks for the transactions
 func (e *EthereumInterface) parseBlocksForTransactions(blockNumber *big.Int) {
 	block, err := e.PrimaryNode.BlockByNumber(context.Background(), blockNumber)
 
@@ -141,6 +144,9 @@ func (e *EthereumInterface) EventHandler() {
 	}
 }
 
+// Go through all the blocks between start and end index, and check for the
+// transactions contained in the blocks. This can help with (A) latency, and
+// (B) correctness to ensure that committed transactions are actually in the blocks.
 func (e *EthereumInterface) ParseBlocksForTransactions(startNumber uint64, endNumber uint64) error {
 	for i := startNumber; i <= endNumber; i++ {
 		b, err := e.GetBlockByNumber(i)
@@ -236,6 +242,8 @@ func (e *EthereumInterface) DeploySmartContract(tx interface{}) (interface{}, er
 	return r.ContractAddress, nil
 }
 
+// Sends a raw transaction - it assumes that the transaction is the correct type
+// and has already been signed and is ready to send into the network.
 func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
 	// NOTE: type conversion might be slow, there might be a better way to send this.
 	txSigned := tx.(*ethtypes.Transaction)
@@ -251,12 +259,14 @@ func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
 	return nil
 }
 
+// Implement a "secure read" - will read a value from all connected nodes to ensure that the
+// value is the same.
 func (e *EthereumInterface) SecureRead(call_func string, call_params []byte) (interface{}, error) {
 	// TODO implement
 	return nil, nil
 }
 
-// Get the block information
+// Get the block information by passing it the height number.
 func (e *EthereumInterface) GetBlockByNumber(index uint64) (block GenericBlock, error error) {
 
 	var ethBlock map[string]interface{}
@@ -287,7 +297,8 @@ func (e *EthereumInterface) GetBlockByNumber(index uint64) (block GenericBlock, 
 	}, nil
 }
 
-// Get the block height through the RPC interaction.
+// Get the block height through the RPC interaction. Should return the index
+// of the block.
 func (e *EthereumInterface) GetBlockHeight() (uint64, error) {
 
 	h, err := e.PrimaryNode.HeaderByNumber(context.Background(), nil)

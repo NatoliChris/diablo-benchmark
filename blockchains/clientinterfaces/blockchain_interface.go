@@ -1,3 +1,8 @@
+// Package clientinterfaces provides the implementations and interactions of the
+// specific blockchain interface. The "blockchain_interface" is the main interface
+// defining the required functionality of all implementations for the blockchain.
+// This package is defined to integrate the interactions of the different
+// blockchain RPC interactions.
 package clientinterfaces
 
 import (
