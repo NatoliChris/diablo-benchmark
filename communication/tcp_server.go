@@ -271,6 +271,9 @@ func (s *PrimaryServer) SendBlockchainType(bcType blockchains.BlockchainTypeMess
 	return errorList
 }
 
+// Action to send the workload to all secondaries. Encodes the workload in the
+// chosen encoding in helpers.go and will send off the bytes to be read and processed
+// by the secondary.
 func (s *PrimaryServer) SendWorkload(workloads workloadgenerators.Workload) SecondaryReplyErrors {
 	var errorList []error
 
@@ -299,6 +302,7 @@ func (s *PrimaryServer) SendWorkload(workloads workloadgenerators.Workload) Seco
 	return nil
 }
 
+// Sends the message to all secondaries to run the benchmark.
 func (s *PrimaryServer) RunBenchmark() SecondaryReplyErrors {
 	zap.L().Info("\n------------\nStarting Benchmark\n------------\n")
 
@@ -355,6 +359,8 @@ func (s *PrimaryServer) RunBenchmark() SecondaryReplyErrors {
 	return errorList
 }
 
+// Call the secondaries to return the results.
+// Will return the list of results as well as any errors that had been encountered
 func (s *PrimaryServer) GetResults() ([]results.Results, SecondaryReplyErrors) {
 	var allResults []results.Results
 	var errs SecondaryReplyErrors
