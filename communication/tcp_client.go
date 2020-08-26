@@ -8,8 +8,11 @@ import (
 	"net"
 )
 
+// The connection client provides an active connection from the secondary to
+// the primary. The main action of the connection is to receive commands and to
+// reply with OK or errors and results.
 type ConnClient struct {
-	Conn net.Conn
+	Conn net.Conn // Active connection to the primary
 }
 
 // The amount to read on first read
@@ -19,7 +22,14 @@ type ConnClient struct {
 // 3 byte (16 bit number to represent size to read of payload)
 const READLENGTH int = 9
 
+// Maximum value to read in one read operation.
+// If the size we need to read is greater, then we need to read split amounts
+// and iterate through the reading.
+const MAXREAD uint64 = 65500
+
+// Connect to the master TCP address and return the connected client
 func SetupSecondaryTCP(addr string) (*ConnClient, error) {
+	// Dial the address, return the error if we cannot
 	conn, err := net.Dial("tcp", addr)
 
 	if err != nil {
@@ -97,11 +107,15 @@ func (c *ConnClient) InitialRead() ([]byte, error) {
 	return buf, nil
 }
 
+// Reads information over a number of "reads".
+// This should happen if the size of the object to read is larger than the
+// size of a full read in go.
 func (c *ConnClient) ReadSplit(totalSize uint64) ([]byte, error) {
 	fullData := make([]byte, 0)
 	buffer := make([]byte, 1024)
 	readLen := 0
 
+	// Loop through, iteratively reading until the EOF is reached.
 	for {
 		numRead, err := c.Conn.Read(buffer)
 		if err != nil {
@@ -125,7 +139,7 @@ func (c *ConnClient) ReadSplit(totalSize uint64) ([]byte, error) {
 // Read to the given size
 func (c *ConnClient) ReadSize(size uint64) ([]byte, error) {
 
-	if size > 65500 {
+	if size > MAXREAD {
 		// split read
 		return c.ReadSplit(size)
 	}

@@ -1,8 +1,9 @@
-// This file is part of the DIABLO benchmark framework.
-
 // This file lists the messages used during communication of
 // the primary and the secondary benchmark clients.
 
+// Package communication provides the tcp communication between the primary
+// and the running secondaries. It is used to transfer commands from the primary
+// to the secondary and then run the secondary processes.
 package communication
 
 // Communication Messages
