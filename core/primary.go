@@ -1,3 +1,8 @@
+// Package core provides the critical handlers and structures that run the
+// benchmark. This includes the code for the primary and secondary nodes as well
+// as any major handlers (workload, results, etc.). This code should not be
+// required to be augmented when integrating a new blockchain or adding
+// new workloads.
 package core
 
 import (
@@ -11,12 +16,12 @@ import (
 	"time"
 )
 
-// Primary
+// Primary benchmark server, acts as the orchestrator for the benchmark
 type Primary struct {
-	Server            *communication.PrimaryServer // TCP server identified with the primary for all secondaries to connect to
-	workloadGenerator workloadgenerators.WorkloadGenerator
-	benchmarkConfig   *configs.BenchConfig
-	chainConfig       *configs.ChainConfig
+	Server            *communication.PrimaryServer         // TCP server identified with the primary for all secondaries to connect to
+	workloadGenerator workloadgenerators.WorkloadGenerator // Workload generator implementation that will generate the transactions
+	benchmarkConfig   *configs.BenchConfig                 // Benchmark configuration about the workload
+	chainConfig       *configs.ChainConfig                 // Chain configuration containing information about the nodes
 }
 
 // Initialise the primary server and return an instance of the primary
@@ -28,6 +33,7 @@ func InitPrimary(listenAddr string, expectedSecondaries int, wg workloadgenerato
 		panic(err)
 	}
 
+	// Return a new primary instance with the active communication set up
 	return &Primary{
 		Server:            s,
 		workloadGenerator: wg,
@@ -38,6 +44,7 @@ func InitPrimary(listenAddr string, expectedSecondaries int, wg workloadgenerato
 
 // Main functionality to run
 // Holds the majority of the work
+// TODO: under construction!
 func (p *Primary) Run() {
 	// First, set up the blockchain
 	err := p.workloadGenerator.BlockchainSetup()

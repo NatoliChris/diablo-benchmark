@@ -1,3 +1,7 @@
+// Package configs provides the parsers and validators that deal specifically
+// with the configuration files. The configuration files (bench, chain) provide
+// critical information for the benchmark and all processing must be done prior
+// to the generation of the workload.
 package configs
 
 // Benchmark configuration structure, all the information from the event.

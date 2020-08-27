@@ -8,12 +8,19 @@ import (
 // Transaction types (simple, contract, ...)
 type BenchTransactionType string
 
+// Simple transaction type, denoting just an asset transfer transaction.
 const TxTypeSimple BenchTransactionType = "simple"
+
+// Contract type, indicates that it will be a complex worklaod that has
+// contract interaction and deployment
 const TxTypeContract BenchTransactionType = "contract"
 
 // Transactions Per Second intervals
 type TPSIntervals map[int]int
 
+// Basic "key" structure for generic blockchains, provides a private key in
+// bytes, and the "Address" as a string - the address may change depending on
+// the blockchain.
 type ChainKey struct {
 	PrivateKey []byte `yaml:"private"` // Private key information
 	Address    string `yaml:address`   // Address that it is from
@@ -26,6 +33,7 @@ func checkPrefix(keyHex string) bool {
 		(keyHex[1] == 'x' || keyHex[1] == 'X') // followed by an x or X
 }
 
+// Custom YAML decoding for the chain key.
 func (ck *ChainKey) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var c struct {
 		PrivateKey string `yaml:"private"`
@@ -64,6 +72,7 @@ func (ck *ChainKey) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
+// Custom YAML Decode for a "bench transaction" type. (Simple / Contract)
 func (bt *BenchTransactionType) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var unmarshaled string
 

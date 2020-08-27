@@ -1,3 +1,4 @@
+// Package handlers provides the core handlers within the benchmark.
 package handlers
 
 import (
