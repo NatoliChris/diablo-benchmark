@@ -14,7 +14,7 @@ The interface lives in `diablo-benchmark/blockchains/clientinterfaces/blockchain
 and it defines all the functions that MUST be implemented to integrate a new blockchain.
 
 ```go
-type BlockchainInterface interface 
+type BlockchainInterface interface
 	// Provides the client with the list of all hosts, this is the pair of (host, port) in an array.
 	// This will be used for the secure reads.
 	Init(otherHosts []string)
@@ -140,3 +140,100 @@ about the blocks and the transactions included.
 **Close**
 
 This function closes the connection to the connected blockchain node(s).
+
+### workloadgenerators/workloadgeneratorinterface.go
+
+The workload generator interface provides the necessary functions to generate
+and create a workload of transactions. As part of an integration of a new
+blockchain, any changes in the virtual machine or transaction encoding should
+be implemented in a new workload generator.
+
+```go
+type WorkloadGenerator interface {
+	// Creates a new instance of the workload generator for the specific type of blockchain
+	NewGenerator(chainConfig *configs.ChainConfig, benchConfig *configs.BenchConfig) WorkloadGenerator
+
+	// Sets up the blockchain, creates necessary genesis, starts the blockchain through SSH commands, etc.
+	BlockchainSetup() error
+
+	// Initialises useful params for generation of the workloads
+	// For example, set up a connection to a node to get gas price / chainID, ... etc.
+	InitParams() error
+
+	// Creates an account and returns the <bytes(privateKey), address>
+	// TODO: should this be chainKey, or interface{} for a blockchain account of their own?
+	// CreateAccount() (configs.ChainKey, error)
+	CreateAccount() (interface{}, error)
+
+	// Deploys the contract and returns the contract address used in the chain.
+	DeployContract(fromPrivKey []byte, contractPath string) (string, error)
+
+	// Creates the raw signed transaction that will deploy a contract
+	CreateContractDeployTX(fromPrivKey []byte, contractPath string) ([]byte, error)
+
+	// Create a signed transaction that performs actions on a smart contract at the given address
+	CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []ContractParam) ([]byte, error)
+
+	// Creates a transaction that is signed and ready to send from the given private key.
+	CreateSignedTransaction(fromPrivKey []byte, toAddress string, value *big.Int, data []byte) ([]byte, error)
+
+	// Generates the workload specified in the chain configurations.
+	GenerateWorkload() (Workload, error)
+}
+```
+
+**NewGenerator**
+
+The new generator sets up all relevant fields in the generator and returns a
+new instance of the implemented generator.
+
+**BlockchainSetup**
+
+This function is provided to perform any necessary setup for blockchain nodes
+such as the creation of a genesis block, the creation of accounts, the
+distribution and starting of the blockchain. This step exists as a preliminary
+set up so that any blockchain-related starting functions can be called.
+
+**InitParams**
+
+The InitParams function is called to initialise any parameters that may be used
+during the workload generation. This could be contacting the blockchain for the
+account Nonce, the gas prices, etc.
+
+**CreateAccount**
+
+A generic account creation function that is used to generate a public:private
+key pair that will be used for signing and sending, or receiving transactions.
+
+**DeployContract**
+
+Provided a smart contract, the "DeployContract" deploys the smart contract
+and returns the address. This is an initial step for the contract workloads, as
+they must send a transaction to a known address.
+
+**CreateContractDeployTX**
+
+Generates a transaction that is used to deploy a contract. This is most likely
+used in the `DeployContract` function, but may be used in workloads where there
+is a measurement of the performance of contract deployment.
+
+**CreateInteractionTX**
+
+Generates a transaction that interacts with a smart contract given a function,
+arguments and the types. This is a low level function that converts high-level
+properties to interact with the contract into a transaction and relevant bytes.
+For example: `string: "hello"` will be converted into the bytecode for the
+contract interaction.
+
+**CreateSignedTransaction**
+
+Creates a generic signed transaction with the value, data signed from a private
+key and sent to a specified address. This is a basic form of transaction
+generation and should return a transaction ready to send in raw format on the
+secondary nodes with the `clientinterface`.
+
+**GenerateWorkload**
+
+Generates the workload specified in the benchmark configuration. This function
+should perform the checks and calculations to generate the entire workload for
+all secondaries in the benchmark.
