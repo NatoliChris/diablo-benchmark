@@ -2,6 +2,9 @@
 
 Diablo, an analytical blockchain benchmark framework focusing on distributed clients performing real-world workloads. The focus of this benchmark is to provide a benchmark framework with a focus on truly distributed clients performing realistic workloads to evaluate and analyse different blockchain systems.
 
+## Other Sections
+
+* [New Chains](docs/new-chains.md)
 
 ## Workloads
 
