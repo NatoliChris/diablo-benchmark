@@ -14,14 +14,14 @@ type Arguments struct {
 	SecondaryArgs    *SecondaryArgs // Secondary arguments
 }
 
-// Arguments for the paster
+// Arguments for the primary
 type PrimaryArgs struct {
 	BenchConfigPath string // Path to the configurations
 	ChainConfigPath string // Path to the chain configuration
 	ListenAddr      string // host:port that it should run on
 }
 
-// Secondary arguments
+// Arguments for the secondary nodes
 type SecondaryArgs struct {
 	ConfigPath      string // Path to the secondary config
 	ChainConfigPath string // Path to the blockchain configuration

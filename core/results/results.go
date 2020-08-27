@@ -1,3 +1,9 @@
+// Package results contains the information about the results and handles the
+// processing and display / logging of the information. The results are passed
+// from all secondaries and collated by the primary.
+// The goal of this package is to provide a central point to display the results
+// which over time will develop into more complex processing and utilisation of
+// available information.
 package results
 
 import "sort"
@@ -9,6 +15,8 @@ type Results struct {
 	Throughput     float64   `json:Throughput`     // Number of transactions per second "committed"
 }
 
+// Aggregated results returns all the information from all secondaries, and
+// stores the calculated information (e.g. max, min, ...)
 type AggregatedResults struct {
 	SecondaryResults  []Results // All results from secondaries
 	TotalThroughput   float64   // Total cumulative throughput
@@ -21,6 +29,7 @@ type AggregatedResults struct {
 	MedianLatency     float64   // median latency
 }
 
+// Given the set of results from the secondary, calculate the aggregated results
 func CalculateAggregatedResults(secondaryResults []Results) AggregatedResults {
 
 	if len(secondaryResults) == 0 {

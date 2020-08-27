@@ -1,3 +1,8 @@
+// Package validators provides the validation for configurations
+// With more complex chain and benchmark configurations, the validators should
+// verify the existence of core fields and ensure that the correct definitions
+// are available. This does NOT verify that the YAML is well formed, that is
+// performed through the decoding of the yaml in the parsers
 package validators
 
 import (

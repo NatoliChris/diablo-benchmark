@@ -1,3 +1,6 @@
+// Package parsers presents the parsing of configuration files, which will
+// parse and generate the related information necessary for the use in the
+// benchmark file
 package parsers
 
 import (

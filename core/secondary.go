@@ -13,6 +13,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// The secondary node that is tasked with providing workers and executing the
+// workload. Communicates with the primary to receive commands and information.
 type Secondary struct {
 	ID              int                                  // This secondary's unique ID
 	ChainConfig     *configs.ChainConfig                 // Chain configuration
@@ -156,6 +158,7 @@ func (s *Secondary) Run() {
 			s.WorkloadHandler.CloseAll()
 			return
 		default:
+			// Return that there was no matching command
 			s.PrimaryComms.ReplyERR("no matching command")
 			continue
 		}

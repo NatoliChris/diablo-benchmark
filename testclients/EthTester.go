@@ -1,3 +1,6 @@
+// Package testclients provides testing clients to test and generate information
+// used through development. The files in this folder are ONLY USED DURING
+// DEVELOPMENT and act as a sandbox to test and write functionality.
 package main
 
 import (
