@@ -14,7 +14,7 @@ The interface lives in `diablo-benchmark/blockchains/clientinterfaces/blockchain
 and it defines all the functions that MUST be implemented to integrate a new blockchain.
 
 ```go
-type BlockchainInterface interface
+type BlockchainInterface interface {
 	// Provides the client with the list of all hosts, this is the pair of (host, port) in an array.
 	// This will be used for the secure reads.
 	Init(otherHosts []string)
@@ -237,3 +237,21 @@ secondary nodes with the `clientinterface`.
 Generates the workload specified in the benchmark configuration. This function
 should perform the checks and calculations to generate the entire workload for
 all secondaries in the benchmark.
+
+
+### Other files
+
+#### clientinterfaces/utils.go
+
+This file provides the `GetBlockchainInterface` function which reads the string
+of the blockchain name and maps it to an implemented interface. For example,
+the configuration "ethereum" will result in returning the "EthereumInterface".
+This mapping should be updated with any new blockchain implementations.
+
+#### workloadgenerators/utils.go
+
+This file provides the utility function `GetWorkloadGenerator` function, which
+reads the name of the blockchain and returns the implemented workload generator.
+The "ethereum" string in the chain configuration passed to this function should
+return the "EthereumWorkloadGenerator", which will be used to generate the
+workloads for any Ethereum benchmark.
