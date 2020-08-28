@@ -354,6 +354,7 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 			break
 		// bool
 		case "bool":
+			// Bool is just a padded uint8 of value 0 or 1
 			var bVal uint8
 			if v.Value == "true" {
 				bVal = 1
@@ -368,15 +369,26 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 			break
 		// address
 		case "address":
-			// TODO implement
 			// uint160
+			// get the address
+			addr := common.HexToAddress(v.Value)
+			// padding - address bytes should be 20bytes long.
+			padding := make([]byte, 12)
+			payloadBytes = append(payloadBytes, padding...)
+			payloadBytes = append(payloadBytes, addr.Bytes()...)
 			break
 		// bytes
 		case "bytes24":
-			// TODO implement
+			// TODO this needs improvement!
+			s := []byte(v.Value)
+			padding := make([]byte, 32-len(s))
+			payloadBytes = append(payloadBytes, s...)
+			payloadBytes = append(payloadBytes, padding...)
 			break
 		case "bytes32":
-			// TODO implement
+			// TODO this needs improvement!
+			s := []byte(v.Value)
+			payloadBytes = append(payloadBytes, s...)
 			break
 			// Default
 		default:

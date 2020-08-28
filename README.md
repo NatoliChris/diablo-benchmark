@@ -66,7 +66,7 @@ for example:
 
 2. Once you see the "ready to connect", start the secondaries on their respective machines:
 ```sh
-./diablo secondary -m "<Primary IP>:<port>" -cc /path/to/chain/config
+./diablo secondary -m "<Primary IP>:<port>" -cc /path/to/chain/config
 ```
 for example:
 ```sh
