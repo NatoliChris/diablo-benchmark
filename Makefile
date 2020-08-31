@@ -3,14 +3,16 @@ BUILDFLAGS := -v
 
 default: all
 
-all: diablo
+all: reqs diablo
+
+reqs:
+	$(GOBIN) mod download
+	$(GOBIN) mod vendor
 
 diablo:
-	# mkdir -p $(PWD)/bin
-	# $(GOBIN) build -v -o bin/diablo main/diablo.go
 	$(GOBIN) build $(BUILDFLAGS) -o diablo
 
 clean:
-	-rm -rf bin/*
+	rm diablo
 
-.PHONY: default clean
+.PHONY: default clean reqs
