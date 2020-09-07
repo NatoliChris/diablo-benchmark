@@ -230,6 +230,11 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 		return nil, fmt.Errorf("contract does not exist in known generator")
 	}
 
+	if len(contractParams) < 1 {
+		// empty
+		return nil, fmt.Errorf("empty contract params for %s", functionName)
+	}
+
 	// next - get the function hash
 	var funcHash string
 	if val, ok := e.CompiledContract.Hashes[functionName]; !ok {
@@ -396,7 +401,20 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 		}
 	}
 
-	return []byte{}, nil
+	// Assume that the payload bytes have been correctly formed at this point?
+	if len(payloadBytes) < 1 {
+		return nil, fmt.Errorf("no payload generated")
+	}
+
+	// Create the signed transaction
+	tx, err := e.CreateSignedTransaction(fromPrivKey, contractAddress, big.NewInt(0), payloadBytes)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// return the transaction
+	return tx, nil
 }
 
 // Create a signed transaction that returns the bytes
@@ -414,7 +432,7 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, 
 
 	// Get the transaction fields
 	toConverted := common.HexToAddress(toAddress)
-	gasLimit := uint64(21000)
+	gasLimit := uint64(300000)
 
 	zap.L().Debug("transaction params",
 		zap.String("addrFrom", addrFrom.String()),
