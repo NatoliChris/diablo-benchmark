@@ -20,6 +20,7 @@ import (
 	"math/big"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -97,12 +98,14 @@ func (e *EthereumWorkloadGenerator) InitParams() error {
 			return err
 		}
 
-		e.Nonces[key.Address] = v
+		e.Nonces[strings.ToLower(key.Address)] = v
 	}
 
 	zap.L().Info("Blockchain client contacted and got params",
 		zap.String("gasPrice", e.SuggestedGasPrice.String()),
 		zap.String("chainID", e.ChainID.String()))
+
+	zap.L().Debug("nonces", zap.String("noncemap", fmt.Sprintf("%v", e.Nonces)))
 
 	return nil
 }
@@ -128,7 +131,7 @@ func (e *EthereumWorkloadGenerator) DeployContract(fromPivKey []byte, contractPa
 
 	// Convert back to the transaction type
 	var parsedTx types.Transaction
-	err = json.Unmarshal(tx, parsedTx)
+	err = json.Unmarshal(tx, &parsedTx)
 	if err != nil {
 		return "", err
 	}
@@ -195,8 +198,14 @@ func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, c
 
 			// TODO maybe estimate gas rather than have an upper bound
 			gasLimit := uint64(300000)
+
+			zap.L().Debug("tx params",
+				zap.String("from", addrFrom.String()),
+				zap.Uint64("Nonce", e.Nonces[strings.ToLower(addrFrom.String())]),
+				zap.Uint64("gaslimit", gasLimit),
+			)
 			tx := types.NewContractCreation(
-				e.Nonces[addrFrom.String()],
+				e.Nonces[strings.ToLower(addrFrom.String())],
 				big.NewInt(0),
 				gasLimit,
 				e.SuggestedGasPrice,
@@ -205,7 +214,7 @@ func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, c
 			signedTx, err := types.SignTx(tx, types.NewEIP155Signer(e.ChainID), priv)
 
 			// Update nonce
-			e.Nonces[addrFrom.String()]++
+			e.Nonces[strings.ToLower(addrFrom.String())]++
 			e.CompiledContract = v
 
 			return signedTx.MarshalJSON()
@@ -440,14 +449,14 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, 
 	)
 
 	// Make and sign the transaction
-	tx := types.NewTransaction(e.Nonces[addrFrom.String()], toConverted, value, gasLimit, e.SuggestedGasPrice, data)
+	tx := types.NewTransaction(e.Nonces[strings.ToLower(addrFrom.String())], toConverted, value, gasLimit, e.SuggestedGasPrice, data)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(e.ChainID), priv)
 	if err != nil {
 		return []byte{}, nil
 	}
 
 	// Update the nonce (if we are using multiple transactions from the same account)
-	e.Nonces[addrFrom.String()]++
+	e.Nonces[strings.ToLower(addrFrom.String())]++
 
 	// Return the transaction in bytes ready to send to the secondaries and threads.
 	return signedTx.MarshalJSON()
