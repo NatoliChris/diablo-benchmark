@@ -10,6 +10,8 @@ import (
 	"errors"
 	"fmt"
 	"go.uber.org/zap"
+	"os"
+	"reflect"
 )
 
 // Validates all fields of the benchmark configuration
@@ -24,6 +26,34 @@ func ValidateBenchConfig(c *configs.BenchConfig) (bool, error) {
 	// Description can be omitted, but we will warn.
 	if len(c.Description) == 0 {
 		zap.L().Warn("Missing description in configuration file.")
+	}
+
+	// Contract Checks!
+	if c.TxInfo.TxType == configs.TxTypeContract {
+		// Check if it's empty
+		if reflect.DeepEqual(configs.ContractInfo{}, c.ContractInfo) {
+			return false, fmt.Errorf("[%s] empty contract info for contract workload in", c.Name)
+		}
+
+		// Check that the contract exists.
+		if c.ContractInfo.Path == "" {
+			return false, fmt.Errorf("[%s] empty path for contract in config", c.Name)
+		}
+
+		info, err := os.Stat(c.ContractInfo.Path)
+		if err != nil {
+			return false, err
+		}
+
+		// If it is a directory - then error
+		if info.IsDir() {
+			return false, fmt.Errorf("[%s] contract path (%s) is a directory", c.Name, c.ContractInfo.Path)
+		}
+
+		// Check that the functions aren't empty.
+		if len(c.ContractInfo.Functions) == 0 {
+			return false, fmt.Errorf("[%s] no functions provided for contract", c.Name)
+		}
 	}
 
 	// Intervals cannot be empty.
