@@ -14,12 +14,6 @@ type Workload [][][][][]byte         // Workload: [secondary][worker][time][txli
 type SecondaryWorkload [][][][]byte  // Secondary workload: [worker][time][txlist][txbytes]
 type WorkerThreadWorkload [][][]byte // Worker workload: [time][txlist][txbytes]
 
-// Definitions
-type ContractParam struct {
-	Type  string // The argument type
-	Value string // The value of the argument (as interface for easy conversion)
-}
-
 // Interface and basic functionality to generate a workload given the configurations.
 // The workload generator handles the creation of the transactions and additionally sets
 // up the blockchain and starts the blockchain nodes.
@@ -46,7 +40,7 @@ type WorkloadGenerator interface {
 	CreateContractDeployTX(fromPrivKey []byte, contractPath string) ([]byte, error)
 
 	// Create a signed transaction that performs actions on a smart contract at the given address
-	CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []ContractParam) ([]byte, error)
+	CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []configs.ContractParam) ([]byte, error)
 
 	// Creates a transaction that is signed and ready to send from the given private key.
 	CreateSignedTransaction(fromPrivKey []byte, toAddress string, value *big.Int, data []byte) ([]byte, error)

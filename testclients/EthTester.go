@@ -7,6 +7,7 @@ import (
 	"context"
 	"diablo-benchmark/blockchains/clientinterfaces"
 	"diablo-benchmark/blockchains/workloadgenerators"
+	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/configs/parsers"
 	"encoding/hex"
 	"encoding/json"
@@ -106,10 +107,10 @@ func main() {
 		panic(err)
 	}
 
-	var cParamList []workloadgenerators.ContractParam
+	var cParamList []configs.ContractParam
 
 	cParamList = append(cParamList,
-		workloadgenerators.ContractParam{
+		configs.ContractParam{
 			Type:  "uint32",
 			Value: "10000",
 		})
