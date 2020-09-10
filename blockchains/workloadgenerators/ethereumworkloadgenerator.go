@@ -233,7 +233,7 @@ func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, c
 }
 
 // Creates an interaction with the contract
-func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []ContractParam) ([]byte, error) {
+func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []configs.ContractParam) ([]byte, error) {
 	// Check that the contract has been compiled, if nto - then it's difficult to get the hashes from the ABI.
 	if e.CompiledContract == nil {
 		return nil, fmt.Errorf("contract does not exist in known generator")
