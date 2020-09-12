@@ -10,9 +10,9 @@ import "sort"
 
 // Results is the generic result structure that will be encoded and sent back to the primary and combined
 type Results struct {
-	TxLatencies    []float64 `json:TxLatencies`    // Latency of each transaction, can be used in CDF
-	AverageLatency float64   `json:AverageLatency` // Averaged latency of the transactions
-	Throughput     float64   `json:Throughput`     // Number of transactions per second "committed"
+	TxLatencies    []float64 `json:"TxLatencies"`    // Latency of each transaction, can be used in CDF
+	AverageLatency float64   `json:"AverageLatency"` // Averaged latency of the transactions
+	Throughput     float64   `json:"Throughput"`     // Number of transactions per second "committed"
 }
 
 // AggregatedResults returns all the information from all secondaries, and
