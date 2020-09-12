@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// Handler loop that dispatches the workload into channels and creates routines that will read and send
+// WorkloadHandler is the main handler loop that dispatches the workload into channels and creates routines that will read and send
 type WorkloadHandler struct {
 	numThread            uint32                                 // Number of workers
 	workerThreadChannels []chan interface{}                     // Channels between the threads to have the workload from
@@ -27,6 +27,7 @@ type WorkloadHandler struct {
 	StartEnd             []time.Time                            // Start and end of the benchmark
 }
 
+// NewWorkloadHandler provides a new workload handler with number of threads and clients
 func NewWorkloadHandler(numThread uint32, clients []clientinterfaces.BlockchainInterface) *WorkloadHandler {
 	// Generate the channels to speak to the workers.
 	return &WorkloadHandler{
@@ -35,7 +36,7 @@ func NewWorkloadHandler(numThread uint32, clients []clientinterfaces.BlockchainI
 	}
 }
 
-// Initialise the clients and connect
+// Connect initialises the clients and connects to the nodes
 func (wh *WorkloadHandler) Connect(nodes []string, ID int) error {
 	var combinedErr []string
 	for _, v := range wh.activeClients {
@@ -53,7 +54,7 @@ func (wh *WorkloadHandler) Connect(nodes []string, ID int) error {
 	return nil
 }
 
-// Parse the workloads on each client, populate the channels
+// ParseWorkloads parse the workloads on each client, populate the channels
 func (wh *WorkloadHandler) ParseWorkloads(rawWorkload workloadgenerators.SecondaryWorkload) error {
 
 	// Set up the workload channels
@@ -103,7 +104,7 @@ func (wh *WorkloadHandler) ParseWorkloads(rawWorkload workloadgenerators.Seconda
 	return nil
 }
 
-// Worker producer, handles the transaction per second producing into the queue.
+// workloadProducer producer that places transactions into the queue and handles naive rate limiting.
 func (wh *WorkloadHandler) workloadProducer(workload [][]interface{}, workerChan chan interface{}, ready chan bool, id int) {
 	zap.L().Debug(fmt.Sprintf("producer %d ready", id))
 	<-ready
@@ -132,7 +133,7 @@ func (wh *WorkloadHandler) workloadProducer(workload [][]interface{}, workerChan
 
 }
 
-// Runner for the thread
+// runnerConsumer consumer that runs the workload pulling from the channel
 func (wh *WorkloadHandler) runnerConsumer(blockchainInterface clientinterfaces.BlockchainInterface, workload chan interface{}, wg *sync.WaitGroup) {
 	var errs []error
 	defer wg.Done()
@@ -149,18 +150,7 @@ func (wh *WorkloadHandler) runnerConsumer(blockchainInterface clientinterfaces.B
 	// TODO handle errors
 }
 
-// Periodically adds the workloads to the channels, allowing for a "curve" of
-// transactions to be sent (rate-limiting the sending of transactions)
-func (wh *WorkloadHandler) txAdder(workloads chan interface{}, ready chan bool) {
-	// TODO - channel for every second, adds more to the workload channel one
-	// at a time - then checks if the channel has ended.
-	// Changes to implement
-	// - workload is now [][][]byte - allows for per-second intervals
-	// - blockchain interface must take ^ for parseworkload
-	// - sending / receiving the workload through primary must also be handled
-	// - workload generation must return [][][]byte
-}
-
+// statusPrinter periodically prints the status of the workload progress
 func (wh *WorkloadHandler) statusPrinter(stopCh chan bool) {
 	var timer *time.Timer = time.NewTimer(5 * time.Second)
 	for {
@@ -175,7 +165,7 @@ func (wh *WorkloadHandler) statusPrinter(stopCh chan bool) {
 	}
 }
 
-// Run the benchmark()
+// RunBench executes the benchmark
 func (wh *WorkloadHandler) RunBench() error {
 	wh.StartEnd = append(wh.StartEnd, time.Now())
 	stopPrinting := make(chan bool, 0)
@@ -199,12 +189,12 @@ func (wh *WorkloadHandler) RunBench() error {
 	return nil
 }
 
-// Get the results
+// HandleCleanup performs all post-benchmark calculation and returns the result set
 func (wh *WorkloadHandler) HandleCleanup() results.Results {
 	// Aggregate the results
 	allLatencies := make([]float64, 0)
-	var avgThroughput float64 = 0
-	var avgLatency float64 = 0
+	var avgThroughput float64
+	var avgLatency float64
 	for i, c := range wh.activeClients {
 		zap.L().Debug("processing cleanup",
 			zap.Int("client", i))
@@ -227,7 +217,7 @@ func (wh *WorkloadHandler) HandleCleanup() results.Results {
 	}
 }
 
-// Close the clients and the channels
+// CloseAll closes the clients and the channels
 func (wh *WorkloadHandler) CloseAll() {
 	for _, c := range wh.activeClients {
 		c.Close()

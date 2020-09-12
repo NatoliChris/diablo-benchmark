@@ -1,7 +1,6 @@
-// Implements the generic types for blockchain artefacts
 package clientinterfaces
 
-// Generic block for the blockchains, this may or may not be fully filled.
+// GenericBlock defines a generic block structure for the blockchains, this may or may not be fully filled.
 // This should be extended to accompany for other blockchains but MUST retain
 // base functionality for other chains.
 type GenericBlock struct {

@@ -8,26 +8,26 @@ import (
 	"net"
 )
 
-// The connection client provides an active connection from the secondary to
+// ConnClient provides an active connection from the secondary to
 // the primary. The main action of the connection is to receive commands and to
 // reply with OK or errors and results.
 type ConnClient struct {
 	Conn net.Conn // Active connection to the primary
 }
 
-// The amount to read on first read
+// READLENGTH is the amount to read on first read
 // byte 0 : cmd
 // byte 1 : aux / len
 // byte 2-9 will be the uint64
 // 3 byte (16 bit number to represent size to read of payload)
 const READLENGTH int = 9
 
-// Maximum value to read in one read operation.
+// MAXREAD is the maximum value to read in a single read.
 // If the size we need to read is greater, then we need to read split amounts
 // and iterate through the reading.
 const MAXREAD uint64 = 65500
 
-// Connect to the master TCP address and return the connected client
+// SetupSecondaryTCP connects to the master TCP address and return the connected client
 func SetupSecondaryTCP(addr string) (*ConnClient, error) {
 	// Dial the address, return the error if we cannot
 	conn, err := net.Dial("tcp", addr)
@@ -43,7 +43,7 @@ func SetupSecondaryTCP(addr string) (*ConnClient, error) {
 // Writing Response
 //////////////////////////
 
-// Reply with an OK, just an ACK to say we got the message and all is well
+// ReplyOK replies with an OK, just an ACK to say we got the message and all is well
 func (c *ConnClient) ReplyOK() {
 	_, err := c.Conn.Write(MsgOk)
 	if err != nil {
@@ -53,7 +53,7 @@ func (c *ConnClient) ReplyOK() {
 	}
 }
 
-// Reply with an error: We tried the command, but something went wrong
+// ReplyERR replies with an error: We tried the command, but something went wrong
 func (c *ConnClient) ReplyERR(msg string) {
 	errmsg := append(MsgErr, []byte(msg)...)
 	_, err := c.Conn.Write(errmsg)
@@ -64,7 +64,7 @@ func (c *ConnClient) ReplyERR(msg string) {
 	}
 }
 
-// send; OK + DATA to the Primary
+// SendDataOK will send OK + DATA to the Primary
 func (c *ConnClient) SendDataOK(data []byte) {
 	// msg OK
 	payload := MsgOk
@@ -94,8 +94,8 @@ func (c *ConnClient) SendDataOK(data []byte) {
 // Reading
 //////////////////////////
 
-// Initial read, always reads 4 bytes long
-// gets command, length or aux value
+// InitialRead performs a first read, always reads 4 bytes long
+// gets command, length to read or aux value
 func (c *ConnClient) InitialRead() ([]byte, error) {
 	buf := make([]byte, READLENGTH)
 
@@ -107,7 +107,7 @@ func (c *ConnClient) InitialRead() ([]byte, error) {
 	return buf, nil
 }
 
-// Reads information over a number of "reads".
+// ReadSplit reads information over a number of "reads".
 // This should happen if the size of the object to read is larger than the
 // size of a full read in go.
 func (c *ConnClient) ReadSplit(totalSize uint64) ([]byte, error) {
@@ -136,7 +136,7 @@ func (c *ConnClient) ReadSplit(totalSize uint64) ([]byte, error) {
 	return fullData, nil
 }
 
-// Read to the given size
+// ReadSize read to the given size
 func (c *ConnClient) ReadSize(size uint64) ([]byte, error) {
 
 	if size > MAXREAD {
@@ -156,6 +156,7 @@ func (c *ConnClient) ReadSize(size uint64) ([]byte, error) {
 	return buf, nil
 }
 
+// CloseConn closes the connection to the primary server
 func (c *ConnClient) CloseConn() {
 	_ = c.Conn.Close()
 }

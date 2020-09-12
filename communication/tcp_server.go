@@ -7,24 +7,24 @@ import (
 	"diablo-benchmark/core/results"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"go.uber.org/zap"
 	"io"
 	"net"
 )
 
-// Primary server struct that contains the listener and the
-// list of all the secondaries.
+// PrimaryServer provides the listening server to communicate with the secondaries
+// as well as a connection to the active secondaries.
 type PrimaryServer struct {
 	Listener            net.Listener // TCP listener listening for incoming secondaries
 	Secondaries         []net.Conn   // Any connected secondaries so that they can communicate with the Primary
 	ExpectedSecondaries int          // The number of expected secondaries to connect
 }
 
+// SecondaryReplyErrors stores the errors returned by the secondaries to be printed out
 type SecondaryReplyErrors []string
 
-// Generates a new "Listener" by creating the TCP server.
+// SetupPrimaryTCP generates a new "Listener" by creating the TCP server.
 func SetupPrimaryTCP(addr string, expectedSecondaries int) (*PrimaryServer, error) {
 	listener, err := net.Listen("tcp", addr)
 
@@ -41,7 +41,7 @@ func SetupPrimaryTCP(addr string, expectedSecondaries int) (*PrimaryServer, erro
 	return &PrimaryServer{Listener: listener, ExpectedSecondaries: expectedSecondaries}, nil
 }
 
-// A listener that will run in a thread to
+// HandleSecondaries starts a listener that will run in a thread to
 // handle any secondary connections.
 func (s *PrimaryServer) HandleSecondaries(readyChannel chan bool) {
 
@@ -65,8 +65,8 @@ func (s *PrimaryServer) HandleSecondaries(readyChannel chan bool) {
 	}
 }
 
-// // This function is used to send and wait for the OK byte to be
-// // received. This takes a channel and replies on the channel once OK or err is received.
+// sendAndWaitOKAsync is used to send and wait for the OK byte to be
+// received. This takes a channel and replies on the channel once OK or err is received.
 func (s *PrimaryServer) sendAndWaitOKAsync(data []byte, secondary net.Conn, doneCh chan int, errCh chan error) {
 	if _, err := secondary.Write(data); err != nil {
 		// TODO: Log that we can't communicate with secondary
@@ -89,7 +89,7 @@ func (s *PrimaryServer) sendAndWaitOKAsync(data []byte, secondary net.Conn, done
 	// something failed on the secondary machine
 	if bytes.Equal(MsgErr, reply) {
 		// TODO: Add a "get X bytes for the error reason"
-		errCh <- errors.New(fmt.Sprintf("failed to communicate with secondary %s", secondary.RemoteAddr().String()))
+		errCh <- fmt.Errorf("failed to communicate with secondary %s", secondary.RemoteAddr().String())
 		doneCh <- 1
 	}
 
@@ -97,7 +97,7 @@ func (s *PrimaryServer) sendAndWaitOKAsync(data []byte, secondary net.Conn, done
 	return
 }
 
-// Send a message to a secondary and wait for the okay without
+// SendAndWaitOKSync send a message to a secondary and wait for the okay without
 // the use of a channel (synchronous sending).
 func (s *PrimaryServer) SendAndWaitOKSync(data []byte, secondary net.Conn) error {
 	if _, err := secondary.Write(data); err != nil {
@@ -135,7 +135,7 @@ func (s *PrimaryServer) SendAndWaitOKSync(data []byte, secondary net.Conn) error
 	return nil
 }
 
-// Send a message to a secondary and wait for the OK and data, or errors
+// sendAndWaitData sends a message to a secondary and waits for the OK and data, or errors
 func (s *PrimaryServer) sendAndWaitData(data []byte, secondary net.Conn) (*results.Results, error) {
 	if _, err := secondary.Write(data); err != nil {
 		// TODO log that we can't communicate with secondary
@@ -223,6 +223,7 @@ func (s *PrimaryServer) sendAndWaitData(data []byte, secondary net.Conn) (*resul
 	return &res, nil
 }
 
+// PrepareBenchmarkSecondaries sends the prepare message to the secondaires
 func (s *PrimaryServer) PrepareBenchmarkSecondaries(numThreads uint32) SecondaryReplyErrors {
 
 	var errorList []string
@@ -250,6 +251,10 @@ func (s *PrimaryServer) PrepareBenchmarkSecondaries(numThreads uint32) Secondary
 	return errorList
 }
 
+// SendBlockchainType [UNUSED/TODO] sends the blockchain type to the secondaries
+// Note: this function was intended to let the same servers be used for multiple
+// benchmarks of different chains without having to restart and spawn new secondaries.
+// Moved to future work.
 func (s *PrimaryServer) SendBlockchainType(bcType blockchains.BlockchainTypeMessage) SecondaryReplyErrors {
 	// Send the blockchain type message
 	var errorList []string
@@ -271,7 +276,7 @@ func (s *PrimaryServer) SendBlockchainType(bcType blockchains.BlockchainTypeMess
 	return errorList
 }
 
-// Action to send the workload to all secondaries. Encodes the workload in the
+// SendWorkload sends the workload to all secondaries. Encodes the workload in the
 // chosen encoding in helpers.go and will send off the bytes to be read and processed
 // by the secondary.
 func (s *PrimaryServer) SendWorkload(workloads workloadgenerators.Workload) SecondaryReplyErrors {
@@ -302,7 +307,7 @@ func (s *PrimaryServer) SendWorkload(workloads workloadgenerators.Workload) Seco
 	return nil
 }
 
-// Sends the message to all secondaries to run the benchmark.
+// RunBenchmark sends the message to all secondaries to run the benchmark.
 func (s *PrimaryServer) RunBenchmark() SecondaryReplyErrors {
 	zap.L().Info("\n------------\nStarting Benchmark\n------------\n")
 
@@ -359,7 +364,7 @@ func (s *PrimaryServer) RunBenchmark() SecondaryReplyErrors {
 	return errorList
 }
 
-// Call the secondaries to return the results.
+// GetResults calls the secondaries to return the results.
 // Will return the list of results as well as any errors that had been encountered
 func (s *PrimaryServer) GetResults() ([]results.Results, SecondaryReplyErrors) {
 	var allResults []results.Results
@@ -380,20 +385,20 @@ func (s *PrimaryServer) GetResults() ([]results.Results, SecondaryReplyErrors) {
 	return allResults, errs
 }
 
-// Send the final GOODBYE message and then close the connection
+// SendFin sends the final GOODBYE message and then close the connection to the secondaries
 func (s *PrimaryServer) SendFin() {
 	for _, c := range s.Secondaries {
 		_ = s.SendAndWaitOKSync(MsgFin, c)
 	}
 }
 
-// Primary method to close all things
+// CloseAll close all connections and threads
 func (s *PrimaryServer) CloseAll() {
 	s.CloseSecondaries()
 	s.CloseAll()
 }
 
-// Close the secondary connections
+// CloseSecondaries closes the secondary connections
 func (s *PrimaryServer) CloseSecondaries() {
 	for i, c := range s.Secondaries {
 		zap.L().Info(fmt.Sprintf("Closing Secondary %d @ %s", i, c.RemoteAddr().String()))

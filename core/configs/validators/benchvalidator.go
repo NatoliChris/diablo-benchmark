@@ -14,9 +14,10 @@ import (
 	"reflect"
 )
 
-// Validates all fields of the benchmark configuration
+// ValidateBenchConfig validates all fields of the benchmark configuration
 // Determines the validity and returns a boolean whether it is
 // valid or invalid.
+// TODO major improvements for validations!
 func ValidateBenchConfig(c *configs.BenchConfig) (bool, error) {
 	// Empty name is an error
 	if len(c.Name) == 0 {
@@ -64,15 +65,14 @@ func ValidateBenchConfig(c *configs.BenchConfig) (bool, error) {
 	// Check that there are no negative values.
 	for k := range c.TxInfo.Intervals {
 		if k < 0 {
-			return false, errors.New(fmt.Sprintf("tps key %d cannot be negative", k))
+			return false, fmt.Errorf("tps key %d cannot be negative", k)
 		}
 
 		if c.TxInfo.Intervals[k] < 0 {
-			return false, errors.New(
-				fmt.Sprintf(
-					"tps value %d at key %d cannot be negative",
-					c.TxInfo.Intervals[k],
-					k))
+			return false, fmt.Errorf(
+				"tps value %d at key %d cannot be negative",
+				c.TxInfo.Intervals[k],
+				k)
 		}
 	}
 

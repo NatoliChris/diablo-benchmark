@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 )
 
-// Parse the chain configuration file.
+// ParseChainConfig parses the chain configuration file.
 // This function both (a) reads the file from disk, and (b) calls the YAML
 // to be parsed.
 func ParseChainConfig(filePath string) (*configs.ChainConfig, error) {
@@ -21,7 +21,7 @@ func ParseChainConfig(filePath string) (*configs.ChainConfig, error) {
 	return parseChainYaml(configFileBytes)
 }
 
-// Parse the chain configuration in the YAML files.
+// parseChainYaml parses the chain configuration in the YAML files.
 // This will get the bytes of the file.
 func parseChainYaml(fileContents []byte) (*configs.ChainConfig, error) {
 	var chainConfig configs.ChainConfig

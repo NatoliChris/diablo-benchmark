@@ -3,7 +3,6 @@ package core
 import (
 	"diablo-benchmark/blockchains"
 	"diablo-benchmark/blockchains/clientinterfaces"
-	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/communication"
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/handlers"
@@ -13,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// The secondary node that is tasked with providing workers and executing the
+// Secondary is the secondary node that is tasked with providing workers and executing the
 // workload. Communicates with the primary to receive commands and information.
 type Secondary struct {
 	ID              int                                  // This secondary's unique ID
@@ -23,7 +22,7 @@ type Secondary struct {
 	WorkloadHandler *handlers.WorkloadHandler            // Workload Handler
 }
 
-// Create a new secondary, set up the things we need.
+// NewSecondary creates a new secondary, performs set up for the tcp connection to primary.
 func NewSecondary(config *configs.ChainConfig, primaryAddress string) (*Secondary, error) {
 	// Set up the communication
 	c, err := communication.SetupSecondaryTCP(primaryAddress)
@@ -40,7 +39,8 @@ func NewSecondary(config *configs.ChainConfig, primaryAddress string) (*Secondar
 	}, nil
 }
 
-// Runs the main secondary things, sets up the secondary and waits for the commands
+// Run is the main loop that performs the receiving of commands and executes relevant actions.
+// This is the main handler loop where all secondary action runs
 func (s *Secondary) Run() {
 	// Main work loop that handles the commands from primary and dispatches
 	// the workload from the benchmark.
@@ -114,8 +114,7 @@ func (s *Secondary) Run() {
 				continue
 			}
 
-			var unmarshaledWorkload workloadgenerators.SecondaryWorkload
-			err = json.Unmarshal(wl, &unmarshaledWorkload)
+			unmarshaledWorkload, err := communication.DecodeWorkload(wl)
 
 			if err != nil {
 				zap.L().Warn("failed to unmarshal workload",

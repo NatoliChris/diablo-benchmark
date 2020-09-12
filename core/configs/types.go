@@ -5,20 +5,21 @@ import (
 	"errors"
 )
 
-// Transaction types (simple, contract, ...)
+// BenchTransactionType provides the type of benchmark
+// Currently:
 type BenchTransactionType string
 
-// Simple transaction type, denoting just an asset transfer transaction.
+// TxTypeSimple denoting just value transfer transactions in the workload.
 const TxTypeSimple BenchTransactionType = "simple"
 
-// Contract type, indicates that it will be a complex worklaod that has
+// TxTypeContract indicates that it will be a contract workload that has
 // contract interaction and deployment
 const TxTypeContract BenchTransactionType = "contract"
 
-// Transactions Per Second intervals
+// TPSIntervals defines the "Transactions Per Second" send rate intervals
 type TPSIntervals map[int]int
 
-// Basic "key" structure for generic blockchains, provides a private key in
+// ChainKey is a basic "key" structure for generic blockchains, provides a private key in
 // bytes, and the "Address" as a string - the address may change depending on
 // the blockchain.
 type ChainKey struct {
@@ -26,14 +27,14 @@ type ChainKey struct {
 	Address    string `yaml:address`   // Address that it is from
 }
 
-// Naive check if the prefixed PrivateKey has "0x" leading.
+// checkPrefix Naive check if the prefixed PrivateKey has "0x" leading.
 func checkPrefix(keyHex string) bool {
 	return len(keyHex) >= 2 && // Length must be 0x or more
 		keyHex[0] == '0' && // Starts with 0
 		(keyHex[1] == 'x' || keyHex[1] == 'X') // followed by an x or X
 }
 
-// Custom YAML decoding for the chain key.
+// UnmarshalYAML provides a custom YAML decoding for the chain key.
 func (ck *ChainKey) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var c struct {
 		PrivateKey string `yaml:"private"`
@@ -72,7 +73,8 @@ func (ck *ChainKey) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// Custom YAML Decode for a "bench transaction" type. (Simple / Contract)
+// UnmarshalYAML provides a custom YAML Decode for a "bench transaction" type. (Simple / Contract)
+// Note, this will need to be updated with future improvements.
 func (bt *BenchTransactionType) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var unmarshaled string
 

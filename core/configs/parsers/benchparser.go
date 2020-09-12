@@ -13,8 +13,8 @@ import (
 	"sort"
 )
 
-// Parse the benchmark configuration file, read the filepath to see
-// if we can extract the YAML.
+// ParseBenchConfig parses the benchmark configuration file from YAML.
+// Reads the filepath to see if we can extract the YAML.
 // TODO: proper error handling
 func ParseBenchConfig(filepath string) (*configs.BenchConfig, error) {
 	// Get the configuration information from the filepath
@@ -27,7 +27,7 @@ func ParseBenchConfig(filepath string) (*configs.BenchConfig, error) {
 	return parseBenchYaml(configFileBytes)
 }
 
-// Unmarshal the YAML into the required context.
+// parseBenchYaml provides the full unmarshal of the YAML and performs relevant calculations
 // TODO: proper error handling
 func parseBenchYaml(content []byte) (*configs.BenchConfig, error) {
 	// Try to read the YAML.
@@ -57,7 +57,7 @@ func parseBenchYaml(content []byte) (*configs.BenchConfig, error) {
 	return &benchConfig, nil
 }
 
-// Fills the intervals into all seconds defined.
+// generateFullIntervals fills the intervals into all seconds defined.
 // NOTE: this is only a naive implementation, will definitely require more work ;)
 // TODO: more complex generation of transaction intervals.
 func generateFullIntervals(intervals configs.TPSIntervals) (configs.TPSIntervals, error) {
@@ -89,7 +89,7 @@ func generateFullIntervals(intervals configs.TPSIntervals) (configs.TPSIntervals
 
 	// Go through each interval
 	// Fill in the gaps by calculating a linear ramp-up.
-	// TODO: this needs improvement, big time!
+	// TODO: this needs improvement, big time! Currently doing linear, but maybe we can have a smoothing curve?
 	currentKey := intervalKeys[0]
 	for _, nextKey := range intervalKeys[1:] {
 		// Note: extremely naive linear ramp-up.
@@ -116,7 +116,7 @@ func generateFullIntervals(intervals configs.TPSIntervals) (configs.TPSIntervals
 	return finalIntervals, nil
 }
 
-// Gets the total number of transactions in total for the intervals
+// GetTotalNumberOfTransactions calculates the total number of transactions in the entire benchmark
 func GetTotalNumberOfTransactions(config *configs.BenchConfig) (int, error) {
 	totalNumberOfTransactions := 0
 

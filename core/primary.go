@@ -24,7 +24,7 @@ type Primary struct {
 	chainConfig       *configs.ChainConfig                 // Chain configuration containing information about the nodes
 }
 
-// Initialise the primary server and return an instance of the primary
+// InitPrimary initialises the primary server and returns an instance of the primary
 // This will be passed back to the main
 func InitPrimary(listenAddr string, expectedSecondaries int, wg workloadgenerators.WorkloadGenerator, bConfig *configs.BenchConfig, cConfig *configs.ChainConfig) *Primary {
 	s, err := communication.SetupPrimaryTCP(listenAddr, expectedSecondaries)
@@ -42,7 +42,7 @@ func InitPrimary(listenAddr string, expectedSecondaries int, wg workloadgenerato
 	}
 }
 
-// Main functionality to run
+// Run provides the main functionality to run
 // Holds the majority of the work
 // TODO: under construction!
 func (p *Primary) Run() {

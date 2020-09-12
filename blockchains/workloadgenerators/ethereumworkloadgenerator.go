@@ -24,7 +24,7 @@ import (
 	"time"
 )
 
-// Generates the workload for the Ethereum blockchain
+// EthereumWorkloadGenerator is the workload generator implementation for the Ethereum blockchain
 type EthereumWorkloadGenerator struct {
 	ActiveConn        *ethclient.Client    // Active connection to a blockchain node for information
 	SuggestedGasPrice *big.Int             // Suggested gas price on the network
@@ -36,12 +36,12 @@ type EthereumWorkloadGenerator struct {
 	CompiledContract  *compiler.Contract   // Compiled contract bytecode for the contract used in complex workloads
 }
 
-// Returns a new instance of the generator
+// NewGenerator returns a new instance of the generator
 func (e *EthereumWorkloadGenerator) NewGenerator(chainConfig *configs.ChainConfig, benchConfig *configs.BenchConfig) WorkloadGenerator {
 	return &EthereumWorkloadGenerator{BenchConfig: benchConfig, ChainConfig: chainConfig}
 }
 
-// Set up the blockchain nodes with relevant information.
+// BlockchainSetup sets up the blockchain nodes with relevant information.
 // This is the function that can be used to create and generate a genesis block
 // as well as deliver the genesis block to the blockchain nodes and run the
 // setup command. By the end of this function, there should be:
@@ -63,7 +63,7 @@ func (e *EthereumWorkloadGenerator) BlockchainSetup() error {
 	return nil
 }
 
-// Sets the suggested gas price and sets up a small connection to get information from the blockchain.
+// InitParams sets initial aspects such as the suggested gas price and sets up a small connection to get information from the blockchain.
 func (e *EthereumWorkloadGenerator) InitParams() error {
 
 	// Connect to the blockchain
@@ -110,7 +110,7 @@ func (e *EthereumWorkloadGenerator) InitParams() error {
 	return nil
 }
 
-// Generic account creation to return the private key
+// CreateAccount is used as a generic account creation to return the private key
 func (e *EthereumWorkloadGenerator) CreateAccount() (interface{}, error) {
 	// Generate a private key
 	privKey, err := crypto.GenerateKey()
@@ -122,7 +122,7 @@ func (e *EthereumWorkloadGenerator) CreateAccount() (interface{}, error) {
 	return privKey, nil
 }
 
-// Deploy the contract - returns the address of the contract
+// DeployContract deploys the contract and returns the address
 func (e *EthereumWorkloadGenerator) DeployContract(fromPivKey []byte, contractPath string) (string, error) {
 	tx, err := e.CreateContractDeployTX(fromPivKey, contractPath)
 	if err != nil {
@@ -161,7 +161,7 @@ func (e *EthereumWorkloadGenerator) DeployContract(fromPivKey []byte, contractPa
 	}
 }
 
-// Creates a transaction to deploy the contract
+// CreateContractDeployTX creates a transaction to deploy the smart contract
 func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, contractPath string) ([]byte, error) {
 
 	// Generate the relevant account information from the private key
@@ -232,7 +232,7 @@ func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, c
 	return []byte{}, errors.New("failed to create deploy tx")
 }
 
-// Creates an interaction with the contract
+// CreateInteractionTX forms a transaction that invokes a smart contract
 func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []configs.ContractParam) ([]byte, error) {
 	// Check that the contract has been compiled, if nto - then it's difficult to get the hashes from the ABI.
 	if e.CompiledContract == nil {
@@ -246,11 +246,11 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 
 	// next - get the function hash
 	var funcHash string
-	if val, ok := e.CompiledContract.Hashes[functionName]; !ok {
+	val, ok := e.CompiledContract.Hashes[functionName]
+	if !ok {
 		return nil, fmt.Errorf("contract does not contain function: %s", functionName)
-	} else {
-		funcHash = val
 	}
+	funcHash = val
 
 	// Now we need to parse the arguments to get them into the correct padding
 	payloadBytes, err := hex.DecodeString(funcHash)
@@ -426,7 +426,7 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 	return tx, nil
 }
 
-// Create a signed transaction that returns the bytes
+// CreateSignedTransaction forms a signed transaction and returns bytes to be sent by the 'SendRawTransaction' call.
 func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, toAddress string, value *big.Int, data []byte) ([]byte, error) {
 
 	// Get the private key
@@ -462,7 +462,7 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, 
 	return signedTx.MarshalJSON()
 }
 
-// Generate a simple transaction value transfer workload
+// generateSimpleWorkload generates a simple transaction value transfer workload
 // returns: Workload ([secondary][threads][time][tx]) -> [][][][]byte
 func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 
@@ -520,16 +520,24 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 	return totalWorkload, nil
 }
 
-// Generates the workload for smart contract integration (or deployment)
+// generateContractWorkload generates the workload for smart contract integration (or deployment)
 // NOTE: Future implementations can have a separation to test both
 // smart contract deployment and interaction in the same benchmark
 // This can simulate a very realistic blockchain trace to replay existing chains?
 func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error) {
 	// TODO implement
+	// Work out the number of transactions total
+
+	// Get the ratios <> function
+
+	// Deploy the contract (if not already deployed)
+	// Generate the workloads of each function.
+
+	// Get workload ready
 	return nil, nil
 }
 
-// Generate the workload, returning the slice of transactions. [secondaryID = [ list of transactions ] ]
+// GenerateWorkload creates a workload of transactions to be used in the benchmark for all clients.
 func (e *EthereumWorkloadGenerator) GenerateWorkload() (Workload, error) {
 	// 1/ work out the total number of secondarys.
 	numberOfWorkingSecondaries := e.BenchConfig.Secondaries * e.BenchConfig.Threads
