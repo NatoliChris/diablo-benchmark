@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-// The Ethereum implementation of the client interface
+// EthereumInterface is the the Ethereum implementation of the clientinterface
 // Provides functionality to interaact with the Ethereum blockchain
 type EthereumInterface struct {
 	Nodes           []string               // List of the nodes host:port combinations
@@ -31,7 +31,7 @@ type EthereumInterface struct {
 	TotalTx         int                    // Total number of transactions
 }
 
-// Initialise the list of nodes
+// Init initialises the list of nodes
 func (e *EthereumInterface) Init(otherHosts []string) {
 	e.Nodes = otherHosts
 	e.TransactionInfo = make(map[string][]time.Time, 0)
@@ -40,7 +40,7 @@ func (e *EthereumInterface) Init(otherHosts []string) {
 	e.NumTxDone = 0
 }
 
-// Cleans up and formats the results
+// Cleanup formats results and unsubscribes from the blockchain
 func (e *EthereumInterface) Cleanup() results.Results {
 	// clean up connections and format results
 	if e.HandlersStarted {
@@ -48,7 +48,7 @@ func (e *EthereumInterface) Cleanup() results.Results {
 	}
 
 	txLatencies := make([]float64, 0)
-	var avgLatency float64 = 0
+	var avgLatency float64
 
 	startTime := time.Now()
 	var endTime time.Time
@@ -76,7 +76,7 @@ func (e *EthereumInterface) Cleanup() results.Results {
 	}
 }
 
-// Parses the workload and convert into the type for the benchmark.
+// ParseWorkload parses the workload and converts into the type for the benchmark.
 func (e *EthereumInterface) ParseWorkload(workload workloadgenerators.WorkerThreadWorkload) ([][]interface{}, error) {
 	parsedWorkload := make([][]interface{}, 0)
 
@@ -99,7 +99,7 @@ func (e *EthereumInterface) ParseWorkload(workload workloadgenerators.WorkerThre
 	return parsedWorkload, nil
 }
 
-// Parse the blocks for the transactions
+// parseBlocksForTransactions parses the the given block number for the transactions
 func (e *EthereumInterface) parseBlocksForTransactions(blockNumber *big.Int) {
 	block, err := e.PrimaryNode.BlockByNumber(context.Background(), blockNumber)
 
@@ -119,7 +119,7 @@ func (e *EthereumInterface) parseBlocksForTransactions(blockNumber *big.Int) {
 	atomic.AddUint64(&e.NumTxDone, uint64(len(block.Transactions())))
 }
 
-// Handles the incoming information about the Transactions
+// EventHandler subscribes to the blocks and handles the incoming information about the transactions
 func (e *EthereumInterface) EventHandler() {
 	// Channel for the events
 	eventCh := make(chan *ethtypes.Header)
@@ -144,7 +144,7 @@ func (e *EthereumInterface) EventHandler() {
 	}
 }
 
-// Go through all the blocks between start and end index, and check for the
+// ParseBlocksForTransactions Goes through all the blocks between start and end index, and check for the
 // transactions contained in the blocks. This can help with (A) latency, and
 // (B) correctness to ensure that committed transactions are actually in the blocks.
 func (e *EthereumInterface) ParseBlocksForTransactions(startNumber uint64, endNumber uint64) error {
@@ -165,7 +165,7 @@ func (e *EthereumInterface) ParseBlocksForTransactions(startNumber uint64, endNu
 	return nil
 }
 
-// Connect to one node with credentials in the ID.
+// ConnectOne connects to one node with the node index matching the "ID".
 func (e *EthereumInterface) ConnectOne(id int) error {
 	// If our ID is greater than the nodes we know, there's a problem!
 
@@ -191,15 +191,15 @@ func (e *EthereumInterface) ConnectOne(id int) error {
 	return nil
 }
 
-// Connect to all the nodes with one primary
-func (e *EthereumInterface) ConnectAll(primaryId int) error {
+// ConnectAll connects to all nodes given in the hosts
+func (e *EthereumInterface) ConnectAll(primaryID int) error {
 	// If our ID is greater than the nodes we know, there's a problem!
-	if primaryId >= len(e.Nodes) {
+	if primaryID >= len(e.Nodes) {
 		return errors.New("invalid client primary ID")
 	}
 
 	// primary connect
-	err := e.ConnectOne(primaryId)
+	err := e.ConnectOne(primaryID)
 
 	if err != nil {
 		return err
@@ -207,7 +207,7 @@ func (e *EthereumInterface) ConnectAll(primaryId int) error {
 
 	// Connect all the others
 	for idx, node := range e.Nodes {
-		if idx != primaryId {
+		if idx != primaryID {
 			c, err := ethclient.Dial(fmt.Sprintf("ws://%s", node))
 			if err != nil {
 				return err
@@ -220,7 +220,7 @@ func (e *EthereumInterface) ConnectAll(primaryId int) error {
 	return nil
 }
 
-// Deploy the smart contract, respond with the contract address.
+// DeploySmartContract will deploy the transaction and wait for the contract address to be returned.
 func (e *EthereumInterface) DeploySmartContract(tx interface{}) (interface{}, error) {
 	txSigned := tx.(*ethtypes.Transaction)
 	timeoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
@@ -231,7 +231,7 @@ func (e *EthereumInterface) DeploySmartContract(tx interface{}) (interface{}, er
 		return nil, err
 	}
 
-	// TODO: fix to wait for deploy
+	// TODO: fix to wait for deploy - look at workloadGenerator!
 	// Wait for transaction receipt
 	r, err := e.PrimaryNode.TransactionReceipt(context.Background(), txSigned.Hash())
 
@@ -242,7 +242,8 @@ func (e *EthereumInterface) DeploySmartContract(tx interface{}) (interface{}, er
 	return r.ContractAddress, nil
 }
 
-// Sends a raw transaction - it assumes that the transaction is the correct type
+// SendRawTransaction sends a raw transaction to the blockchain node.
+// It assumes that the transaction is the correct type
 // and has already been signed and is ready to send into the network.
 func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
 	// NOTE: type conversion might be slow, there might be a better way to send this.
@@ -259,14 +260,14 @@ func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
 	return nil
 }
 
-// Implement a "secure read" - will read a value from all connected nodes to ensure that the
+// SecureRead will implement a "secure read" - will read a value from all connected nodes to ensure that the
 // value is the same.
-func (e *EthereumInterface) SecureRead(call_func string, call_params []byte) (interface{}, error) {
+func (e *EthereumInterface) SecureRead(callFunc string, callPrams []byte) (interface{}, error) {
 	// TODO implement
 	return nil, nil
 }
 
-// Get the block information by passing it the height number.
+// GetBlockByNumber will request the block information by passing it the height number.
 func (e *EthereumInterface) GetBlockByNumber(index uint64) (block GenericBlock, error error) {
 
 	var ethBlock map[string]interface{}
@@ -297,7 +298,7 @@ func (e *EthereumInterface) GetBlockByNumber(index uint64) (block GenericBlock, 
 	}, nil
 }
 
-// Get the block height through the RPC interaction. Should return the index
+// GetBlockHeight will get the block height through the RPC interaction. Should return the index
 // of the block.
 func (e *EthereumInterface) GetBlockHeight() (uint64, error) {
 

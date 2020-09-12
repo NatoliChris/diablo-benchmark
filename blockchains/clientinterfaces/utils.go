@@ -5,7 +5,7 @@ import (
 	"errors"
 )
 
-// Maps the name of the blockchain in the config with the interface to implement.
+// GetBlockchainInterface maps the name of the blockchain in the config with the interface to implement.
 // Is used by the clients to select the correct chain configuration
 func GetBlockchainInterface(config *configs.ChainConfig) (BlockchainInterface, error) {
 	switch config.Name {

@@ -4,15 +4,15 @@ import (
 	"fmt"
 )
 
-// When the benchmark fails to send or receive from
+// SecondaryCommError is when the benchmark fails to send or receive from
 // a secondary.
 type SecondaryCommError struct {
 	SecondaryInfo string // Secondary Information
 	Err           error  // The error message.
 }
 
-// When the benchmark receives a secondary error
-// message.
+// SecondaryErrorReply occurs when the benchmark receives an error
+// message from the seconaary.
 type SecondaryErrorReply struct {
 	Info string // Information about the secondary
 	Err  error  // The actual error we want to send

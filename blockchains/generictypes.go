@@ -1,4 +1,4 @@
-// Package blockchain provides the blockchain integration with the benchmark.
+// Package blockchains provides the blockchain integration with the benchmark.
 // It defines two packages: clientinterfaces and workloadgenerators, which are
 // both used to implement and integrate new blockchains into the benchmark.
 //
@@ -17,8 +17,8 @@
 // the workload. Additionally, it will also create and deploy the smart contract.
 package blockchains
 
-// Generic information about the transaction, stores hash, sent time and
-// time that it was mined into a block
+// TransactionBenchmarkInformation contains generic information about the
+// transaction, stores hash, sent time and time that it was mined into a block
 type TransactionBenchmarkInformation struct {
 	Hash            string // Unique transaction hash
 	SentTime        uint64 // Time that the transaction request was sent

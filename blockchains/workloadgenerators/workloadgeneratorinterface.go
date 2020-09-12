@@ -9,42 +9,48 @@ import (
 	"math/big"
 )
 
-// Workload definitions for ease of use
-type Workload [][][][][]byte         // Workload: [secondary][worker][time][txlist][txbytes]
-type SecondaryWorkload [][][][]byte  // Secondary workload: [worker][time][txlist][txbytes]
-type WorkerThreadWorkload [][][]byte // Worker workload: [time][txlist][txbytes]
+// Workload definitions for ease of use: [secondary][worker][time][txlist][txbytes]
+type Workload [][][][][]byte
 
-// Interface and basic functionality to generate a workload given the configurations.
+// SecondaryWorkload is the workload per secondary: [worker][time][txlist][txbytes]
+type SecondaryWorkload [][][][]byte
+
+// WorkerThreadWorkload is the workload executed per thread on the secondary: [time][txlist][txbytes]
+type WorkerThreadWorkload [][][]byte
+
+// WorkloadGenerator provides the interface and basic functionality to generate a workload given the configurations.
 // The workload generator handles the creation of the transactions and additionally sets
 // up the blockchain and starts the blockchain nodes.
 type WorkloadGenerator interface {
-	// Creates a new instance of the workload generator for the specific type of blockchain
+
+	// NewGenerator returns a new instance of the workload generator for the specific type of blockchain.
+	// This instance should initialise all required variables
 	NewGenerator(chainConfig *configs.ChainConfig, benchConfig *configs.BenchConfig) WorkloadGenerator
 
-	// Sets up the blockchain, creates necessary genesis, starts the blockchain through SSH commands, etc.
+	// BlockchainSetup sets up the blockchain, creates necessary genesis, starts the blockchain through SSH commands, etc.
 	BlockchainSetup() error
 
-	// Initialises useful params for generation of the workloads
+	// InitParms initialises useful params for generation of the workloads
 	// For example, set up a connection to a node to get gas price / chainID, ... etc.
 	InitParams() error
 
-	// Creates an account and returns the <bytes(privateKey), address>
+	// CreateAccount Creates an account and returns the <bytes(privateKey), address>
 	// TODO: should this be chainKey, or interface{} for a blockchain account of their own?
 	// CreateAccount() (configs.ChainKey, error)
 	CreateAccount() (interface{}, error)
 
-	// Deploys the contract and returns the contract address used in the chain.
+	// DeployContract deploys the contract and returns the contract address used in the chain.
 	DeployContract(fromPrivKey []byte, contractPath string) (string, error)
 
-	// Creates the raw signed transaction that will deploy a contract
+	// CreateContractDeployTX creates the raw signed transaction that will deploy a contract
 	CreateContractDeployTX(fromPrivKey []byte, contractPath string) ([]byte, error)
 
-	// Create a signed transaction that performs actions on a smart contract at the given address
+	// CreateInteractionTX create a signed transaction that performs actions on a smart contract at the given address
 	CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []configs.ContractParam) ([]byte, error)
 
-	// Creates a transaction that is signed and ready to send from the given private key.
+	// CreateSignedTransaction creates a transaction that is signed and ready to send from the given private key.
 	CreateSignedTransaction(fromPrivKey []byte, toAddress string, value *big.Int, data []byte) ([]byte, error)
 
-	// Generates the workload specified in the chain configurations.
+	// GenerateWorkload generates the workload specified in the chain configurations.
 	GenerateWorkload() (Workload, error)
 }

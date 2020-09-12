@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-// All the available arguments
+// Arguments provides all the argument sets
 type Arguments struct {
 	PrimaryCommand   *flag.FlagSet  // Commands related to the primary
 	SecondaryCommand *flag.FlagSet  // Commands related to the secondarys
@@ -14,21 +14,21 @@ type Arguments struct {
 	SecondaryArgs    *SecondaryArgs // Secondary arguments
 }
 
-// Arguments for the primary
+// PrimaryArgs contains the command-line arguments for the primary
 type PrimaryArgs struct {
 	BenchConfigPath string // Path to the configurations
 	ChainConfigPath string // Path to the chain configuration
 	ListenAddr      string // host:port that it should run on
 }
 
-// Arguments for the secondary nodes
+// SecondaryArgs provides command-line arguments for secondary
 type SecondaryArgs struct {
 	ConfigPath      string // Path to the secondary config
 	ChainConfigPath string // Path to the blockchain configuration
 	PrimaryAddr     string // Address of the primary (can also be in secondary config)
 }
 
-// Initialise the arguments
+// DefineArguments sets the arguments that will be used for the subcommands
 func DefineArguments() *Arguments {
 
 	primaryCommand := flag.NewFlagSet("primary", flag.ExitOnError)
@@ -68,7 +68,7 @@ func DefineArguments() *Arguments {
 	}
 }
 
-// Check the primary arguments conform to specified requirements
+// CheckArgs checks that the primary arguments conform to specified requirements
 func (pa *PrimaryArgs) CheckArgs() {
 	if pa.BenchConfigPath == "" {
 		zap.L().Error("benchmark config not provided")
@@ -81,7 +81,7 @@ func (pa *PrimaryArgs) CheckArgs() {
 	}
 }
 
-// Checks that the secondary arguments are correct
+// SecondaryArgs validates that the secondary arguments are correct
 func (sa *SecondaryArgs) SecondaryArgs() {
 	// We must have at least one - either the primary address or the config
 	if sa.ConfigPath == "" && sa.PrimaryAddr == "" {

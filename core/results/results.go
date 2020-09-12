@@ -8,14 +8,14 @@ package results
 
 import "sort"
 
-// Generic result structure that will be encoded and sent back to the primary and combined
+// Results is the generic result structure that will be encoded and sent back to the primary and combined
 type Results struct {
 	TxLatencies    []float64 `json:TxLatencies`    // Latency of each transaction, can be used in CDF
 	AverageLatency float64   `json:AverageLatency` // Averaged latency of the transactions
 	Throughput     float64   `json:Throughput`     // Number of transactions per second "committed"
 }
 
-// Aggregated results returns all the information from all secondaries, and
+// AggregatedResults returns all the information from all secondaries, and
 // stores the calculated information (e.g. max, min, ...)
 type AggregatedResults struct {
 	SecondaryResults  []Results // All results from secondaries
@@ -29,7 +29,7 @@ type AggregatedResults struct {
 	MedianLatency     float64   // median latency
 }
 
-// Given the set of results from the secondary, calculate the aggregated results
+// CalculateAggregatedResults calculates the aggregated results given the set of results from the secondaries
 func CalculateAggregatedResults(secondaryResults []Results) AggregatedResults {
 
 	if len(secondaryResults) == 0 {
@@ -37,13 +37,13 @@ func CalculateAggregatedResults(secondaryResults []Results) AggregatedResults {
 	}
 
 	// First, we want to get all the information
-	var averageThroughput float64 = 0
-	var maxThroughput float64 = 0
+	var averageThroughput float64
+	var maxThroughput float64
 	minThroughput := secondaryResults[0].Throughput
-	var totalThroughput float64 = 0
+	var totalThroughput float64
 
 	var allLatencies []float64
-	var averageLatency float64 = 0
+	var averageLatency float64
 
 	for _, res := range secondaryResults {
 		allLatencies = append(allLatencies, res.TxLatencies...)
@@ -70,7 +70,7 @@ func CalculateAggregatedResults(secondaryResults []Results) AggregatedResults {
 	sort.Float64s(allLatencies)
 	averageThroughput = averageThroughput / float64(len(secondaryResults))
 	averageLatency = averageLatency / float64(len(secondaryResults))
-	var medianLatency float64 = 0
+	var medianLatency float64
 
 	// If it's even
 	midNumber := len(allLatencies) / 2

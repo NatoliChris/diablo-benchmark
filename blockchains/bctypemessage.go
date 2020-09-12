@@ -13,13 +13,15 @@ import (
 	"strings"
 )
 
+// BlockchainTypeMessage represents the type of blockchain during communication.
 type BlockchainTypeMessage byte
 
 const (
+	// BCEthereum defines the message to use the Ethereum blockchain.
 	BCEthereum BlockchainTypeMessage = '\xb0'
 )
 
-// Matches the name in the configuration to the blockchain
+// MatchStringToMessage Matches the name in the configuration to the blockchain
 func MatchStringToMessage(configBCType string) (BlockchainTypeMessage, error) {
 	switch strings.ToLower(configBCType) {
 	case "ethereum":
@@ -29,8 +31,9 @@ func MatchStringToMessage(configBCType string) (BlockchainTypeMessage, error) {
 	}
 }
 
-// Matches the byte received from the primary to the interface that is required
-// to interact with the blockchain system we are benchmarking.
+// MatchMessageToInterface Matches the byte received from the primary to the
+// interface that is required to interact with the blockchain system we are
+// benchmarking.
 func MatchMessageToInterface(msg byte) (clientinterfaces.BlockchainInterface, error) {
 	switch BlockchainTypeMessage(msg) {
 	case BCEthereum:
