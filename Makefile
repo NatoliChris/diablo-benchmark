@@ -8,6 +8,7 @@ default: all
 all: reqs diablo
 
 reqs:
+	go get -v -u golang.org/x/lint/golint
 	$(GOBIN) mod download
 	# $(GOBIN) mod vendor
 
