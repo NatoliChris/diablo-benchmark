@@ -152,7 +152,7 @@ func (wh *WorkloadHandler) runnerConsumer(blockchainInterface clientinterfaces.B
 
 // statusPrinter periodically prints the status of the workload progress
 func (wh *WorkloadHandler) statusPrinter(stopCh chan bool) {
-	var timer *time.Timer = time.NewTimer(5 * time.Second)
+	timer := time.NewTimer(5 * time.Second)
 	for {
 		select {
 		case <-stopCh:

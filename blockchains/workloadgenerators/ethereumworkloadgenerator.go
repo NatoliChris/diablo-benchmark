@@ -525,21 +525,85 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 // smart contract deployment and interaction in the same benchmark
 // This can simulate a very realistic blockchain trace to replay existing chains?
 func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error) {
-	// TODO implement
-	// Work out the number of transactions total
+	// Get the number of transactions to be created
+	numberOfTransactions, err := parsers.GetTotalNumberOfTransactions(e.BenchConfig)
+	if err != nil {
+		return nil, err
+	}
 
-	// Get the ratios <> function
+	// Deploy the contract
+	contractAddr, err := e.DeployContract(e.KnownAccounts[0].PrivateKey, e.BenchConfig.ContractInfo.Path)
 
-	// Deploy the contract (if not already deployed)
-	// Generate the workloads of each function.
+	if err != nil {
+		return nil, err
+	}
+
+	// List of functions to create for each thread
+	// TODO this needs some tuning!
+	// This is a list of [id] pointing to each function
+	// It will occur K times in the list, which is representative of the
+	// ratio.
+	functionsToCreatePerThread := make([]int, numberOfTransactions)
+
+	for idx, funcInfo := range e.BenchConfig.ContractInfo.Functions {
+		// add index to functionsToCreate
+		funcRatio := (funcInfo.Ratio / 100) * numberOfTransactions
+
+		for i := 0; i < funcRatio; i++ {
+			functionsToCreatePerThread = append(functionsToCreatePerThread, idx)
+		}
+	}
+
+	// Shuffle the function interactions
+	// TODO check this carefully - we may have workloads with dependent transactions in future - maybe add this as a flag in config?
+	ShuffleFunctionCalls(functionsToCreatePerThread)
+
+	// Now generate the workload as usual
+	var totalWorkload Workload
+	for secondaryID := 0; secondaryID < e.BenchConfig.Secondaries; secondaryID++ {
+		secondaryWorkload := make(SecondaryWorkload, 0)
+		for threadID := 0; threadID < e.BenchConfig.Threads; threadID++ {
+			threadWorkload := make(WorkerThreadWorkload, 0)
+			txCount := 0
+			for _, numTx := range e.BenchConfig.TxInfo.Intervals {
+				intervalWorkload := make([][]byte, 0)
+
+				for i := 0; i < numTx; i++ {
+					// function to create
+					funcToCreate := e.BenchConfig.ContractInfo.Functions[functionsToCreatePerThread[txCount]]
+					zap.L().Debug(fmt.Sprintf("tx %d for func %s", txCount, funcToCreate.Name),
+						zap.Int("secondary", secondaryID),
+						zap.Int("thread", threadID))
+
+					tx, err := e.CreateInteractionTX(
+						e.KnownAccounts[(secondaryID+threadID)%len(e.KnownAccounts)].PrivateKey,
+						contractAddr,
+						funcToCreate.Name,
+						funcToCreate.Params,
+					)
+
+					if err != nil {
+						return nil, err
+					}
+
+					intervalWorkload = append(intervalWorkload, tx)
+					txCount++
+				}
+
+				threadWorkload = append(threadWorkload, intervalWorkload)
+			}
+			secondaryWorkload = append(secondaryWorkload, threadWorkload)
+		}
+		totalWorkload = append(totalWorkload, secondaryWorkload)
+	}
 
 	// Get workload ready
-	return nil, nil
+	return totalWorkload, nil
 }
 
 // GenerateWorkload creates a workload of transactions to be used in the benchmark for all clients.
 func (e *EthereumWorkloadGenerator) GenerateWorkload() (Workload, error) {
-	// 1/ work out the total number of secondarys.
+	// 1/ work out the total number of secondaries.
 	numberOfWorkingSecondaries := e.BenchConfig.Secondaries * e.BenchConfig.Threads
 
 	// Get the number of transactions to be created

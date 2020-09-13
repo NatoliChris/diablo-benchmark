@@ -8,7 +8,7 @@ default: all
 all: reqs diablo
 
 reqs:
-	go get -v -u golang.org/x/lint/golint
+	GO111MODULE=off GO111MODULE=off go get -v golang.org/x/lint/golint
 	$(GOBIN) mod download
 	# $(GOBIN) mod vendor
 

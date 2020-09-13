@@ -105,6 +105,7 @@ func runPrimary(primaryArgs *core.PrimaryArgs) {
 	cConfig, err := parsers.ParseChainConfig(primaryArgs.ChainConfigPath)
 
 	if err != nil {
+		zap.L().Error(err.Error())
 		os.Exit(1)
 	}
 
@@ -122,6 +123,7 @@ func runPrimary(primaryArgs *core.PrimaryArgs) {
 	m := core.InitPrimary(primaryArgs.ListenAddr, bConfig.Secondaries, wg, bConfig, cConfig)
 
 	// Run the benchmark flow
+	zap.L().Info("Primary ready, running benchmark flow")
 	m.Run()
 }
 
