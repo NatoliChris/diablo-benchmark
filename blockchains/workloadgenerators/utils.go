@@ -4,6 +4,8 @@ import (
 	"diablo-benchmark/core/configs"
 	"errors"
 	"go.uber.org/zap"
+	"math/rand"
+	"time"
 )
 
 // GetWorkloadGenerator matches the workload generator with the name provided of the chain in the configuration
@@ -24,4 +26,18 @@ func GetWorkloadGenerator(config *configs.ChainConfig) (WorkloadGenerator, error
 	}
 
 	return wg, nil
+}
+
+// ShuffleFunctionCalls shuffles the function calls to interleave execution
+func ShuffleFunctionCalls(functionsToGet []int) {
+	// start with a source of randomness
+	randomness := rand.New(rand.NewSource(time.Now().Unix()))
+
+	// In-place shuffle
+	for len(functionsToGet) > 0 {
+		currentN := len(functionsToGet)
+		randIndex := randomness.Intn(currentN)
+		functionsToGet[currentN-1], functionsToGet[randIndex] = functionsToGet[randIndex], functionsToGet[currentN-1]
+		functionsToGet = functionsToGet[:currentN-1]
+	}
 }
