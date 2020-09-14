@@ -76,5 +76,13 @@ func ValidateBenchConfig(c *configs.BenchConfig) (bool, error) {
 		}
 	}
 
+	if c.Secondaries <= 0 {
+		return false, fmt.Errorf("number of secondaries must be minimum 1")
+	}
+
+	if c.Threads <= 0 {
+		return false, fmt.Errorf("number of threads must be minimum 1")
+	}
+
 	return true, nil
 }
