@@ -5,6 +5,7 @@ Diablo, an analytical blockchain benchmark framework focusing on distributed cli
 ## Other Sections
 
 * [New Chains](docs/new-chains.md)
+* [Running the example](docs/sample-example.md)
 
 ## Workloads
 
