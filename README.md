@@ -73,6 +73,8 @@ for example:
 ./diablo secondary -m "127.0.0.1:8323" --chain-config configurations/blockchain-configs/ethereum/ethereum-basic.yaml
 ```
 
+If you would like to run the sample benchmark for seeing how diablo operates, please see [Sample Example](docs/sample-example.md).
+
 It will then run through the benchmark and perform the relevant analysis.
 
 ## Reading Material (for development)
