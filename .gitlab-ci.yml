@@ -1,12 +1,5 @@
 image: golang:1.15
 
-cache:
-  paths:
-    - /go/src/github.com
-    - /go/src/golang.org
-    - /go/src/google.golang.org
-    - /go/src/gopkg.in
-
 stages:
   - lint
   - build
@@ -14,7 +7,6 @@ stages:
 before_script:
   - mkdir -p /go/src/hades.it.usyd.edu.au/diablo-benchmark /go/src/_/builds
   - cp -r $CI_PROJECT_DIR /go/src/hades.it.usyd.edu.au/diablo-benchmark
-  - ln -s /go/src/gitlab.com/pantomath-io /go/src/_/builds/pantomath-io
   - make reqs
 
 lint_code:
