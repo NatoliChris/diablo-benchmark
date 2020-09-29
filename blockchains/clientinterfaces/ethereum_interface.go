@@ -20,15 +20,18 @@ import (
 // EthereumInterface is the the Ethereum implementation of the clientinterface
 // Provides functionality to interaact with the Ethereum blockchain
 type EthereumInterface struct {
-	Nodes           []string               // List of the nodes host:port combinations
-	PrimaryNode     *ethclient.Client      // The primary node connected for this client.
-	SecondaryNodes  []*ethclient.Client    // The other node information (for secure reads etc.)
-	SubscribeDone   chan bool              // Event channel that will unsub from events
-	TransactionInfo map[string][]time.Time // Transaction information
-	HandlersStarted bool                   // Have the handlers been initiated?
-	NumTxDone       uint64                 // Number of transactions done
-	NumTxSent       uint64                 // Number of transactions currently sent
-	TotalTx         int                    // Total number of transactions
+	Nodes            []string               // List of the nodes host:port combinations
+	PrimaryNode      *ethclient.Client      // The primary node connected for this client.
+	SecondaryNodes   []*ethclient.Client    // The other node information (for secure reads etc.)
+	SubscribeDone    chan bool              // Event channel that will unsub from events
+	TransactionInfo  map[string][]time.Time // Transaction information
+	HandlersStarted  bool                   // Have the handlers been initiated?
+	NumTxDone        uint64                 // Number of transactions done
+	NumTxSent        uint64                 // Number of transactions currently sent
+	TotalTx          int                    // Total number of transactions
+	StartTime        time.Time
+	ThroughputTicker *time.Ticker
+	Throughputs      []float64
 }
 
 // Init initialises the list of nodes
@@ -42,6 +45,10 @@ func (e *EthereumInterface) Init(otherHosts []string) {
 
 // Cleanup formats results and unsubscribes from the blockchain
 func (e *EthereumInterface) Cleanup() results.Results {
+	// Stop the ticker
+	e.ThroughputTicker.Stop()
+
+	fmt.Println("%v", e.Throughputs)
 	// clean up connections and format results
 	if e.HandlersStarted {
 		e.SubscribeDone <- true
@@ -50,7 +57,6 @@ func (e *EthereumInterface) Cleanup() results.Results {
 	txLatencies := make([]float64, 0)
 	var avgLatency float64
 
-	startTime := time.Now()
 	var endTime time.Time
 
 	for _, v := range e.TransactionInfo {
@@ -62,18 +68,36 @@ func (e *EthereumInterface) Cleanup() results.Results {
 				endTime = v[1]
 			}
 		}
-		if startTime.After(v[0]) {
-			startTime = v[0]
-		}
 	}
 
-	throughput := float64(e.NumTxDone) / (endTime.Sub(startTime).Seconds())
+	throughput := float64(e.NumTxDone) / (endTime.Sub(e.StartTime).Seconds())
 
 	return results.Results{
 		TxLatencies:    txLatencies,
 		AverageLatency: avgLatency / float64(len(txLatencies)),
 		Throughput:     throughput,
 	}
+}
+
+// throughputSeconds calculates the throughput over time, to show dynamic
+func (e *EthereumInterface) throughputSeconds() {
+	e.ThroughputTicker = time.NewTicker(time.Second)
+	seconds := float64(0)
+
+	for {
+		select {
+		case <-e.ThroughputTicker.C:
+			seconds += 1
+			e.Throughputs = append(e.Throughputs, float64(e.NumTxDone)/seconds)
+		}
+	}
+}
+
+// Start sets up the start time and starts the periodic checking of the
+// throughput.
+func (e *EthereumInterface) Start() {
+	e.StartTime = time.Now()
+	go e.throughputSeconds()
 }
 
 // ParseWorkload parses the workload and converts into the type for the benchmark.

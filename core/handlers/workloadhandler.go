@@ -172,7 +172,8 @@ func (wh *WorkloadHandler) RunBench() error {
 
 	go wh.statusPrinter(stopPrinting)
 
-	for _, ch := range wh.readyChannels {
+	for i, ch := range wh.readyChannels {
+		wh.activeClients[i].Start()
 		ch <- true
 	}
 
