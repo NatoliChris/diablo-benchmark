@@ -23,6 +23,11 @@ type BlockchainInterface interface {
 	// Can be used to format the results to parse back
 	Cleanup() results.Results
 
+	// Start handles the starting aspects of the benchmark
+	// Is primarily used for setting the start time and allocating resources for
+	// metrics
+	Start()
+
 	// Handles the workload, converts the bytes to usable transactions.
 	// This takes the worker's workload - and transitions to transactions
 	ParseWorkload(workload workloadgenerators.WorkerThreadWorkload) ([][]interface{}, error)
