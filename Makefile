@@ -5,7 +5,7 @@ PKG_LIST := $(shell go list ${PKG}/... | grep -v vendor/)
 
 default: all
 
-all: reqs diablo
+all: diablo
 
 reqs:
 	GO111MODULE=off GO111MODULE=off go get -v golang.org/x/lint/golint
@@ -16,9 +16,9 @@ lint:
 	@golint -set_exit_status ${PKG_LIST}
 
 diablo:
-	$(GOBIN) build $(BUILDFLAGS) -o diablo
+	$(GOBIN) build $(BUILDFLAGS) -o $@
 
 clean:
 	rm diablo
 
-.PHONY: default clean reqs
+.PHONY: default clean reqs diablo
