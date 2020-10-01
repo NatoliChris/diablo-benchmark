@@ -8,8 +8,6 @@ package results
 
 import "sort"
 
-const MAXLAT float64 = 3000
-
 // Results is the generic result structure that will be encoded and sent back to the primary and combined
 type Results struct {
 	TxLatencies       []float64 `json:"TxLatencies"`       // Latency of each transaction, can be used in CDF
@@ -45,9 +43,8 @@ func getMedian(arr []float64) float64 {
 	midNumber := len(arrSorted) / 2
 	if len(arrSorted)%2 == 0 {
 		return (arrSorted[midNumber-1] + arrSorted[midNumber]) / 2
-	} else {
-		return arrSorted[midNumber]
 	}
+	return arrSorted[midNumber]
 }
 
 // CalculateAggregatedResults calculates the aggregated results given the set of results from the secondaries
@@ -71,7 +68,7 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 	// Min/Max/Average Latency
 	maxTotalLatency := float64(0)
 	averageTotalLatency := float64(0)
-	minTotalLatency := MAXLAT
+	minTotalLatency := float64(-1)
 
 	var latencyPerSecondary []float64
 
@@ -92,7 +89,7 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 			latencyEntries += float64(len(workerResult.TxLatencies))
 			for latencyIdx, v := range workerResult.TxLatencies {
 				averageLatencyPerSecondary += v
-				if v < minTotalLatency {
+				if v < minTotalLatency || minTotalLatency < 0 {
 					minTotalLatency = v
 				}
 

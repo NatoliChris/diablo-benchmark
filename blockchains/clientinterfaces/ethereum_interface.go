@@ -88,7 +88,7 @@ func (e *EthereumInterface) throughputSeconds() {
 	for {
 		select {
 		case <-e.ThroughputTicker.C:
-			seconds += 1
+			seconds++
 			e.Throughputs = append(e.Throughputs, float64(e.NumTxDone)/seconds)
 		}
 	}
