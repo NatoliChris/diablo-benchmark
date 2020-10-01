@@ -73,9 +73,10 @@ func (e *EthereumInterface) Cleanup() results.Results {
 	throughput := float64(e.NumTxDone) / (endTime.Sub(e.StartTime).Seconds())
 
 	return results.Results{
-		TxLatencies:    txLatencies,
-		AverageLatency: avgLatency / float64(len(txLatencies)),
-		Throughput:     throughput,
+		TxLatencies:       txLatencies,
+		AverageLatency:    avgLatency / float64(len(txLatencies)),
+		Throughput:        throughput,
+		ThroughputSeconds: e.Throughputs,
 	}
 }
 
