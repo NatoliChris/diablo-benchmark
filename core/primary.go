@@ -11,6 +11,7 @@ import (
 	"diablo-benchmark/communication"
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/results"
+	"encoding/json"
 	"fmt"
 	"go.uber.org/zap"
 	"time"
@@ -164,8 +165,11 @@ func (p *Primary) Run() {
 	)
 
 	// Temporary printing
-	//a, _ := json.Marshal(aggregatedResults)
-	//fmt.Println(string(a))
+	a, _ := json.MarshalIndent(aggregatedResults, "", " ")
+	fmt.Println(string(a))
+
+	// bench, chain, results, dir
+	results.WriteResultsToFile(p.benchmarkConfig.Path, p.chainConfig.Path, aggregatedResults, "results")
 
 	// Step 7 - store results
 	p.Server.SendFin()
