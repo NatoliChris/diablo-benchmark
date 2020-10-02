@@ -208,7 +208,7 @@ func (s *PrimaryServer) sendAndWaitData(data []byte, secondary net.Conn) (*resul
 		readLen += n
 	}
 
-	zap.L().Info("Read secondary reply",
+	zap.L().Debug("Read secondary reply",
 		zap.String("secondary", secondary.RemoteAddr().String()),
 		zap.Int("numbytes", readLen))
 
@@ -326,7 +326,7 @@ func (s *PrimaryServer) RunBenchmark() SecondaryReplyErrors {
 	for {
 		select {
 		case secondaryDone := <-okCh:
-			zap.L().Info("Secondary Done")
+			zap.L().Debug("Secondary Done")
 			numberDone++
 			numberOfErrors += secondaryDone
 			if numberDone == len(s.Secondaries) {
@@ -401,7 +401,7 @@ func (s *PrimaryServer) CloseAll() {
 // CloseSecondaries closes the secondary connections
 func (s *PrimaryServer) CloseSecondaries() {
 	for i, c := range s.Secondaries {
-		zap.L().Info(fmt.Sprintf("Closing Secondary %d @ %s", i, c.RemoteAddr().String()))
+		zap.L().Debug(fmt.Sprintf("Closing Secondary %d @ %s", i, c.RemoteAddr().String()))
 		_ = c.Close()
 	}
 }
