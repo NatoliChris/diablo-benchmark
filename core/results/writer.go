@@ -3,6 +3,7 @@ package results
 import (
 	"encoding/json"
 	"fmt"
+	"go.uber.org/zap"
 	"io"
 	"io/ioutil"
 	"os"
@@ -84,6 +85,9 @@ func WriteResultsToFile(benchConfig string, chainConfig string, results Aggregat
 	}
 
 	ts := fmt.Sprintf("%v", time.Now().Format(time.RFC3339))
+
+	zap.L().Info(fmt.Sprintf("Saving results in %s", resultDir),
+		zap.String("timestamp", ts))
 
 	// Write the results to file
 	err := writeResults(fmt.Sprintf("%s/%s_results.json", resultDir, ts), results)

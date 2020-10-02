@@ -164,17 +164,21 @@ func (p *Primary) Run() {
 		),
 	)
 
-	// Temporary printing
-	a, _ := json.MarshalIndent(aggregatedResults, "", " ")
-	fmt.Println(string(a))
-
-	// bench, chain, results, dir
-	results.WriteResultsToFile(p.benchmarkConfig.Path, p.chainConfig.Path, aggregatedResults, "results")
-
 	// Step 7 - store results
 	p.Server.SendFin()
 
 	time.Sleep(2 * time.Second)
+
+	// Temporary printing
+	a, _ := json.MarshalIndent(aggregatedResults, "", " ")
+	fmt.Println(string(a))
+
+	// Write the results to a file
+	err = results.WriteResultsToFile(p.benchmarkConfig.Path, p.chainConfig.Path, aggregatedResults, "results")
+	if err != nil {
+		zap.L().Error("Encountered error when saving results",
+			zap.Error(err))
+	}
 
 	// Step 8: Close all connections
 	p.Server.CloseSecondaries()
