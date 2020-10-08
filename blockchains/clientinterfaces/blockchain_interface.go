@@ -10,6 +10,19 @@ import (
 	"diablo-benchmark/core/results"
 )
 
+
+// GenericInterface provides the required fields of the blockchain interface so that
+// All information can be accessed
+type GenericInterface struct {
+	NumTxDone uint64 // The number of completed transactions
+	NumTxSent uint64 // Number of transactions sent
+}
+
+// GetTxDone returns the number of transactions completed
+func (gi *GenericInterface) GetTxDone() uint64 {
+	return gi.NumTxDone
+}
+
 // BlockchainInterface provides the basic funcitonality that will be tested
 // with the blockchains.
 // It _should_ cover most interaction, but will be extendible in the event that
@@ -55,6 +68,10 @@ type BlockchainInterface interface {
 
 	// GetBlockHeight returns the current height of the chain
 	GetBlockHeight() (uint64, error)
+
+	// Get Tx Done returns the number of transactions completed
+	// This is already implemented with the GenericInterface
+	GetTxDone() uint64
 
 	// ParseBlocksForTransactions retrieves block information from start to end index and
 	// is used as a post-benchmark check to learn about the block and transactions.

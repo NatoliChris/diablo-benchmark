@@ -152,17 +152,26 @@ func (wh *WorkloadHandler) runnerConsumer(blockchainInterface clientinterfaces.B
 
 // statusPrinter periodically prints the status of the workload progress
 func (wh *WorkloadHandler) statusPrinter(stopCh chan bool) {
-	timer := time.NewTimer(5 * time.Second)
+	timer := time.NewTicker(5 * time.Second)
 	for {
 		select {
 		case <-stopCh:
+			timer.Stop()
 			return
 		case <-timer.C:
 			// print
 			zap.L().Info(fmt.Sprintf("%d tx | %d errors", wh.numTx, wh.numErrors))
-			timer = time.NewTimer(5 * time.Second)
 		}
 	}
+}
+
+func (wh *WorkloadHandler) getTxCheck() uint64 {
+	fullTx := uint64(0)
+	for _, v := range wh.activeClients {
+		fullTx += v.GetTxDone()
+	}
+
+	return fullTx
 }
 
 // RunBench executes the benchmark
@@ -177,7 +186,30 @@ func (wh *WorkloadHandler) RunBench() error {
 	}
 
 	wh.wg.Wait()
+
+	// Sending finished waiting for timeout
+	// TODO: add configurable timeout that will exit if benchmark not complete
+	zap.L().Info("Sending complete, waiting for finish")
 	stopPrinting <- true
+
+	waitingTicker := time.NewTicker(1 * time.Second)
+	waitCount := 0
+	td := uint64(0)
+	for {
+		select {
+		case <-waitingTicker.C:
+			waitCount++
+			td = wh.getTxCheck()
+			zap.L().Debug("TX Done:",
+				zap.Uint64("tx", td),
+				zap.Uint64("total", wh.numTx),
+			)
+			break
+		}
+		if waitCount >= 20 || (td / wh.numTx) == 1  {
+			break
+		}
+	}
 
 	wh.StartEnd = append(wh.StartEnd, time.Now())
 	zap.L().Info("Benchmark complete:",

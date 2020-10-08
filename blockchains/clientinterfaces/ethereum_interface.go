@@ -26,9 +26,8 @@ type EthereumInterface struct {
 	SubscribeDone   chan bool              // Event channel that will unsub from events
 	TransactionInfo map[string][]time.Time // Transaction information
 	HandlersStarted bool                   // Have the handlers been initiated?
-	NumTxDone       uint64                 // Number of transactions done
-	NumTxSent       uint64                 // Number of transactions currently sent
 	TotalTx         int                    // Total number of transactions
+	GenericInterface
 }
 
 // Init initialises the list of nodes
@@ -109,14 +108,16 @@ func (e *EthereumInterface) parseBlocksForTransactions(blockNumber *big.Int) {
 	}
 
 	tNow := time.Now()
+	var tAdd uint64
 	for _, v := range block.Transactions() {
 		tHash := v.Hash().String()
 		if _, ok := e.TransactionInfo[tHash]; ok {
 			e.TransactionInfo[tHash] = append(e.TransactionInfo[tHash], tNow)
+			tAdd++
 		}
 	}
 
-	atomic.AddUint64(&e.NumTxDone, uint64(len(block.Transactions())))
+	atomic.AddUint64(&e.NumTxDone, tAdd)
 }
 
 // EventHandler subscribes to the blocks and handles the incoming information about the transactions
