@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"go.uber.org/zap"
 	"time"
-	"encoding/json"
 )
 
 // Primary benchmark server, acts as the orchestrator for the benchmark
@@ -175,7 +174,7 @@ func (p *Primary) Run() {
 	time.Sleep(2 * time.Second)
 
 	// Temporary printing
-	a, _ := json.MarshalIndent(aggregatedResults, "", " ")
+	a, _ = json.MarshalIndent(aggregatedResults, "", " ")
 	fmt.Println(string(a))
 
 	// Write the results to a file
