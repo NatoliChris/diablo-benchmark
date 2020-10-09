@@ -136,7 +136,7 @@ func (s *PrimaryServer) SendAndWaitOKSync(data []byte, secondary net.Conn) error
 }
 
 // sendAndWaitData sends a message to a secondary and waits for the OK and data, or errors
-func (s *PrimaryServer) sendAndWaitData(data []byte, secondary net.Conn) (*results.Results, error) {
+func (s *PrimaryServer) sendAndWaitData(data []byte, secondary net.Conn) ([]results.Results, error) {
 	if _, err := secondary.Write(data); err != nil {
 		// TODO log that we can't communicate with secondary
 		return nil, &SecondaryCommError{
@@ -176,11 +176,11 @@ func (s *PrimaryServer) sendAndWaitData(data []byte, secondary net.Conn) (*resul
 	dataLen := binary.BigEndian.Uint64(initialReply[1:9])
 
 	if dataLen == 0 {
-		return &results.Results{
+		return []results.Results{results.Results{
 			AverageLatency: 0,
 			Throughput:     0,
 			TxLatencies:    []float64{},
-		}, nil
+		}}, nil
 	}
 
 	fullReply := initialReply[9:]
@@ -212,7 +212,7 @@ func (s *PrimaryServer) sendAndWaitData(data []byte, secondary net.Conn) (*resul
 		zap.String("secondary", secondary.RemoteAddr().String()),
 		zap.Int("numbytes", readLen))
 
-	var res results.Results
+	var res []results.Results
 	err = json.Unmarshal(fullReply[:dataLen], &res)
 
 	if err != nil {
@@ -220,7 +220,7 @@ func (s *PrimaryServer) sendAndWaitData(data []byte, secondary net.Conn) (*resul
 			zap.Error(err))
 		return nil, err
 	}
-	return &res, nil
+	return res, nil
 }
 
 // PrepareBenchmarkSecondaries sends the prepare message to the secondaires
@@ -366,8 +366,8 @@ func (s *PrimaryServer) RunBenchmark() SecondaryReplyErrors {
 
 // GetResults calls the secondaries to return the results.
 // Will return the list of results as well as any errors that had been encountered
-func (s *PrimaryServer) GetResults() ([]results.Results, SecondaryReplyErrors) {
-	var allResults []results.Results
+func (s *PrimaryServer) GetResults() ([][]results.Results, SecondaryReplyErrors) {
+	var allResults [][]results.Results
 	var errs SecondaryReplyErrors
 
 	for _, c := range s.Secondaries {
@@ -379,7 +379,7 @@ func (s *PrimaryServer) GetResults() ([]results.Results, SecondaryReplyErrors) {
 			continue
 		}
 
-		allResults = append(allResults, *secondaryRes)
+		allResults = append(allResults, secondaryRes)
 	}
 
 	return allResults, errs
