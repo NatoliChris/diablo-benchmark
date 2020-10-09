@@ -10,85 +10,179 @@ import "sort"
 
 // Results is the generic result structure that will be encoded and sent back to the primary and combined
 type Results struct {
-	TxLatencies    []float64 `json:"TxLatencies"`    // Latency of each transaction, can be used in CDF
-	AverageLatency float64   `json:"AverageLatency"` // Averaged latency of the transactions
-	Throughput     float64   `json:"Throughput"`     // Number of transactions per second "committed"
+	TxLatencies       []float64 `json:"TxLatencies"`       // Latency of each transaction, can be used in CDF
+	AverageLatency    float64   `json:"AverageLatency"`    // Averaged latency of the transactions
+	MedianLatency     float64   `json:"MedianLatency"`     // Median Latency of the transaction
+	Throughput        float64   `json:"Throughput"`        // Number of transactions per second "committed"
+	ThroughputSeconds []float64 `json:"ThroughputSeconds"` // Number of transactions "committed" over second periods to measure dynamic throughput
 }
 
 // AggregatedResults returns all the information from all secondaries, and
 // stores the calculated information (e.g. max, min, ...)
 type AggregatedResults struct {
-	SecondaryResults  []Results // All results from secondaries
-	TotalThroughput   float64   // Total cumulative throughput
-	MaxThroughput     float64   // maximum throughput observed
-	MinThroughput     float64   // minimum throughput observed
-	AverageThroughput float64   // average throughput
-	MaxLatency        float64   // highest latency observed
-	MinLatency        float64   // smallest latency observed
-	AverageLatency    float64   // average latency
-	MedianLatency     float64   // median latency
+	RawResults                    [][]Results `json:"RawResults"`                           // Result of [secondary][thread]
+	ResultsPerSecondary           []Results   `json:"ResultsPerSecondary"`                  // Aggregation of results per secondary
+	MinLatency                    float64     `json:"MinLatency"`                           // Minimum latency across all workers and secondaries
+	AverageLatency                float64     `json:"AverageLatency"`                       // Average latency across all workers and secondaries
+	AverageLatencyPerSecondary    []float64   `json:"AverageLatencyPerSecond"`              // Average latency per secondary
+	MedianLatency                 float64     `json:"MedianAverageLatency"`                 // Median latency value
+	MaxLatency                    float64     `json:"MaxAverageLatency"`                    // Highest latency across all secondaries and workers
+	TotalThroughputTimes          []float64   `json:"TotalThroughputPerSecond"`             // Throughput over time
+	AverageThroughputPerSecondary []float64   `json:"OverallThroughputPerSecondary"`        // Throughput per secondary
+	TotalThroughputSecondaryTime  [][]float64 `json:"TotalThroughputPerSecondaryPerSecond"` // Throughput over time for each secondary
+	MaxThroughput                 float64     `json:"MaximumOverallThroughput"`             // Highest throughput
+	MinThroughput                 float64     `json:"MinimumOverallThroughput"`             // Highest throughput
+	OverallThroughput             float64     `json:"OverallAverageThroughput"`             // Overall throughput measured as success / time
+}
+
+// Return the median of a list
+func getMedian(arr []float64) float64 {
+	arrSorted := arr
+	sort.Float64s(arrSorted)
+
+	midNumber := len(arrSorted) / 2
+	if len(arrSorted)%2 == 0 {
+		return (arrSorted[midNumber-1] + arrSorted[midNumber]) / 2
+	}
+	return arrSorted[midNumber]
 }
 
 // CalculateAggregatedResults calculates the aggregated results given the set of results from the secondaries
-func CalculateAggregatedResults(secondaryResults []Results) AggregatedResults {
+func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults {
 
+	// Check that it's not empty
 	if len(secondaryResults) == 0 {
 		return AggregatedResults{}
 	}
 
-	// First, we want to get all the information
-	var averageThroughput float64
-	var maxThroughput float64
-	minThroughput := secondaryResults[0].Throughput
-	var totalThroughput float64
+	// Now let's go through and calculate all the things
+	// Results aggregated per secondary
+	var ResultsPerSecondary []Results
+	// Total throughputs cumulated over time (should range from 0 to end of benchmark)
+	totalThroughputOverTime := make([]float64, 0)
+	// Average throughput per secondary
+	var throughputPerSecondary []float64
+	// Total throughput per secondary per second (throughput over time)
+	var throughputOverTimeSecondary [][]float64
 
-	var allLatencies []float64
-	var averageLatency float64
+	// Min/Max/Average Latency
+	maxTotalLatency := float64(0)
+	averageTotalLatency := float64(0)
+	minTotalLatency := float64(-1)
 
-	for _, res := range secondaryResults {
-		allLatencies = append(allLatencies, res.TxLatencies...)
+	var latencyPerSecondary []float64
 
-		// Averages
-		averageLatency += res.AverageLatency
-		averageThroughput += res.Throughput
-		totalThroughput += res.Throughput
+	// Throughput total
+	maxTotalThroughput := float64(0)
+	averageTotalThroughput := float64(0)
 
-		// Maximum and minimums
-		if res.Throughput > maxThroughput {
-			maxThroughput = res.Throughput
+	// Iterate through the results
+	for _, secondaryResult := range secondaryResults {
+		txLatencies := make([]float64, 0)
+		averageLatencyPerSecondary := float64(0)
+		secondaryThroughputs := make([]float64, 0)
+		latencyEntries := float64(0)
+		avgThroughputPerSecondary := float64(0)
+		// For each worker
+		for _, workerResult := range secondaryResult {
+			// 1. get the latency average per secondary
+			latencyEntries += float64(len(workerResult.TxLatencies))
+			for latencyIdx, v := range workerResult.TxLatencies {
+				averageLatencyPerSecondary += v
+				if v < minTotalLatency || minTotalLatency < 0 {
+					minTotalLatency = v
+				}
+
+				if v > maxTotalLatency {
+					maxTotalLatency = v
+				}
+
+				if latencyIdx >= len(txLatencies) {
+					txLatencies = append(txLatencies, 0)
+				}
+				txLatencies[latencyIdx] += v
+			}
+
+			// 2. Obtain throughputs
+			for timeIndex, v := range workerResult.ThroughputSeconds {
+				if timeIndex >= len(totalThroughputOverTime) {
+					totalThroughputOverTime = append(totalThroughputOverTime, 0)
+				}
+				totalThroughputOverTime[timeIndex] += v
+
+				if timeIndex >= len(secondaryThroughputs) {
+					secondaryThroughputs = append(secondaryThroughputs, 0)
+				}
+				secondaryThroughputs[timeIndex] += v
+			}
+			avgThroughputPerSecondary += workerResult.Throughput
 		}
-		if res.Throughput < minThroughput {
-			minThroughput = res.Throughput
+
+		// fix the average latencies
+		avgLatency := float64(0)
+		for idx := 0; idx < len(txLatencies); idx++ {
+			txLatencies[idx] = txLatencies[idx] / float64(len(secondaryResult))
+			avgLatency += txLatencies[idx]
 		}
+		avgLatency = avgLatency / float64(len(txLatencies))
+		latencyPerSecondary = append(latencyPerSecondary, avgLatency)
+
+		sortedLatencies := txLatencies
+		sort.Float64s(sortedLatencies)
+		medianLatency := float64(0)
+		midNumber := len(txLatencies) / 2
+		if len(txLatencies)%2 == 0 {
+			medianLatency = (txLatencies[midNumber-1] + txLatencies[midNumber]) / 2
+		} else {
+			medianLatency = txLatencies[midNumber]
+		}
+
+		averageTotalLatency += avgLatency
+		throughputOverTimeSecondary = append(throughputOverTimeSecondary, secondaryThroughputs)
+
+		throughputPerSecondary = append(throughputPerSecondary, avgThroughputPerSecondary/float64(len(secondaryResult)))
+		ResultsPerSecondary = append(ResultsPerSecondary, Results{
+			TxLatencies:       txLatencies,
+			ThroughputSeconds: secondaryThroughputs,
+			Throughput:        avgThroughputPerSecondary / float64(len(secondaryResult)),
+			AverageLatency:    avgLatency,
+			MedianLatency:     medianLatency,
+		})
 	}
 
-	// If empty
-	if allLatencies == nil {
-		allLatencies = []float64{0}
+	// Fix up the average and median latency
+	averageTotalLatency = averageTotalLatency / float64(len(secondaryResults))
+	medianLatencyTotal := getMedian(latencyPerSecondary)
+
+	// Fix up the overall throughput and average throughput
+	minTotalThroughput := totalThroughputOverTime[0]
+	for _, v := range totalThroughputOverTime {
+		if v > maxTotalThroughput {
+			maxTotalThroughput = v
+		}
+
+		if v < minTotalThroughput {
+			minTotalThroughput = v
+		}
+		averageTotalThroughput += v
 	}
 
-	sort.Float64s(allLatencies)
-	averageThroughput = averageThroughput / float64(len(secondaryResults))
-	averageLatency = averageLatency / float64(len(secondaryResults))
-	var medianLatency float64
+	averageTotalThroughput = averageTotalThroughput / float64(len(totalThroughputOverTime))
 
-	// If it's even
-	midNumber := len(allLatencies) / 2
-	if len(allLatencies)%2 == 0 {
-		medianLatency = (allLatencies[midNumber-1] + allLatencies[midNumber]) / 2
-	} else {
-		medianLatency = allLatencies[midNumber]
-	}
-
+	// Return the absolute mass of results chunked together!
 	return AggregatedResults{
-		SecondaryResults:  secondaryResults,
-		TotalThroughput:   totalThroughput,
-		MaxThroughput:     maxThroughput,
-		MinThroughput:     minThroughput,
-		AverageThroughput: averageThroughput,
-		MaxLatency:        allLatencies[len(allLatencies)-1],
-		MinLatency:        allLatencies[0],
-		AverageLatency:    averageLatency,
-		MedianLatency:     medianLatency,
+		RawResults:                    secondaryResults,
+		ResultsPerSecondary:           ResultsPerSecondary,
+		MinLatency:                    minTotalLatency,
+		AverageLatency:                averageTotalLatency,
+		AverageLatencyPerSecondary:    latencyPerSecondary,
+		MedianLatency:                 medianLatencyTotal,
+		MaxLatency:                    maxTotalLatency,
+		TotalThroughputTimes:          totalThroughputOverTime,
+		AverageThroughputPerSecondary: throughputPerSecondary,
+		TotalThroughputSecondaryTime:  throughputOverTimeSecondary,
+		MaxThroughput:                 maxTotalThroughput,
+		MinThroughput:                 minTotalThroughput,
+		OverallThroughput:             averageTotalThroughput,
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"go.uber.org/zap"
 	"time"
+	"encoding/json"
 )
 
 // Primary benchmark server, acts as the orchestrator for the benchmark
@@ -140,19 +141,19 @@ func (p *Primary) Run() {
 		fmt.Println(errs)
 	}
 
+	// TODO: @CHRIS
 	aggregatedResults := results.CalculateAggregatedResults(rawResults)
 
 	// Print the benchmark information
 	zap.L().Info("\n" +
-		"---------------\n" +
+		"----------------------\n" +
 		"Benchmark Complete\n" +
-		"---------------\n" +
+		"----------------------\n" +
 		fmt.Sprintf(
-			"[*] Throughput: Total %.2f, (Min: %.2f ; Max %.2f; Avg: %.2f)\n",
-			aggregatedResults.TotalThroughput,
+			"[*] Throughput: Total %.2f, (Min: %.2f ; Max %.2f)\n",
+			aggregatedResults.OverallThroughput,
 			aggregatedResults.MinThroughput,
 			aggregatedResults.MaxThroughput,
-			aggregatedResults.AverageThroughput,
 		) +
 		fmt.Sprintf(
 			"[*] Latency: %.2f, (Min: %.2f ; Max %.2f; Median %2.f)\n",
@@ -164,8 +165,8 @@ func (p *Primary) Run() {
 	)
 
 	// Temporary printing
-	//a, _ := json.Marshal(aggregatedResults)
-	//fmt.Println(string(a))
+	a, _ := json.Marshal(aggregatedResults)
+	fmt.Println(string(a))
 
 	// Step 7 - store results
 	p.Server.SendFin()
