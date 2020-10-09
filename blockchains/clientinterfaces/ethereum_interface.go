@@ -9,12 +9,13 @@ import (
 	"diablo-benchmark/core/results"
 	"errors"
 	"fmt"
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"go.uber.org/zap"
 	"math/big"
 	"sync/atomic"
 	"time"
+
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"go.uber.org/zap"
 )
 
 // EthereumInterface is the the Ethereum implementation of the clientinterface
@@ -29,9 +30,9 @@ type EthereumInterface struct {
 	NumTxDone        uint64                 // Number of transactions done
 	NumTxSent        uint64                 // Number of transactions currently sent
 	TotalTx          int                    // Total number of transactions
-	StartTime        time.Time
-	ThroughputTicker *time.Ticker
-	Throughputs      []float64
+	StartTime        time.Time              // Start time of the benchmark
+	ThroughputTicker *time.Ticker           // Ticker for throughput (1s)
+	Throughputs      []float64              // Throughput over time with 1 second intervals
 }
 
 // Init initialises the list of nodes
@@ -48,7 +49,6 @@ func (e *EthereumInterface) Cleanup() results.Results {
 	// Stop the ticker
 	e.ThroughputTicker.Stop()
 
-	fmt.Println("%v", e.Throughputs)
 	// clean up connections and format results
 	if e.HandlersStarted {
 		e.SubscribeDone <- true
