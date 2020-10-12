@@ -7,11 +7,12 @@ import (
 	"diablo-benchmark/core/results"
 	"errors"
 	"fmt"
-	"go.uber.org/zap"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // WorkloadHandler is the main handler loop that dispatches the workload into channels and creates routines that will read and send
@@ -25,14 +26,16 @@ type WorkloadHandler struct {
 	numTx                uint64                                 // number of transactions sent
 	numErrors            uint64                                 // Number of errors during workload
 	StartEnd             []time.Time                            // Start and end of the benchmark
+	timeout              int                                    // Timeout to wait for the benchmark
 }
 
 // NewWorkloadHandler provides a new workload handler with number of threads and clients
-func NewWorkloadHandler(numThread uint32, clients []clientinterfaces.BlockchainInterface) *WorkloadHandler {
+func NewWorkloadHandler(numThread uint32, clients []clientinterfaces.BlockchainInterface, timeout int) *WorkloadHandler {
 	// Generate the channels to speak to the workers.
 	return &WorkloadHandler{
 		numThread:     numThread,
 		activeClients: clients,
+		timeout:       timeout,
 	}
 }
 
@@ -206,7 +209,7 @@ func (wh *WorkloadHandler) RunBench() error {
 			)
 			break
 		}
-		if waitCount >= 20 || (td / wh.numTx) == 1  {
+		if waitCount >= wh.timeout || (td/wh.numTx) == 1 {
 			break
 		}
 	}
