@@ -146,6 +146,7 @@ func (wh *WorkloadHandler) runnerConsumer(blockchainInterface clientinterfaces.B
 		e := blockchainInterface.SendRawTransaction(tx)
 		if e != nil {
 			errs = append(errs, e)
+			atomic.AddUint64(&wh.numErrors, 1)
 		}
 		atomic.AddUint64(&wh.numTx, 1)
 	}
@@ -184,10 +185,13 @@ func (wh *WorkloadHandler) RunBench() error {
 
 	go wh.statusPrinter(stopPrinting)
 
-	for _, ch := range wh.readyChannels {
+	for i, ch := range wh.readyChannels {
+		wh.activeClients[i].Start()
 		ch <- true
 	}
 
+	// All of the threads have stopped sending, we should wait some time for
+	// confirmations
 	wh.wg.Wait()
 
 	// Sending finished waiting for timeout
@@ -215,6 +219,7 @@ func (wh *WorkloadHandler) RunBench() error {
 	}
 
 	wh.StartEnd = append(wh.StartEnd, time.Now())
+
 	zap.L().Info("Benchmark complete:",
 		zap.Time("start", wh.StartEnd[0]),
 		zap.Time("end", wh.StartEnd[1]),
@@ -225,31 +230,14 @@ func (wh *WorkloadHandler) RunBench() error {
 }
 
 // HandleCleanup performs all post-benchmark calculation and returns the result set
-func (wh *WorkloadHandler) HandleCleanup() results.Results {
-	// Aggregate the results
-	allLatencies := make([]float64, 0)
-	var avgThroughput float64
-	var avgLatency float64
-	for i, c := range wh.activeClients {
-		zap.L().Debug("processing cleanup",
-			zap.Int("client", i))
-		res := c.Cleanup()
-		avgThroughput += res.Throughput
-		allLatencies = append(allLatencies, res.TxLatencies...)
-		avgLatency += res.AverageLatency
+func (wh *WorkloadHandler) HandleCleanup() []results.Results {
+
+	var resList []results.Results
+	for _, c := range wh.activeClients {
+		resList = append(resList, c.Cleanup())
 	}
 
-	zap.L().Debug("Cleanup results",
-		zap.Float64("avg throughput", avgThroughput),
-		zap.Float64("avg latency", avgLatency/float64(wh.numThread)),
-		zap.Float64s("latencies", allLatencies))
-
-	// Return the aggregated results
-	return results.Results{
-		AverageLatency: avgLatency / float64(wh.numThread),
-		Throughput:     avgThroughput,
-		TxLatencies:    allLatencies,
-	}
+	return resList
 }
 
 // CloseAll closes the clients and the channels
