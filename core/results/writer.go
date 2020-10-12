@@ -3,11 +3,12 @@ package results
 import (
 	"encoding/json"
 	"fmt"
-	"go.uber.org/zap"
 	"io"
 	"io/ioutil"
 	"os"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // checkFileExists is a simple stat check to ensure that the file
@@ -78,6 +79,7 @@ func writeResults(path string, data AggregatedResults) error {
 func WriteResultsToFile(benchConfig string, chainConfig string, results AggregatedResults, resultDir string) error {
 	// First, check that the directory exists
 	if !checkFileExists(resultDir) {
+		zap.L().Warn(fmt.Sprintf("Directory %s does not exist, creating it", resultDir))
 		err := os.Mkdir(resultDir, 0755)
 		if err != nil {
 			return err
@@ -102,4 +104,10 @@ func WriteResultsToFile(benchConfig string, chainConfig string, results Aggregat
 
 	err = copyFile(chainConfig, fmt.Sprintf("%s/%s_chain.yaml", resultDir, ts))
 	return err
+}
+
+// Display presents the formatting to display the results to stdout.
+// TODO: future - this can be made to show graphs, and present the results in a much nicer way!
+func Display(results AggregatedResults) {
+
 }
