@@ -27,8 +27,6 @@ type EthereumInterface struct {
 	SubscribeDone    chan bool              // Event channel that will unsub from events
 	TransactionInfo  map[string][]time.Time // Transaction information
 	HandlersStarted  bool                   // Have the handlers been initiated?
-	NumTxDone        uint64                 // Number of transactions done
-	NumTxSent        uint64                 // Number of transactions currently sent
 	TotalTx          int                    // Total number of transactions
 	StartTime        time.Time              // Start time of the benchmark
 	ThroughputTicker *time.Ticker           // Ticker for throughput (1s)
