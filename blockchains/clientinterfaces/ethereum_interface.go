@@ -21,13 +21,11 @@ import (
 // EthereumInterface is the the Ethereum implementation of the clientinterface
 // Provides functionality to interaact with the Ethereum blockchain
 type EthereumInterface struct {
-	Nodes            []string               // List of the nodes host:port combinations
 	PrimaryNode      *ethclient.Client      // The primary node connected for this client.
 	SecondaryNodes   []*ethclient.Client    // The other node information (for secure reads etc.)
 	SubscribeDone    chan bool              // Event channel that will unsub from events
 	TransactionInfo  map[string][]time.Time // Transaction information
 	HandlersStarted  bool                   // Have the handlers been initiated?
-	TotalTx          int                    // Total number of transactions
 	StartTime        time.Time              // Start time of the benchmark
 	ThroughputTicker *time.Ticker           // Ticker for throughput (1s)
 	Throughputs      []float64              // Throughput over time with 1 second intervals
