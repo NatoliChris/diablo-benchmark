@@ -10,12 +10,13 @@ import (
 	"diablo-benchmark/core/results"
 )
 
-
 // GenericInterface provides the required fields of the blockchain interface so that
 // All information can be accessed
 type GenericInterface struct {
-	NumTxDone uint64 // The number of completed transactions
-	NumTxSent uint64 // Number of transactions sent
+	Nodes     []string // List of node "address:port" strings
+	TotalTx   int      // Total nuimber of transactions
+	NumTxDone uint64   // The number of completed transactions
+	NumTxSent uint64   // Number of transactions sent
 }
 
 // GetTxDone returns the number of transactions completed
