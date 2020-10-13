@@ -60,6 +60,9 @@ func (e *EthereumInterface) Cleanup() results.Results {
 
 	var endTime time.Time
 
+	success := 0
+	fails := 0
+
 	for _, v := range e.TransactionInfo {
 		if len(v) > 1 {
 			txLatency := v[1].Sub(v[0]).Milliseconds()
@@ -68,6 +71,10 @@ func (e *EthereumInterface) Cleanup() results.Results {
 			if v[1].After(endTime) {
 				endTime = v[1]
 			}
+
+			success++
+		} else {
+			fails++
 		}
 	}
 
@@ -78,6 +85,8 @@ func (e *EthereumInterface) Cleanup() results.Results {
 		AverageLatency:    avgLatency / float64(len(txLatencies)),
 		Throughput:        throughput,
 		ThroughputSeconds: e.Throughputs,
+		Success:           success,
+		Fail:              fails,
 	}
 }
 
