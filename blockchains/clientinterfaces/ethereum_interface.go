@@ -286,6 +286,7 @@ func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
 	err := e.PrimaryNode.SendTransaction(timoutCTX, txSigned)
 
 	if err != nil {
+		atomic.AddUint64(&e.NumTxDone, 1)
 		return err
 	}
 
