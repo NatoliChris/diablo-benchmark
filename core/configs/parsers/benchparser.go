@@ -24,12 +24,12 @@ func ParseBenchConfig(filepath string) (*configs.BenchConfig, error) {
 		return nil, err
 	}
 
-	return parseBenchYaml(configFileBytes)
+	return parseBenchYaml(configFileBytes, filepath)
 }
 
 // parseBenchYaml provides the full unmarshal of the YAML and performs relevant calculations
 // TODO: proper error handling
-func parseBenchYaml(content []byte) (*configs.BenchConfig, error) {
+func parseBenchYaml(content []byte, path string) (*configs.BenchConfig, error) {
 	// Try to read the YAML.
 	var benchConfig configs.BenchConfig
 
@@ -53,6 +53,8 @@ func parseBenchYaml(content []byte) (*configs.BenchConfig, error) {
 
 	// Add the full intervals into the benchmark configurations
 	benchConfig.TxInfo.Intervals = fullIntervals
+
+	benchConfig.Path = path
 
 	return &benchConfig, nil
 }

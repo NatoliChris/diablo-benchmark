@@ -18,18 +18,20 @@ func ParseChainConfig(filePath string) (*configs.ChainConfig, error) {
 		return nil, err
 	}
 
-	return parseChainYaml(configFileBytes)
+	return parseChainYaml(configFileBytes, filePath)
 }
 
 // parseChainYaml parses the chain configuration in the YAML files.
 // This will get the bytes of the file.
-func parseChainYaml(fileContents []byte) (*configs.ChainConfig, error) {
+func parseChainYaml(fileContents []byte, path string) (*configs.ChainConfig, error) {
 	var chainConfig configs.ChainConfig
 	err := yaml.Unmarshal(fileContents, &chainConfig)
 
 	if err != nil {
 		return nil, err
 	}
+
+	chainConfig.Path = path
 
 	return &chainConfig, nil
 }

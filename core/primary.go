@@ -12,9 +12,9 @@ import (
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/results"
 	"fmt"
-	"go.uber.org/zap"
 	"time"
-	"encoding/json"
+
+	"go.uber.org/zap"
 )
 
 // Primary benchmark server, acts as the orchestrator for the benchmark
@@ -144,34 +144,19 @@ func (p *Primary) Run() {
 	// TODO: @CHRIS
 	aggregatedResults := results.CalculateAggregatedResults(rawResults)
 
-	// Print the benchmark information
-	zap.L().Info("\n" +
-		"----------------------\n" +
-		"Benchmark Complete\n" +
-		"----------------------\n" +
-		fmt.Sprintf(
-			"[*] Throughput: Total %.2f, (Min: %.2f ; Max %.2f)\n",
-			aggregatedResults.OverallThroughput,
-			aggregatedResults.MinThroughput,
-			aggregatedResults.MaxThroughput,
-		) +
-		fmt.Sprintf(
-			"[*] Latency: %.2f, (Min: %.2f ; Max %.2f; Median %2.f)\n",
-			aggregatedResults.AverageLatency,
-			aggregatedResults.MinLatency,
-			aggregatedResults.MaxLatency,
-			aggregatedResults.MedianLatency,
-		),
-	)
-
-	// Temporary printing
-	a, _ := json.Marshal(aggregatedResults)
-	fmt.Println(string(a))
-
 	// Step 7 - store results
 	p.Server.SendFin()
 
 	time.Sleep(2 * time.Second)
+
+	// Display the results
+	results.Display(aggregatedResults)
+	// Write the results to a file
+	err = results.WriteResultsToFile(p.benchmarkConfig.Path, p.chainConfig.Path, aggregatedResults, "results")
+	if err != nil {
+		zap.L().Error("Encountered error when saving results",
+			zap.Error(err))
+	}
 
 	// Step 8: Close all connections
 	p.Server.CloseSecondaries()
