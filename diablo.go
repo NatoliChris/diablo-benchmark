@@ -74,15 +74,44 @@ func printWelcome(isPrimary bool) {
 
 // Prepares the logger
 // TODO make a flag to change level of the logger (DEBUG, INFO, ..)
-func prepareLogger() {
-	config := zap.NewDevelopmentConfig()
-	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	logger, err := config.Build()
+func prepareLogger(logType string) {
+	// config := zap.NewDevelopmentConfig()
+	// config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	// logger, err := config.Build()
 
-	if err != nil {
-		_ = fmt.Errorf("failed to produce a logger: %s", err.Error())
-		os.Exit(1)
-	}
+	highPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+		return lvl >= zapcore.ErrorLevel
+	})
+	lowPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+		return lvl < zapcore.ErrorLevel
+	})
+
+	consoleConfig := zap.NewDevelopmentEncoderConfig()
+	consoleConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+
+	consoleCore := zapcore.NewConsoleEncoder(consoleConfig)
+
+	config := zap.NewProductionEncoderConfig()
+	config.EncodeTime = zapcore.ISO8601TimeEncoder
+	config.EncodeLevel = zapcore.CapitalLevelEncoder
+
+	file, _ := os.Create(fmt.Sprintf("%s_diablo.log", logType))
+
+	topicDebugging := zapcore.AddSync(file)
+	topicErrors := zapcore.AddSync(file)
+	consoleDebugging := zapcore.Lock(os.Stdout)
+	consoleErrors := zapcore.Lock(os.Stderr)
+
+	writerCore := zapcore.NewJSONEncoder(config)
+
+	core := zapcore.NewTee(
+		zapcore.NewCore(consoleCore, consoleErrors, highPriority),
+		zapcore.NewCore(consoleCore, consoleDebugging, lowPriority),
+		zapcore.NewCore(writerCore, topicErrors, highPriority),
+		zapcore.NewCore(writerCore, topicDebugging, lowPriority),
+	)
+
+	logger := zap.New(core)
 	zap.ReplaceGlobals(logger)
 }
 
@@ -164,21 +193,18 @@ func runSecondary(secondaryArgs *core.SecondaryArgs) {
 
 // Main running function
 func main() {
-	prepareLogger()
-
 	args := core.DefineArguments()
 
 	if len(os.Args) < 2 {
 		// This is going to be a primary
-		zap.L().Warn("No subcommand given, running as primary!")
-		args.PrimaryCommand.Parse(os.Args[1:])
-		runPrimary(args.PrimaryArgs)
+		fmt.Fprintf(os.Stderr, "No subcommand given (primary/secondary), exiting!")
+		os.Exit(1)
 	} else {
 		switch os.Args[1] {
 		case "primary":
 			// Print the welcome message
 			printWelcome(true)
-
+			prepareLogger("primary")
 			// Parse the arguments
 			args.PrimaryCommand.Parse(os.Args[2:])
 
@@ -187,7 +213,7 @@ func main() {
 		case "secondary":
 			// Print the welcome message
 			printWelcome(false)
-
+			prepareLogger("secondary")
 			// Parse the arguments
 			err := args.SecondaryCommand.Parse(os.Args[2:])
 			if err != nil {

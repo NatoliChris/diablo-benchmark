@@ -6,7 +6,8 @@ package configs
 
 // BenchConfig provides the main benchmark configuration structure, all information about the specified workload
 type BenchConfig struct {
-	Name         string       `yaml:"name"`                  // Name of the benchmark.
+	Name         string       `yaml:"name"` // Name of the benchmark.
+	Path         string       // The path of the config
 	Description  string       `yaml:"description,omitempty"` // Description of what it is.
 	Threads      int          `yaml:"threads"`               // Number of threads per secondary expected.
 	Secondaries  int          `yaml:"secondaries"`           // Number of secondary machines.
