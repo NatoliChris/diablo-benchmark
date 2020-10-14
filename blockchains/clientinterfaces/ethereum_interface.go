@@ -56,8 +56,8 @@ func (e *EthereumInterface) Cleanup() results.Results {
 
 	var endTime time.Time
 
-	success := 0
-	fails := 0
+	success := uint(0)
+	fails := uint(e.Fail)
 
 	for _, v := range e.TransactionInfo {
 		if len(v) > 1 {
@@ -74,11 +74,23 @@ func (e *EthereumInterface) Cleanup() results.Results {
 		}
 	}
 
-	throughput := float64(e.NumTxDone) / (endTime.Sub(e.StartTime).Seconds())
+	zap.L().Debug("Statistics being returned",
+		zap.Uint("success", success),
+		zap.Uint("fail", fails))
+
+	var throughput float64
+
+	if len(txLatencies) > 0 {
+		throughput = float64(e.NumTxDone) / (endTime.Sub(e.StartTime).Seconds())
+		avgLatency = avgLatency / float64(len(txLatencies))
+	} else {
+		avgLatency = 0
+		throughput = 0
+	}
 
 	return results.Results{
 		TxLatencies:       txLatencies,
-		AverageLatency:    avgLatency / float64(len(txLatencies)),
+		AverageLatency:    avgLatency,
 		Throughput:        throughput,
 		ThroughputSeconds: e.Throughputs,
 		Success:           success,
@@ -95,7 +107,7 @@ func (e *EthereumInterface) throughputSeconds() {
 		select {
 		case <-e.ThroughputTicker.C:
 			seconds++
-			e.Throughputs = append(e.Throughputs, float64(e.NumTxDone)/seconds)
+			e.Throughputs = append(e.Throughputs, float64(e.NumTxDone-e.Fail)/seconds)
 		}
 	}
 }
@@ -282,14 +294,18 @@ func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
 	// NOTE: type conversion might be slow, there might be a better way to send this.
 	txSigned := tx.(*ethtypes.Transaction)
 	timoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
-	e.TransactionInfo[txSigned.Hash().String()] = []time.Time{time.Now()}
+
 	err := e.PrimaryNode.SendTransaction(timoutCTX, txSigned)
 
+	// The transaction failed - this could be if it was reproposed, or, just failed.
+	// We need to make sure that if it was re-proposed it doesn't count as a "success" on this node.
 	if err != nil {
+		atomic.AddUint64(&e.Fail, 1)
 		atomic.AddUint64(&e.NumTxDone, 1)
 		return err
 	}
 
+	e.TransactionInfo[txSigned.Hash().String()] = []time.Time{time.Now()}
 	atomic.AddUint64(&e.NumTxSent, 1)
 	return nil
 }

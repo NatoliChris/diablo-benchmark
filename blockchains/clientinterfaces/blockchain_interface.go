@@ -17,6 +17,8 @@ type GenericInterface struct {
 	TotalTx   int      // Total nuimber of transactions
 	NumTxDone uint64   // The number of completed transactions
 	NumTxSent uint64   // Number of transactions sent
+	Success   uint64   // Number of successful transactions
+	Fail      uint64   // Number of failed transactions
 }
 
 // GetTxDone returns the number of transactions completed

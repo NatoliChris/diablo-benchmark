@@ -15,8 +15,8 @@ type Results struct {
 	MedianLatency     float64   `json:"MedianLatency"`     // Median Latency of the transaction
 	Throughput        float64   `json:"Throughput"`        // Number of transactions per second "committed"
 	ThroughputSeconds []float64 `json:"ThroughputSeconds"` // Number of transactions "committed" over second periods to measure dynamic throughput
-	Success           int       // Number of successful transactions
-	Fail              int       // Number of failed transactions
+	Success           uint      // Number of successful transactions
+	Fail              uint      // Number of failed transactions
 }
 
 // AggregatedResults returns all the information from all secondaries, and
@@ -35,8 +35,8 @@ type AggregatedResults struct {
 	MaxThroughput                 float64     `json:"MaximumOverallThroughput"`             // Highest throughput
 	MinThroughput                 float64     `json:"MinimumOverallThroughput"`             // Highest throughput
 	OverallThroughput             float64     `json:"OverallAverageThroughput"`             // Overall throughput measured as success / time
-	TotalSuccess                  int         `json:"TotalSuccess"`                         // Total successful transactions
-	TotalFails                    int         `json:"TotalFails"`                           // Total failed transactions
+	TotalSuccess                  uint        `json:"TotalSuccess"`                         // Total successful transactions
+	TotalFails                    uint        `json:"TotalFails"`                           // Total failed transactions
 }
 
 // Return the median of a list
@@ -80,8 +80,8 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 	maxTotalThroughput := float64(0)
 	averageTotalThroughput := float64(0)
 
-	totalSuccess := 0
-	totalFails := 0
+	totalSuccess := uint(0)
+	totalFails := uint(0)
 
 	// Iterate through the results
 	for _, secondaryResult := range secondaryResults {
@@ -91,8 +91,8 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 		latencyEntries := float64(0)
 		avgThroughputPerSecondary := float64(0)
 		// For each worker
-		numSuccess := 0
-		numFails := 0
+		numSuccess := uint(0)
+		numFails := uint(0)
 		for _, workerResult := range secondaryResult {
 			// 1. get the latency average per secondary
 			latencyEntries += float64(len(workerResult.TxLatencies))
@@ -135,23 +135,29 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 			txLatencies[idx] = txLatencies[idx] / float64(len(secondaryResult))
 			avgLatency += txLatencies[idx]
 		}
-		avgLatency = avgLatency / float64(len(txLatencies))
+		if len(txLatencies) > 0 {
+			avgLatency = avgLatency / float64(len(txLatencies))
+		}
 		latencyPerSecondary = append(latencyPerSecondary, avgLatency)
 
+		// Get the median latency by sorting -> getting middle number
 		sortedLatencies := txLatencies
 		sort.Float64s(sortedLatencies)
 		medianLatency := float64(0)
-		midNumber := len(txLatencies) / 2
-		if len(txLatencies)%2 == 0 {
-			medianLatency = (txLatencies[midNumber-1] + txLatencies[midNumber]) / 2
-		} else {
-			medianLatency = txLatencies[midNumber]
+		if len(txLatencies) > 0 {
+			midNumber := len(txLatencies) / 2
+			if len(txLatencies)%2 == 0 {
+				medianLatency = (txLatencies[midNumber-1] + txLatencies[midNumber]) / 2
+			} else {
+				medianLatency = txLatencies[midNumber]
+			}
 		}
 
+		// Total and averages
 		averageTotalLatency += avgLatency
 		throughputOverTimeSecondary = append(throughputOverTimeSecondary, secondaryThroughputs)
-
 		throughputPerSecondary = append(throughputPerSecondary, avgThroughputPerSecondary/float64(len(secondaryResult)))
+
 		ResultsPerSecondary = append(ResultsPerSecondary, Results{
 			TxLatencies:       txLatencies,
 			ThroughputSeconds: secondaryThroughputs,
@@ -162,6 +168,7 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 			Fail:              numFails,
 		})
 
+		// Update the number of total success and failures
 		totalSuccess += numSuccess
 		totalFails += numFails
 	}
