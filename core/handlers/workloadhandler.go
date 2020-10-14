@@ -237,6 +237,10 @@ func (wh *WorkloadHandler) HandleCleanup() []results.Results {
 		resList = append(resList, c.Cleanup())
 	}
 
+	zap.L().Debug("Results being returned",
+		zap.Int("len", len(resList)))
+
+	fmt.Println(resList)
 	return resList
 }
 
