@@ -2,8 +2,10 @@ package core
 
 import (
 	"flag"
-	"go.uber.org/zap"
 	"os"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // Arguments provides all the argument sets
@@ -16,16 +18,18 @@ type Arguments struct {
 
 // PrimaryArgs contains the command-line arguments for the primary
 type PrimaryArgs struct {
-	BenchConfigPath string // Path to the configurations
-	ChainConfigPath string // Path to the chain configuration
-	ListenAddr      string // host:port that it should run on
+	BenchConfigPath string        // Path to the configurations
+	ChainConfigPath string        // Path to the chain configuration
+	ListenAddr      string        // host:port that it should run on
+	LogLevel        zapcore.Level // log level
 }
 
 // SecondaryArgs provides command-line arguments for secondary
 type SecondaryArgs struct {
-	ConfigPath      string // Path to the secondary config
-	ChainConfigPath string // Path to the blockchain configuration
-	PrimaryAddr     string // Address of the primary (can also be in secondary config)
+	ConfigPath      string        // Path to the secondary config
+	ChainConfigPath string        // Path to the blockchain configuration
+	PrimaryAddr     string        // Address of the primary (can also be in secondary config)
+	LogLevel        zapcore.Level // log level
 }
 
 // DefineArguments sets the arguments that will be used for the subcommands
@@ -44,6 +48,12 @@ func DefineArguments() *Arguments {
 	primaryCommand.StringVar(&primaryArgs.BenchConfigPath, "c", "", "-c /path/to/config")
 	secondaryCommand.StringVar(&secondaryArgs.ConfigPath, "config", "", "--config=/path/to/config (required)")
 	secondaryCommand.StringVar(&secondaryArgs.ConfigPath, "c", "", "-c /path/to/config")
+
+	// --level
+	primaryArgs.LogLevel = zapcore.InfoLevel
+	primaryCommand.Var(&primaryArgs.LogLevel, "level", "--level INFO|WARN|DEBUG|ERROR")
+	secondaryArgs.LogLevel = zapcore.InfoLevel
+	secondaryCommand.Var(&secondaryArgs.LogLevel, "level", "--level INFO|WARN|DEBUG|ERROR")
 
 	// Primary Arguments
 	primaryCommand.StringVar(&primaryArgs.ListenAddr, "addr", "", "--addr=addr (e.g. --addr=\"0.0.0.0:8323\")")
