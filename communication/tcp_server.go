@@ -51,7 +51,8 @@ func (s *PrimaryServer) HandleSecondaries(readyChannel chan bool) {
 
 		if err != nil {
 			// Log the error here
-			fmt.Println(err)
+			zap.L().Error("Error from listen",
+				zap.Error(err))
 		}
 
 		zap.L().Info(fmt.Sprintf("Secondary %d / %d connected", len(s.Secondaries), s.ExpectedSecondaries),
@@ -185,7 +186,10 @@ func (s *PrimaryServer) sendAndWaitData(data []byte, secondary net.Conn) ([]resu
 	}
 
 	fullReply := initialReply[9:]
-	fmt.Println("Got ", dataLen, fullReply)
+	zap.L().Debug("Reply from client",
+		zap.Uint64("length", dataLen),
+		zap.ByteString("reply", fullReply),
+	)
 	buffer := make([]byte, 1024)
 	readLen := n - 9
 
