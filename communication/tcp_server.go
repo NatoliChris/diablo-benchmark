@@ -8,9 +8,10 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"go.uber.org/zap"
 	"io"
 	"net"
+
+	"go.uber.org/zap"
 )
 
 // PrimaryServer provides the listening server to communicate with the secondaries
@@ -83,7 +84,7 @@ func (s *PrimaryServer) sendAndWaitOKAsync(data []byte, secondary net.Conn, done
 		doneCh <- 1
 	}
 
-	fmt.Printf("GOT REPLY FROM %s\n", secondary.RemoteAddr().String())
+	zap.L().Debug(fmt.Sprintf("GOT REPLY FROM %s\n", secondary.RemoteAddr().String()))
 
 	// If we got an error reply - it means
 	// something failed on the secondary machine
@@ -120,7 +121,7 @@ func (s *PrimaryServer) SendAndWaitOKSync(data []byte, secondary net.Conn) error
 		}
 	}
 
-	fmt.Printf("GOT REPLY FROM %s\n", secondary.RemoteAddr().String())
+	zap.L().Debug(fmt.Sprintf("GOT REPLY FROM %s\n", secondary.RemoteAddr().String()))
 
 	// If we got an error reply - it means
 	// something failed on the secondary machine
