@@ -172,7 +172,8 @@ func runSecondary(secondaryArgs *core.SecondaryArgs) {
 	secondary, err := core.NewSecondary(chainConfiguration, secondaryArgs.PrimaryAddr)
 
 	if err != nil {
-		fmt.Println(err)
+		zap.L().Error("Failed to start new secondary",
+			zap.Error(err))
 		os.Exit(1)
 	}
 
