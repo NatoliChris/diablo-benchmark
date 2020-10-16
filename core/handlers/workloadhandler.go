@@ -7,11 +7,12 @@ import (
 	"diablo-benchmark/core/results"
 	"errors"
 	"fmt"
-	"go.uber.org/zap"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // WorkloadHandler is the main handler loop that dispatches the workload into channels and creates routines that will read and send
@@ -142,6 +143,8 @@ func (wh *WorkloadHandler) runnerConsumer(blockchainInterface clientinterfaces.B
 	for tx := range workload {
 		e := blockchainInterface.SendRawTransaction(tx)
 		if e != nil {
+			zap.L().Debug("Error sending tx",
+				zap.Error(e))
 			errs = append(errs, e)
 			atomic.AddUint64(&wh.numErrors, 1)
 		}
