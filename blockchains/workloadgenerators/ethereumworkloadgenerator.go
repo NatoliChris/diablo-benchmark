@@ -10,6 +10,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/compiler"
@@ -17,11 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"go.uber.org/zap"
-	"math/big"
-	"os"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // EthereumWorkloadGenerator is the workload generator implementation for the Ethereum blockchain
@@ -468,6 +469,7 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 
 	// get the known accounts
 	var totalWorkload Workload
+	txIndex := 0
 
 	for secondaryNum := 0; secondaryNum < e.BenchConfig.Secondaries; secondaryNum++ {
 		// secondaryWorkload = [thread][interval][tx=[]byte]
@@ -491,24 +493,54 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 				intervalWorkload := make([][]byte, 0)
 				for txIt := 0; txIt < txnum; txIt++ {
 
+					var tx []byte
+					var txerr error
+
 					// Initial assumption: there's as many accounts as transactions
 					// TODO allow for more intricate transaction generation, such as A->B, A->C, etc.
 					txVal, ok := big.NewInt(0).SetString("1000000", 10)
 					if !ok {
 						return nil, errors.New("failed to set TX value")
 					}
-					tx, err := e.CreateSignedTransaction(
-						e.KnownAccounts[(secondaryNum+thread)%len(e.KnownAccounts)].PrivateKey,
-						e.KnownAccounts[((secondaryNum+thread)+1)%len(e.KnownAccounts)].Address,
-						txVal,
-						[]byte{},
-					)
 
-					if err != nil {
-						return nil, err
+					accFrom := secondaryNum + thread + (secondaryNum * e.BenchConfig.Threads)
+					accTo := accFrom + 1
+
+					// If the number of accounts are equal, then we have one account per secondary
+					if len(e.KnownAccounts) >= e.BenchConfig.Secondaries && len(e.KnownAccounts) < e.BenchConfig.Secondaries*e.BenchConfig.Threads {
+						tx, txerr = e.CreateSignedTransaction(
+							e.KnownAccounts[secondaryNum%len(e.KnownAccounts)].PrivateKey,
+							e.KnownAccounts[(secondaryNum+1)%len(e.KnownAccounts)].Address,
+							txVal,
+							[]byte{},
+						)
+					} else if len(e.KnownAccounts) == e.BenchConfig.Secondaries*e.BenchConfig.Threads {
+						// One account per thread.
+						accFrom := secondaryNum + thread + (secondaryNum * e.BenchConfig.Threads)
+						accTo := accFrom + 1
+						tx, txerr = e.CreateSignedTransaction(
+							e.KnownAccounts[accFrom%len(e.KnownAccounts)].PrivateKey,
+							e.KnownAccounts[accTo%len(e.KnownAccounts)].Address,
+							txVal,
+							[]byte{},
+						)
+					} else {
+						// One account per transaction for all other transactions
+						tx, txerr = e.CreateSignedTransaction(
+							e.KnownAccounts[txIndex%len(e.KnownAccounts)].PrivateKey,
+							e.KnownAccounts[txIndex+1%len(e.KnownAccounts)].Address,
+							txVal,
+							[]byte{},
+						)
+
+					}
+
+					if txerr != nil {
+						return nil, txerr
 					}
 
 					intervalWorkload = append(intervalWorkload, tx)
+					txIndex++
 				}
 				threadWorkload = append(threadWorkload, intervalWorkload)
 			}
@@ -560,6 +592,7 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 
 	// Now generate the workload as usual
 	var totalWorkload Workload
+	txIndex := 0
 	for secondaryID := 0; secondaryID < e.BenchConfig.Secondaries; secondaryID++ {
 		secondaryWorkload := make(SecondaryWorkload, 0)
 		for threadID := 0; threadID < e.BenchConfig.Threads; threadID++ {
@@ -570,24 +603,56 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 
 				for i := 0; i < numTx; i++ {
 					// function to create
+
+					var tx []byte
+					var txerr error
 					funcToCreate := e.BenchConfig.ContractInfo.Functions[functionsToCreatePerThread[txCount]]
 					zap.L().Debug(fmt.Sprintf("tx %d for func %s", txCount, funcToCreate.Name),
 						zap.Int("secondary", secondaryID),
 						zap.Int("thread", threadID))
 
-					tx, err := e.CreateInteractionTX(
-						e.KnownAccounts[(secondaryID+threadID)%len(e.KnownAccounts)].PrivateKey,
-						contractAddr,
-						funcToCreate.Name,
-						funcToCreate.Params,
-					)
+					// If the number of accounts are equal, then we have one account per secondary
+					if len(e.KnownAccounts) >= e.BenchConfig.Secondaries && len(e.KnownAccounts) < e.BenchConfig.Secondaries*e.BenchConfig.Threads {
+						zap.L().Warn("Only enough accounts for one per secondary, this means there may be delays/fails for more threads")
+						tx, txerr = e.CreateInteractionTX(
+							e.KnownAccounts[secondaryID%len(e.KnownAccounts)].PrivateKey,
+							contractAddr,
+							funcToCreate.Name,
+							funcToCreate.Params,
+						)
+					} else if len(e.KnownAccounts) == e.BenchConfig.Secondaries*e.BenchConfig.Threads {
+						zap.L().Warn("Workload has one account per thread")
+						// One account per thread.
+						accFrom := secondaryID + threadID + (secondaryID * e.BenchConfig.Threads)
+						tx, txerr = e.CreateInteractionTX(
+							e.KnownAccounts[accFrom%len(e.KnownAccounts)].PrivateKey,
+							contractAddr,
+							funcToCreate.Name,
+							funcToCreate.Params,
+						)
+					} else {
+						// If there's not enough accounts, send a message saying that some transactions will fail
+						if len(e.KnownAccounts) < (e.BenchConfig.Secondaries * e.BenchConfig.Threads) {
+							zap.L().Warn("Not enough accounts, will experience fails due to sending nonce at incorrect times.")
+						}
 
-					if err != nil {
-						return nil, err
+						// One account per transaction for all other transactions
+						tx, txerr = e.CreateInteractionTX(
+							e.KnownAccounts[txIndex%len(e.KnownAccounts)].PrivateKey,
+							contractAddr,
+							funcToCreate.Name,
+							funcToCreate.Params,
+						)
+
+					}
+
+					if txerr != nil {
+						return nil, txerr
 					}
 
 					intervalWorkload = append(intervalWorkload, tx)
 					txCount++
+					txIndex++
 				}
 
 				threadWorkload = append(threadWorkload, intervalWorkload)
@@ -623,6 +688,16 @@ func (e *EthereumWorkloadGenerator) GenerateWorkload() (Workload, error) {
 		zap.Int("transactionsPerSecondary", numberOfTransactions),
 		zap.Int("totalTransactions", totalTx),
 	)
+
+	// Print a warning about the accounts
+	if len(e.KnownAccounts) >= e.BenchConfig.Secondaries && len(e.KnownAccounts) < e.BenchConfig.Secondaries*e.BenchConfig.Threads {
+		zap.L().Warn("Only enough accounts for one per secondary, this means there may be delays/fails for more threads")
+	} else if len(e.KnownAccounts) == e.BenchConfig.Secondaries*e.BenchConfig.Threads {
+		zap.L().Warn("Workload has one account per thread")
+	} else if len(e.KnownAccounts) < (e.BenchConfig.Secondaries * e.BenchConfig.Threads) {
+		// If there's not enough accounts, send a message saying that some transactions will fail
+		zap.L().Warn("Not enough accounts, will experience fails due to sending nonce at incorrect times.")
+	}
 
 	switch e.BenchConfig.TxInfo.TxType {
 	case configs.TxTypeSimple:
