@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+
 	"go.uber.org/zap"
 )
 
@@ -17,13 +18,14 @@ import (
 type Secondary struct {
 	ID              int                                  // This secondary's unique ID
 	ChainConfig     *configs.ChainConfig                 // Chain configuration
+	BenchConfig     *configs.BenchConfig                 // Bench Configuration
 	Blockchain      clientinterfaces.BlockchainInterface // Blockchain Interface
 	PrimaryComms    *communication.ConnClient            // Connection to the primary
 	WorkloadHandler *handlers.WorkloadHandler            // Workload Handler
 }
 
 // NewSecondary creates a new secondary, performs set up for the tcp connection to primary.
-func NewSecondary(config *configs.ChainConfig, primaryAddress string) (*Secondary, error) {
+func NewSecondary(chainConfig *configs.ChainConfig, benchConfig *configs.BenchConfig, primaryAddress string) (*Secondary, error) {
 	// Set up the communication
 	c, err := communication.SetupSecondaryTCP(primaryAddress)
 	if err != nil {
@@ -34,7 +36,8 @@ func NewSecondary(config *configs.ChainConfig, primaryAddress string) (*Secondar
 	// Log and return, ready to go!
 	zap.L().Info("Secondary init")
 	return &Secondary{
-		ChainConfig:  config,
+		ChainConfig:  chainConfig,
+		BenchConfig:  benchConfig,
 		PrimaryComms: c,
 	}, nil
 }
@@ -79,6 +82,7 @@ func (s *Secondary) Run() {
 			wHandler := handlers.NewWorkloadHandler(
 				numThreads,
 				bcis,
+				s.BenchConfig.Timeout,
 			)
 
 			s.WorkloadHandler = wHandler
