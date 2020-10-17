@@ -20,6 +20,7 @@ package main
 import (
 	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/core"
+	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/configs/parsers"
 	"fmt"
 	"os"
@@ -169,7 +170,18 @@ func runSecondary(secondaryArgs *core.SecondaryArgs) {
 		os.Exit(1)
 	}
 
-	secondary, err := core.NewSecondary(chainConfiguration, secondaryArgs.PrimaryAddr)
+	benchConfiguration, err := parsers.ParseBenchConfig(secondaryArgs.BenchConfigPath)
+
+	// Check the timeout with args
+	if secondaryArgs.Timeout == 0 && benchConfiguration.Timeout <= 0 {
+		zap.L().Warn(fmt.Sprintf("Invalid or no timeout provided, defaulting to %d", configs.DefaultTimeout))
+		benchConfiguration.Timeout = configs.DefaultTimeout
+	} else if secondaryArgs.Timeout > 0 {
+		zap.L().Warn(fmt.Sprintf("Overwriting config timeout (%d) with flag %d", benchConfiguration.Timeout, secondaryArgs.Timeout))
+		benchConfiguration.Timeout = secondaryArgs.Timeout
+	}
+
+	secondary, err := core.NewSecondary(chainConfiguration, benchConfiguration, secondaryArgs.PrimaryAddr)
 
 	if err != nil {
 		fmt.Println(err)
