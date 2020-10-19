@@ -384,9 +384,12 @@ func (s *PrimaryServer) GetResults() ([][]results.Results, SecondaryReplyErrors)
 			continue
 		}
 
+		zap.L().Debug(fmt.Sprintf("Got %d results from secondary", len(secondaryRes)))
+
 		allResults = append(allResults, secondaryRes)
 	}
 
+	zap.L().Debug(fmt.Sprintf("%d Results returned", len(allResults)))
 	return allResults, errs
 }
 
