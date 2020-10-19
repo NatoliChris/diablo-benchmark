@@ -2,8 +2,9 @@ package core
 
 import (
 	"flag"
-	"go.uber.org/zap"
 	"os"
+
+	"go.uber.org/zap"
 )
 
 // Arguments provides all the argument sets
@@ -19,13 +20,15 @@ type PrimaryArgs struct {
 	BenchConfigPath string // Path to the configurations
 	ChainConfigPath string // Path to the chain configuration
 	ListenAddr      string // host:port that it should run on
+	Timeout         int    // benchmark timeout
 }
 
 // SecondaryArgs provides command-line arguments for secondary
 type SecondaryArgs struct {
-	ConfigPath      string // Path to the secondary config
+	BenchConfigPath string // Path to the secondary config
 	ChainConfigPath string // Path to the blockchain configuration
 	PrimaryAddr     string // Address of the primary (can also be in secondary config)
+	Timeout         int    // benchmark timeout
 }
 
 // DefineArguments sets the arguments that will be used for the subcommands
@@ -42,8 +45,14 @@ func DefineArguments() *Arguments {
 
 	primaryCommand.StringVar(&primaryArgs.BenchConfigPath, "config", "", "--config=/path/to/config (required)")
 	primaryCommand.StringVar(&primaryArgs.BenchConfigPath, "c", "", "-c /path/to/config")
-	secondaryCommand.StringVar(&secondaryArgs.ConfigPath, "config", "", "--config=/path/to/config (required)")
-	secondaryCommand.StringVar(&secondaryArgs.ConfigPath, "c", "", "-c /path/to/config")
+	secondaryCommand.StringVar(&secondaryArgs.BenchConfigPath, "config", "", "--config=/path/to/config (required)")
+	secondaryCommand.StringVar(&secondaryArgs.BenchConfigPath, "c", "", "-c /path/to/config")
+
+	//--timeout
+	primaryCommand.IntVar(&primaryArgs.Timeout, "t", 0, "-t <timeout>")
+	primaryCommand.IntVar(&primaryArgs.Timeout, "timeout", 0, "--timeout=<timeout>")
+	secondaryCommand.IntVar(&secondaryArgs.Timeout, "t", 0, "-t <timeout>")
+	secondaryCommand.IntVar(&secondaryArgs.Timeout, "timeout", 0, "--timeout=<timeout>")
 
 	// Primary Arguments
 	primaryCommand.StringVar(&primaryArgs.ListenAddr, "addr", "", "--addr=addr (e.g. --addr=\"0.0.0.0:8323\")")
@@ -72,21 +81,26 @@ func DefineArguments() *Arguments {
 func (pa *PrimaryArgs) CheckArgs() {
 	if pa.BenchConfigPath == "" {
 		zap.L().Error("benchmark config not provided")
-		os.Exit(0)
+		os.Exit(1)
 	}
 
 	if pa.ChainConfigPath == "" {
 		zap.L().Error("chain configuration not provided")
-		os.Exit(0)
+		os.Exit(1)
 	}
 }
 
 // SecondaryArgs validates that the secondary arguments are correct
 func (sa *SecondaryArgs) SecondaryArgs() {
 	// We must have at least one - either the primary address or the config
-	if sa.ConfigPath == "" && sa.PrimaryAddr == "" {
+	if sa.PrimaryAddr == "" {
 		zap.L().Error("primary information not provided")
-		os.Exit(0)
+		os.Exit(1)
+	}
+
+	if sa.BenchConfigPath == "" {
+		zap.L().Error("benchmark configuration not provided")
+		os.Exit(1)
 	}
 
 	if sa.ChainConfigPath == "" {
