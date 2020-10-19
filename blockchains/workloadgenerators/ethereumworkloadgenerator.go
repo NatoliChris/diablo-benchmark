@@ -469,9 +469,28 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 
 	// get the known accounts
 	var totalWorkload Workload
-	txIndex := 0
 
-	for secondaryNum := 0; secondaryNum < e.BenchConfig.Secondaries; secondaryNum++ {
+	// 1. Set up the accounts into buckets for each
+	accountDistribution := make([][]*configs.ChainKey, e.BenchConfig.Secondaries*e.BenchConfig.Threads)
+
+	accountCount := 0
+	for {
+		currentAccount := accountCount % len(e.KnownAccounts)
+		currentDist := accountCount % len(accountDistribution)
+
+		accountDistribution[currentDist] = append(accountDistribution[currentDist], &e.KnownAccounts[currentAccount])
+
+		// exit condition - each thread has an assigned account, and we've run out of accounts.
+		if accountCount > len(e.KnownAccounts) && accountCount > len(accountDistribution) {
+			break
+		}
+
+		accountCount++
+	}
+
+	// 2. Generate the transactions
+	txID := 0
+	for secondaryID := 0; secondaryID < e.BenchConfig.Secondaries; secondaryID++ {
 		// secondaryWorkload = [thread][interval][tx=[]byte]
 		// [][][][]byte
 		secondaryWorkload := make(SecondaryWorkload, 0)
@@ -480,10 +499,15 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 			// [interval][tx] = [][][]byte
 			threadWorkload := make(WorkerThreadWorkload, 0)
 			// for each thread, generate the intervals of transactions.
+			zap.L().Debug("Info",
+				zap.Int("secondary", secondaryID),
+				zap.Int("thread", thread),
+				zap.Int("len", len(accountDistribution)))
+			accountsChoices := accountDistribution[thread+(secondaryID*e.BenchConfig.Threads)]
 			for interval, txnum := range e.BenchConfig.TxInfo.Intervals {
-				// Debug print for each interval to monitor correctness
+				// Debug print for each interval to monitor correctness.
 				zap.L().Debug("Making workload ",
-					zap.Int("secondary", secondaryNum),
+					zap.Int("secondary", secondaryID),
 					zap.Int("thread", thread),
 					zap.Int("interval", interval),
 					zap.Int("value", txnum))
@@ -493,9 +517,6 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 				intervalWorkload := make([][]byte, 0)
 				for txIt := 0; txIt < txnum; txIt++ {
 
-					var tx []byte
-					var txerr error
-
 					// Initial assumption: there's as many accounts as transactions
 					// TODO allow for more intricate transaction generation, such as A->B, A->C, etc.
 					txVal, ok := big.NewInt(0).SetString("1000000", 10)
@@ -503,44 +524,23 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 						return nil, errors.New("failed to set TX value")
 					}
 
-					accFrom := secondaryNum + thread + (secondaryNum * e.BenchConfig.Threads)
-					accTo := accFrom + 1
+					// accFrom := secondaryID + thread + (secondaryID * e.BenchConfig.Threads)
+					accFrom := accountsChoices[txID%len(accountsChoices)]
+					accTo := accountsChoices[(txID+1)%len(accountsChoices)]
 
-					// If the number of accounts are equal, then we have one account per secondary
-					if len(e.KnownAccounts) >= e.BenchConfig.Secondaries && len(e.KnownAccounts) < e.BenchConfig.Secondaries*e.BenchConfig.Threads {
-						tx, txerr = e.CreateSignedTransaction(
-							e.KnownAccounts[secondaryNum%len(e.KnownAccounts)].PrivateKey,
-							e.KnownAccounts[(secondaryNum+1)%len(e.KnownAccounts)].Address,
-							txVal,
-							[]byte{},
-						)
-					} else if len(e.KnownAccounts) == e.BenchConfig.Secondaries*e.BenchConfig.Threads {
-						// One account per thread.
-						accFrom := secondaryNum + thread + (secondaryNum * e.BenchConfig.Threads)
-						accTo := accFrom + 1
-						tx, txerr = e.CreateSignedTransaction(
-							e.KnownAccounts[accFrom%len(e.KnownAccounts)].PrivateKey,
-							e.KnownAccounts[accTo%len(e.KnownAccounts)].Address,
-							txVal,
-							[]byte{},
-						)
-					} else {
-						// One account per transaction for all other transactions
-						tx, txerr = e.CreateSignedTransaction(
-							e.KnownAccounts[txIndex%len(e.KnownAccounts)].PrivateKey,
-							e.KnownAccounts[txIndex+1%len(e.KnownAccounts)].Address,
-							txVal,
-							[]byte{},
-						)
-
-					}
+					tx, txerr := e.CreateSignedTransaction(
+						accFrom.PrivateKey,
+						accTo.Address,
+						txVal,
+						[]byte{},
+					)
 
 					if txerr != nil {
 						return nil, txerr
 					}
 
 					intervalWorkload = append(intervalWorkload, tx)
-					txIndex++
+					txID++
 				}
 				threadWorkload = append(threadWorkload, intervalWorkload)
 			}
@@ -586,6 +586,24 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 		}
 	}
 
+	// 1. Set up the accounts into buckets for each
+	accountDistribution := make([][]*configs.ChainKey, e.BenchConfig.Secondaries*e.BenchConfig.Threads)
+
+	accountCount := 0
+	for {
+		currentAccount := accountCount % len(e.KnownAccounts)
+		currentDist := accountCount % len(accountDistribution)
+
+		accountDistribution[currentDist] = append(accountDistribution[currentDist], &e.KnownAccounts[currentAccount])
+
+		// exit condition - each thread has an assigned account, and we've run out of accounts.
+		if accountCount > len(e.KnownAccounts) && accountCount > len(accountDistribution) {
+			break
+		}
+
+		accountCount++
+	}
+
 	// Shuffle the function interactions
 	// TODO check this carefully - we may have workloads with dependent transactions in future - maybe add this as a flag in config?
 	ShuffleFunctionCalls(functionsToCreatePerThread)
@@ -598,53 +616,25 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 		for threadID := 0; threadID < e.BenchConfig.Threads; threadID++ {
 			threadWorkload := make(WorkerThreadWorkload, 0)
 			txCount := 0
+
+			accountsChoices := accountDistribution[threadID+(secondaryID*e.BenchConfig.Threads)]
+
 			for _, numTx := range e.BenchConfig.TxInfo.Intervals {
 				intervalWorkload := make([][]byte, 0)
 
 				for i := 0; i < numTx; i++ {
 					// function to create
-
-					var tx []byte
-					var txerr error
+					accFrom := accountsChoices[txIndex%len(accountsChoices)]
 					funcToCreate := e.BenchConfig.ContractInfo.Functions[functionsToCreatePerThread[txCount]]
 					zap.L().Debug(fmt.Sprintf("tx %d for func %s", txCount, funcToCreate.Name),
 						zap.Int("secondary", secondaryID),
 						zap.Int("thread", threadID))
-
-					// If the number of accounts are equal, then we have one account per secondary
-					if len(e.KnownAccounts) >= e.BenchConfig.Secondaries && len(e.KnownAccounts) < e.BenchConfig.Secondaries*e.BenchConfig.Threads {
-						zap.L().Warn("Only enough accounts for one per secondary, this means there may be delays/fails for more threads")
-						tx, txerr = e.CreateInteractionTX(
-							e.KnownAccounts[secondaryID%len(e.KnownAccounts)].PrivateKey,
-							contractAddr,
-							funcToCreate.Name,
-							funcToCreate.Params,
-						)
-					} else if len(e.KnownAccounts) == e.BenchConfig.Secondaries*e.BenchConfig.Threads {
-						zap.L().Warn("Workload has one account per thread")
-						// One account per thread.
-						accFrom := secondaryID + threadID + (secondaryID * e.BenchConfig.Threads)
-						tx, txerr = e.CreateInteractionTX(
-							e.KnownAccounts[accFrom%len(e.KnownAccounts)].PrivateKey,
-							contractAddr,
-							funcToCreate.Name,
-							funcToCreate.Params,
-						)
-					} else {
-						// If there's not enough accounts, send a message saying that some transactions will fail
-						if len(e.KnownAccounts) < (e.BenchConfig.Secondaries * e.BenchConfig.Threads) {
-							zap.L().Warn("Not enough accounts, will experience fails due to sending nonce at incorrect times.")
-						}
-
-						// One account per transaction for all other transactions
-						tx, txerr = e.CreateInteractionTX(
-							e.KnownAccounts[txIndex%len(e.KnownAccounts)].PrivateKey,
-							contractAddr,
-							funcToCreate.Name,
-							funcToCreate.Params,
-						)
-
-					}
+					tx, txerr := e.CreateInteractionTX(
+						accFrom.PrivateKey,
+						contractAddr,
+						funcToCreate.Name,
+						funcToCreate.Params,
+					)
 
 					if txerr != nil {
 						return nil, txerr
