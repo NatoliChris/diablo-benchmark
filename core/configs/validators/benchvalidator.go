@@ -9,9 +9,10 @@ import (
 	"diablo-benchmark/core/configs"
 	"errors"
 	"fmt"
-	"go.uber.org/zap"
 	"os"
 	"reflect"
+
+	"go.uber.org/zap"
 )
 
 // ValidateBenchConfig validates all fields of the benchmark configuration
@@ -27,6 +28,16 @@ func ValidateBenchConfig(c *configs.BenchConfig) (bool, error) {
 	// Description can be omitted, but we will warn.
 	if len(c.Description) == 0 {
 		zap.L().Warn("Missing description in configuration file.")
+	}
+
+	// Check that we have at least 1 secondary
+	if c.Secondaries <= 0 {
+		return false, fmt.Errorf("number of secondaries must be minimum 1")
+	}
+
+	// Check that we have at least 1 thread
+	if c.Threads <= 0 {
+		return false, fmt.Errorf("number of threads must be minimum 1")
 	}
 
 	// Contract Checks!
@@ -74,14 +85,6 @@ func ValidateBenchConfig(c *configs.BenchConfig) (bool, error) {
 				c.TxInfo.Intervals[k],
 				k)
 		}
-	}
-
-	if c.Secondaries <= 0 {
-		return false, fmt.Errorf("number of secondaries must be minimum 1")
-	}
-
-	if c.Threads <= 0 {
-		return false, fmt.Errorf("number of threads must be minimum 1")
 	}
 
 	return true, nil

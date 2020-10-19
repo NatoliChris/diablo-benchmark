@@ -26,14 +26,16 @@ type WorkloadHandler struct {
 	numTx                uint64                                 // number of transactions sent
 	numErrors            uint64                                 // Number of errors during workload
 	StartEnd             []time.Time                            // Start and end of the benchmark
+	timeout              int                                    // Timeout to wait for the benchmark
 }
 
 // NewWorkloadHandler provides a new workload handler with number of threads and clients
-func NewWorkloadHandler(numThread uint32, clients []clientinterfaces.BlockchainInterface) *WorkloadHandler {
+func NewWorkloadHandler(numThread uint32, clients []clientinterfaces.BlockchainInterface, timeout int) *WorkloadHandler {
 	// Generate the channels to speak to the workers.
 	return &WorkloadHandler{
 		numThread:     numThread,
 		activeClients: clients,
+		timeout:       timeout,
 	}
 }
 
@@ -156,17 +158,26 @@ func (wh *WorkloadHandler) runnerConsumer(blockchainInterface clientinterfaces.B
 
 // statusPrinter periodically prints the status of the workload progress
 func (wh *WorkloadHandler) statusPrinter(stopCh chan bool) {
-	timer := time.NewTimer(5 * time.Second)
+	timer := time.NewTicker(5 * time.Second)
 	for {
 		select {
 		case <-stopCh:
+			timer.Stop()
 			return
 		case <-timer.C:
 			// print
 			zap.L().Info(fmt.Sprintf("%d tx | %d errors", wh.numTx, wh.numErrors))
-			timer = time.NewTimer(5 * time.Second)
 		}
 	}
+}
+
+func (wh *WorkloadHandler) getTxCheck() uint64 {
+	fullTx := uint64(0)
+	for _, v := range wh.activeClients {
+		fullTx += v.GetTxDone()
+	}
+
+	return fullTx
 }
 
 // RunBench executes the benchmark
@@ -185,12 +196,31 @@ func (wh *WorkloadHandler) RunBench() error {
 	// confirmations
 	wh.wg.Wait()
 
-	zap.L().Info("Sending finished, waiting for timeout to complete before continuing")
-	wh.StartEnd = append(wh.StartEnd, time.Now())
+	// Sending finished waiting for timeout
+	// TODO: add configurable timeout that will exit if benchmark not complete
+	zap.L().Info("Sending complete, waiting for finish")
 	stopPrinting <- true
 
-	// TODO change this to a timeout in config?
-	time.Sleep(2 * time.Second)
+	waitingTicker := time.NewTicker(1 * time.Second)
+	waitCount := 0
+	td := uint64(0)
+	for {
+		select {
+		case <-waitingTicker.C:
+			waitCount++
+			td = wh.getTxCheck()
+			zap.L().Debug("TX Done:",
+				zap.Uint64("tx", td),
+				zap.Uint64("total", wh.numTx),
+			)
+			break
+		}
+		if waitCount >= wh.timeout || (td/wh.numTx) == 1 {
+			break
+		}
+	}
+
+	wh.StartEnd = append(wh.StartEnd, time.Now())
 
 	zap.L().Info("Benchmark complete:",
 		zap.Time("start", wh.StartEnd[0]),
@@ -209,6 +239,10 @@ func (wh *WorkloadHandler) HandleCleanup() []results.Results {
 		resList = append(resList, c.Cleanup())
 	}
 
+	zap.L().Debug("Results being returned",
+		zap.Int("len", len(resList)))
+
+	fmt.Println(resList)
 	return resList
 }
 

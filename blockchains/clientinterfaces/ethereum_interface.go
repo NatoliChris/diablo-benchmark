@@ -21,18 +21,15 @@ import (
 // EthereumInterface is the the Ethereum implementation of the clientinterface
 // Provides functionality to interaact with the Ethereum blockchain
 type EthereumInterface struct {
-	Nodes            []string               // List of the nodes host:port combinations
 	PrimaryNode      *ethclient.Client      // The primary node connected for this client.
 	SecondaryNodes   []*ethclient.Client    // The other node information (for secure reads etc.)
 	SubscribeDone    chan bool              // Event channel that will unsub from events
 	TransactionInfo  map[string][]time.Time // Transaction information
 	HandlersStarted  bool                   // Have the handlers been initiated?
-	NumTxDone        uint64                 // Number of transactions done
-	NumTxSent        uint64                 // Number of transactions currently sent
-	TotalTx          int                    // Total number of transactions
 	StartTime        time.Time              // Start time of the benchmark
 	ThroughputTicker *time.Ticker           // Ticker for throughput (1s)
 	Throughputs      []float64              // Throughput over time with 1 second intervals
+	GenericInterface
 }
 
 // Init initialises the list of nodes
@@ -59,6 +56,9 @@ func (e *EthereumInterface) Cleanup() results.Results {
 
 	var endTime time.Time
 
+	success := uint(0)
+	fails := uint(e.Fail)
+
 	for _, v := range e.TransactionInfo {
 		if len(v) > 1 {
 			txLatency := v[1].Sub(v[0]).Milliseconds()
@@ -67,16 +67,34 @@ func (e *EthereumInterface) Cleanup() results.Results {
 			if v[1].After(endTime) {
 				endTime = v[1]
 			}
+
+			success++
+		} else {
+			fails++
 		}
 	}
 
-	throughput := float64(e.NumTxDone) / (endTime.Sub(e.StartTime).Seconds())
+	zap.L().Debug("Statistics being returned",
+		zap.Uint("success", success),
+		zap.Uint("fail", fails))
+
+	var throughput float64
+
+	if len(txLatencies) > 0 {
+		throughput = float64(e.NumTxDone) / (endTime.Sub(e.StartTime).Seconds())
+		avgLatency = avgLatency / float64(len(txLatencies))
+	} else {
+		avgLatency = 0
+		throughput = 0
+	}
 
 	return results.Results{
 		TxLatencies:       txLatencies,
-		AverageLatency:    avgLatency / float64(len(txLatencies)),
+		AverageLatency:    avgLatency,
 		Throughput:        throughput,
 		ThroughputSeconds: e.Throughputs,
+		Success:           success,
+		Fail:              fails,
 	}
 }
 
@@ -89,7 +107,7 @@ func (e *EthereumInterface) throughputSeconds() {
 		select {
 		case <-e.ThroughputTicker.C:
 			seconds++
-			e.Throughputs = append(e.Throughputs, float64(e.NumTxDone)/seconds)
+			e.Throughputs = append(e.Throughputs, float64(e.NumTxDone-e.Fail)/seconds)
 		}
 	}
 }
@@ -134,14 +152,16 @@ func (e *EthereumInterface) parseBlocksForTransactions(blockNumber *big.Int) {
 	}
 
 	tNow := time.Now()
+	var tAdd uint64
 	for _, v := range block.Transactions() {
 		tHash := v.Hash().String()
 		if _, ok := e.TransactionInfo[tHash]; ok {
 			e.TransactionInfo[tHash] = append(e.TransactionInfo[tHash], tNow)
+			tAdd++
 		}
 	}
 
-	atomic.AddUint64(&e.NumTxDone, uint64(len(block.Transactions())))
+	atomic.AddUint64(&e.NumTxDone, tAdd)
 }
 
 // EventHandler subscribes to the blocks and handles the incoming information about the transactions
@@ -274,13 +294,18 @@ func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
 	// NOTE: type conversion might be slow, there might be a better way to send this.
 	txSigned := tx.(*ethtypes.Transaction)
 	timoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
-	e.TransactionInfo[txSigned.Hash().String()] = []time.Time{time.Now()}
+
 	err := e.PrimaryNode.SendTransaction(timoutCTX, txSigned)
 
+	// The transaction failed - this could be if it was reproposed, or, just failed.
+	// We need to make sure that if it was re-proposed it doesn't count as a "success" on this node.
 	if err != nil {
+		atomic.AddUint64(&e.Fail, 1)
+		atomic.AddUint64(&e.NumTxDone, 1)
 		return err
 	}
 
+	e.TransactionInfo[txSigned.Hash().String()] = []time.Time{time.Now()}
 	atomic.AddUint64(&e.NumTxSent, 1)
 	return nil
 }
