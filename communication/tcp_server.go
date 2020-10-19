@@ -51,7 +51,8 @@ func (s *PrimaryServer) HandleSecondaries(readyChannel chan bool) {
 
 		if err != nil {
 			// Log the error here
-			fmt.Println(err)
+			zap.L().Error("Error from listen",
+				zap.Error(err))
 		}
 
 		zap.L().Info(fmt.Sprintf("Secondary %d / %d connected", len(s.Secondaries), s.ExpectedSecondaries),
@@ -84,7 +85,7 @@ func (s *PrimaryServer) sendAndWaitOKAsync(data []byte, secondary net.Conn, done
 		doneCh <- 1
 	}
 
-	fmt.Printf("GOT REPLY FROM %s\n", secondary.RemoteAddr().String())
+	zap.L().Debug(fmt.Sprintf("GOT REPLY FROM %s\n", secondary.RemoteAddr().String()))
 
 	// If we got an error reply - it means
 	// something failed on the secondary machine
@@ -121,7 +122,7 @@ func (s *PrimaryServer) SendAndWaitOKSync(data []byte, secondary net.Conn) error
 		}
 	}
 
-	fmt.Printf("GOT REPLY FROM %s\n", secondary.RemoteAddr().String())
+	zap.L().Debug(fmt.Sprintf("GOT REPLY FROM %s\n", secondary.RemoteAddr().String()))
 
 	// If we got an error reply - it means
 	// something failed on the secondary machine
@@ -185,7 +186,10 @@ func (s *PrimaryServer) sendAndWaitData(data []byte, secondary net.Conn) ([]resu
 	}
 
 	fullReply := initialReply[9:]
-	fmt.Println("Got ", dataLen, fullReply)
+	zap.L().Debug("Reply from client",
+		zap.Uint64("length", dataLen),
+		zap.ByteString("reply", fullReply),
+	)
 	buffer := make([]byte, 1024)
 	readLen := n - 9
 
