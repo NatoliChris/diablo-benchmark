@@ -27,7 +27,7 @@ type PrimaryArgs struct {
 
 // SecondaryArgs provides command-line arguments for secondary
 type SecondaryArgs struct {
-	ConfigPath      string        // Path to the secondary config
+	BenchConfigPath string        // Path to the secondary config
 	ChainConfigPath string        // Path to the blockchain configuration
 	PrimaryAddr     string        // Address of the primary (can also be in secondary config)
 	LogLevel        zapcore.Level // log level
