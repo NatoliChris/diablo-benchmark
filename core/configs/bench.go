@@ -11,6 +11,7 @@ type BenchConfig struct {
 	Description  string       `yaml:"description,omitempty"` // Description of what it is.
 	Threads      int          `yaml:"threads"`               // Number of threads per secondary expected.
 	Secondaries  int          `yaml:"secondaries"`           // Number of secondary machines.
+	Timeout      int          `yaml:"timeout"`               // Timeout for the benchmark after sending
 	TxInfo       BenchInfo    `yaml:"bench,flow"`            // Benchmark transaction information.
 	ContractInfo ContractInfo `yaml:"contract,omitempty"`    // Contract Information
 }
