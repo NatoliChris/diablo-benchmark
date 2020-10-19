@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // Arguments provides all the argument sets
@@ -17,18 +18,20 @@ type Arguments struct {
 
 // PrimaryArgs contains the command-line arguments for the primary
 type PrimaryArgs struct {
-	BenchConfigPath string // Path to the configurations
-	ChainConfigPath string // Path to the chain configuration
-	ListenAddr      string // host:port that it should run on
-	Timeout         int    // benchmark timeout
+	BenchConfigPath string        // Path to the configurations
+	ChainConfigPath string        // Path to the chain configuration
+	ListenAddr      string        // host:port that it should run on
+	LogLevel        zapcore.Level // log level
+	Timeout         int           // benchmark timeout
 }
 
 // SecondaryArgs provides command-line arguments for secondary
 type SecondaryArgs struct {
-	BenchConfigPath string // Path to the secondary config
-	ChainConfigPath string // Path to the blockchain configuration
-	PrimaryAddr     string // Address of the primary (can also be in secondary config)
-	Timeout         int    // benchmark timeout
+	BenchConfigPath string        // Path to the secondary config
+	ChainConfigPath string        // Path to the blockchain configuration
+	PrimaryAddr     string        // Address of the primary (can also be in secondary config)
+	LogLevel        zapcore.Level // log level
+	Timeout         int           // benchmark timeout
 }
 
 // DefineArguments sets the arguments that will be used for the subcommands
@@ -53,6 +56,12 @@ func DefineArguments() *Arguments {
 	primaryCommand.IntVar(&primaryArgs.Timeout, "timeout", 0, "--timeout=<timeout>")
 	secondaryCommand.IntVar(&secondaryArgs.Timeout, "t", 0, "-t <timeout>")
 	secondaryCommand.IntVar(&secondaryArgs.Timeout, "timeout", 0, "--timeout=<timeout>")
+
+	// --level
+	primaryArgs.LogLevel = zapcore.InfoLevel
+	primaryCommand.Var(&primaryArgs.LogLevel, "level", "--level INFO|WARN|DEBUG|ERROR")
+	secondaryArgs.LogLevel = zapcore.InfoLevel
+	secondaryCommand.Var(&secondaryArgs.LogLevel, "level", "--level INFO|WARN|DEBUG|ERROR")
 
 	// Primary Arguments
 	primaryCommand.StringVar(&primaryArgs.ListenAddr, "addr", "", "--addr=addr (e.g. --addr=\"0.0.0.0:8323\")")
