@@ -3,9 +3,9 @@ BUILDFLAGS := -v
 PKG := "diablo-benchmark"
 PKG_LIST := $(shell go list ${PKG}/... | grep -v vendor/)
 
-default: all
+default: diablo
 
-all: diablo
+all: lint diablo
 
 reqs:
 	GO111MODULE=off GO111MODULE=off go get -v golang.org/x/lint/golint
