@@ -74,44 +74,44 @@ func printWelcome(isPrimary bool) {
 
 // Prepares the logger
 // TODO make a flag to change level of the logger (DEBUG, INFO, ..)
-func prepareLogger(logType string) {
+func prepareLogger(logType string, level zapcore.Level) {
 	// config := zap.NewDevelopmentConfig()
 	// config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	// logger, err := config.Build()
 
-	highPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-		return lvl >= zapcore.ErrorLevel
-	})
-	lowPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-		return lvl < zapcore.ErrorLevel
-	})
-
+	// Set up the console log - so we can see the colours
 	consoleConfig := zap.NewDevelopmentEncoderConfig()
 	consoleConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
-	consoleCore := zapcore.NewConsoleEncoder(consoleConfig)
+	consoleEncoder := zapcore.NewConsoleEncoder(consoleConfig)
+	atomicLevel := zap.NewAtomicLevel()
 
-	config := zap.NewProductionEncoderConfig()
-	config.EncodeTime = zapcore.ISO8601TimeEncoder
-	config.EncodeLevel = zapcore.CapitalLevelEncoder
+	consoleCore := zapcore.NewCore(consoleEncoder, zapcore.Lock(os.Stdout), atomicLevel)
+	atomicLevel.SetLevel(level)
 
-	file, _ := os.Create(fmt.Sprintf("%s_diablo.log", logType))
+	// Set up the file-logger
+	fileConfig := zap.NewProductionEncoderConfig()
+	fileConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	fileConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 
-	topicDebugging := zapcore.AddSync(file)
-	topicErrors := zapcore.AddSync(file)
-	consoleDebugging := zapcore.Lock(os.Stdout)
-	consoleErrors := zapcore.Lock(os.Stderr)
+	// Create the file, add the sync
+	file, err := os.Create(fmt.Sprintf("%s_diablo.log", logType))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create log file")
+		os.Exit(1)
+	}
+	fileSync := zapcore.AddSync(file)
+	fileEncoder := zapcore.NewJSONEncoder(fileConfig)
+	fileLevel := zap.NewAtomicLevel()
+	fileCore := zapcore.NewCore(fileEncoder, fileSync, fileLevel)
 
-	writerCore := zapcore.NewJSONEncoder(config)
-
-	core := zapcore.NewTee(
-		zapcore.NewCore(consoleCore, consoleErrors, highPriority),
-		zapcore.NewCore(consoleCore, consoleDebugging, lowPriority),
-		zapcore.NewCore(writerCore, topicErrors, highPriority),
-		zapcore.NewCore(writerCore, topicDebugging, lowPriority),
+	// Set up both the loggers
+	cores := zapcore.NewTee(
+		consoleCore,
+		fileCore,
 	)
 
-	logger := zap.New(core)
+	logger := zap.New(cores)
 	zap.ReplaceGlobals(logger)
 }
 
@@ -184,7 +184,8 @@ func runSecondary(secondaryArgs *core.SecondaryArgs) {
 	secondary, err := core.NewSecondary(chainConfiguration, benchConfiguration, secondaryArgs.PrimaryAddr)
 
 	if err != nil {
-		fmt.Println(err)
+		zap.L().Error("Failed to start new secondary",
+			zap.Error(err))
 		os.Exit(1)
 	}
 
@@ -204,18 +205,21 @@ func main() {
 		case "primary":
 			// Print the welcome message
 			printWelcome(true)
-			prepareLogger("primary")
+
 			// Parse the arguments
 			args.PrimaryCommand.Parse(os.Args[2:])
 
+			prepareLogger("primary", args.PrimaryArgs.LogLevel)
 			runPrimary(args.PrimaryArgs)
 
 		case "secondary":
 			// Print the welcome message
 			printWelcome(false)
-			prepareLogger("secondary")
+
 			// Parse the arguments
 			err := args.SecondaryCommand.Parse(os.Args[2:])
+
+			prepareLogger("secondary", args.SecondaryArgs.LogLevel)
 			if err != nil {
 				zap.L().Error("error parsing",
 					zap.Error(err))

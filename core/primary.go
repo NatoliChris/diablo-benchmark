@@ -138,7 +138,8 @@ func (p *Primary) Run() {
 	// TODO: Need to store the results
 	rawResults, errs := p.Server.GetResults()
 	if errs != nil {
-		fmt.Println(errs)
+		zap.L().Error("GetResults returned client errors",
+			zap.Strings("errors", errs))
 	}
 
 	// TODO: @CHRIS
