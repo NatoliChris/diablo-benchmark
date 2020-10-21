@@ -131,8 +131,8 @@ func (p *Primary) Run() {
 		fmt.Println(errs)
 	}
 
-	// Wait until everyone is done
-	time.Sleep(10 * time.Second)
+	// Wait until everyone is done and give some room for final messages
+	time.Sleep(2 * time.Second)
 
 	// Step 6 (once all have completed) - get the results
 	// TODO: Need to store the results
