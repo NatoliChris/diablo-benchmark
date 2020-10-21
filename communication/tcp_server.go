@@ -55,10 +55,10 @@ func (s *PrimaryServer) HandleSecondaries(readyChannel chan bool) {
 				zap.Error(err))
 		}
 
+		s.Secondaries = append(s.Secondaries, c)
+
 		zap.L().Info(fmt.Sprintf("Secondary %d / %d connected", len(s.Secondaries), s.ExpectedSecondaries),
 			zap.String("Addr:", c.RemoteAddr().String()))
-
-		s.Secondaries = append(s.Secondaries, c)
 
 		if len(s.Secondaries) == s.ExpectedSecondaries {
 			readyChannel <- true
