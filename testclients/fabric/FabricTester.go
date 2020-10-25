@@ -33,6 +33,9 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 )
 
+
+
+
 const (
 	channelID      = "mychannel"
 	orgName        = "Org1"
@@ -47,15 +50,15 @@ var (
 
 // Run enables testing an end-to-end scenario against the supplied SDK options
 func Run(configOpt core.ConfigProvider, sdkOpts ...fabsdk.Option) {
-	setupAndRun(t, true, configOpt, e2eTest, sdkOpts...)
+	setupAndRun( true, configOpt, e2eTest, sdkOpts...)
 }
 
 // RunWithoutSetup will execute the same way as Run but without creating a new channel and registering a new CC
 func RunWithoutSetup(configOpt core.ConfigProvider, sdkOpts ...fabsdk.Option) {
-	setupAndRun(t, false, configOpt, e2eTest, sdkOpts...)
+	setupAndRun( false, configOpt, e2eTest, sdkOpts...)
 }
 
-type testSDKFunc func(t *Testing, sdk *fabsdk.FabricSDK)
+type testSDKFunc func( sdk *fabsdk.FabricSDK)
 
 // setupAndRun enables testing an end-to-end scenario against the supplied SDK options
 // the createChannel flag will be used to either create a channel and the example CC or not(ie run the tests with existing ch and CC)
@@ -76,14 +79,14 @@ func setupAndRun(createChannel bool, configOpt core.ConfigProvider, test testSDK
 
 	// Delete all private keys from the crypto suite store
 	// and users from the user store at the end
-	integration.CleanupUserData(t, sdk)
-	defer integration.CleanupUserData(t, sdk)
+	integration.CleanupUserData(sdk)
+	defer integration.CleanupUserData(sdk)
 
 	if createChannel {
-		createChannelAndCC(t, sdk)
+		createChannelAndCC( sdk)
 	}
 
-	test(t, sdk)
+	test(sdk)
 }
 
 //SECTION CHANNEL AND CC SETUP
@@ -91,19 +94,20 @@ func setupAndRun(createChannel bool, configOpt core.ConfigProvider, test testSDK
 func e2eTest(sdk *fabsdk.FabricSDK) {
 
 	//ANCHOR Client Channel context creation
-
 	//prepare channel client context using client context
 	clientChannelContext := sdk.ChannelContext(channelID, fabsdk.WithUser("User1"), fabsdk.WithOrg(orgName))
 	// Channel client is used to query and execute transactions (Org1 is default org)ln
+	client,err := channel.New(clientChannelContext)
+
 	if err != nil {
 		fmt.Println("Failed to create new channel client: %s", err)
 	}
 
-	existingValue := queryCC(t, client)
-	ccEvent := moveFunds(t, client)
+	existingValue := queryCC(client)
+	ccEvent := moveFunds(client)
 
 	// Verify move funds transaction result on the same peer where the event came from.
-	verifyFundsIsMoved(t, client, existingValue, ccEvent)
+	verifyFundsIsMoved(client, existingValue, ccEvent)
 }
 
 func createChannelAndCC(sdk *fabsdk.FabricSDK) {
@@ -123,7 +127,7 @@ func createChannelAndCC(sdk *fabsdk.FabricSDK) {
 	}
 
 	// Create channel
-	createChannel(t, sdk, resMgmtClient)
+	createChannel(sdk, resMgmtClient)
 
 	//prepare context
 	adminContext := sdk.Context(fabsdk.WithUser(orgAdmin), fabsdk.WithOrg(orgName))
@@ -143,9 +147,9 @@ func createChannelAndCC(sdk *fabsdk.FabricSDK) {
 
 	// Create chaincode package for example cc
 	if metadata.CCMode == "lscc" {
-		createCC(t, orgResMgmt)
+		createCC(orgResMgmt)
 	} else {
-		createCCLifecycle(t, orgResMgmt, sdk)
+		createCCLifecycle(orgResMgmt, sdk)
 	}
 }
 
@@ -161,7 +165,7 @@ func moveFunds(client *channel.Client) *fab.CCEvent {
 	defer client.UnregisterChaincodeEvent(reg)
 
 	// Move funds
-	executeCC(t, client)
+	executeCC(client)
 
 	var ccEvent *fab.CCEvent
 	select {
@@ -176,7 +180,7 @@ func moveFunds(client *channel.Client) *fab.CCEvent {
 
 func verifyFundsIsMoved(client *channel.Client, value []byte, ccEvent *fab.CCEvent) {
 
-	newValue := queryCC(t, client, ccEvent.SourceURL)
+	newValue := queryCC(client, ccEvent.SourceURL)
 	valueInt, err := strconv.Atoi(string(value))
 	if err != nil {
 		t.Fatal(err.Error())
@@ -232,8 +236,8 @@ func createCC(orgResMgmt *resmgmt.Client) {
 		resmgmt.InstantiateCCRequest{Name: ccID, Path: "github.com/example_cc", Version: "0", Args: integration.ExampleCCInitArgs(), Policy: ccPolicy},
 		resmgmt.WithRetry(retry.DefaultResMgmtOpts),
 	)
-	require.Nil(t, err, "error should be nil")
-	require.NotEmpty(t, resp, "transaction response should be populated")
+	require.Nil(err, "error should be nil")
+	require.NotEmpty(resp, "transaction response should be populated")
 }
 
 func createChannel(sdk *fabsdk.FabricSDK, resMgmtClient *resmgmt.Client) {
@@ -261,31 +265,31 @@ func createCCLifecycle(orgResMgmt *resmgmt.Client, sdk *fabsdk.FabricSDK) {
 	packageID := lcpackager.ComputePackageID(label, ccPkg)
 
 	// Install cc
-	installCC(t, label, ccPkg, orgResMgmt)
+	installCC(label, ccPkg, orgResMgmt)
 
 	// Get installed cc package
-	getInstalledCCPackage(t, packageID, ccPkg, orgResMgmt)
+	getInstalledCCPackage(packageID, ccPkg, orgResMgmt)
 
 	// Query installed cc
-	queryInstalled(t, label, packageID, orgResMgmt)
+	queryInstalled(label, packageID, orgResMgmt)
 
 	// Approve cc
-	approveCC(t, packageID, orgResMgmt)
+	approveCC(packageID, orgResMgmt)
 
 	// Query approve cc
-	queryApprovedCC(t, orgResMgmt)
+	queryApprovedCC(orgResMgmt)
 
 	// Check commit readiness
-	checkCCCommitReadiness(t, orgResMgmt)
+	checkCCCommitReadiness(orgResMgmt)
 
 	// Commit cc
-	commitCC(t, orgResMgmt)
+	commitCC(orgResMgmt)
 
 	// Query committed cc
-	queryCommittedCC(t, orgResMgmt)
+	queryCommittedCC(orgResMgmt)
 
 	// Init cc
-	initCC(t, sdk)
+	initCC(sdk)
 
 }
 
