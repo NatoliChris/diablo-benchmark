@@ -24,6 +24,11 @@ Since the benchmark is developed with distributed clients, the architecture can 
 
 ![docs/architecture](docs/architecture.jpg)
 
+
+The communication between aspects is as follows:
+
+![docs/communication](docs/communication.jpg)
+
 ### Configurations
 
 #### Benchmark
