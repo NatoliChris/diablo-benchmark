@@ -5,6 +5,7 @@ Diablo, an analytical blockchain benchmark framework focusing on distributed cli
 ## Other Sections
 
 * [New Chains](docs/new-chains.md)
+    * [Logging](docs/logging.md)
 * [Running the example](docs/sample-example.md)
 
 ## Workloads
@@ -22,6 +23,11 @@ Diablo, an analytical blockchain benchmark framework focusing on distributed cli
 Since the benchmark is developed with distributed clients, the architecture can become quite complex. The main goal is to limit the required implementation details to allow for easy adoption of new chains. We also focus on providing ease of workload definition, which can help provide a pathway for new workloads to be designed in future.
 
 ![docs/architecture](docs/architecture.jpg)
+
+
+The communication between aspects is as follows:
+
+![docs/communication](docs/communication.jpg)
 
 ### Configurations
 
