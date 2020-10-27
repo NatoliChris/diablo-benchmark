@@ -2,6 +2,7 @@ package configs
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 )
 
@@ -73,6 +74,48 @@ func (ck *ChainKey) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 	(*ck).PrivateKey = privateKeyBytes
 	(*ck).Address = c.Address
+
+	return nil
+}
+
+// UnmarshalJSON provides a custom JSON unmarshal for 'Chain Key' type.
+// It expects the object: {"private": "", "address": ""}
+func (ck *ChainKey) UnmarshalJSON(b []byte) error {
+
+	var c struct {
+		PrivateKey string `json:"private"`
+		Address    string `json:"address"`
+	}
+
+	err := json.Unmarshal(b, &c)
+
+	if err != nil {
+		return err
+	}
+
+	if len(c.PrivateKey) == 0 {
+		return errors.New("empty PrivateKey, or invalid, passed to unmarshal")
+	}
+
+	var privateKeyBytes []byte
+
+	if checkPrefix(c.PrivateKey) {
+		// If the prefix exists, decode from [2:]
+		privateKeyBytes, err = hex.DecodeString(c.PrivateKey[2:])
+		// If we couldn't decode
+		if err != nil {
+			return err
+		}
+	} else {
+		privateKeyBytes, err = hex.DecodeString(c.PrivateKey)
+		// If we couldn't decode
+		if err != nil {
+			return err
+		}
+	}
+
+	ck.PrivateKey = privateKeyBytes
+	ck.Address = c.Address
 
 	return nil
 }
