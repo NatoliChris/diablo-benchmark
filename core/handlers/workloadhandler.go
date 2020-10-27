@@ -145,6 +145,8 @@ func (wh *WorkloadHandler) runnerConsumer(blockchainInterface clientinterfaces.B
 	for tx := range workload {
 		e := blockchainInterface.SendRawTransaction(tx)
 		if e != nil {
+			zap.L().Debug("Error sending tx",
+				zap.Error(e))
 			errs = append(errs, e)
 			atomic.AddUint64(&wh.numErrors, 1)
 		}
