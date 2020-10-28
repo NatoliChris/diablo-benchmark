@@ -475,21 +475,22 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 
 	accountCount := 0
 	for {
+		// exit condition - each thread has an assigned account, and we've run out of accounts.
+		if accountCount >= len(e.KnownAccounts) && accountCount >= len(accountDistribution) {
+			break
+		}
+
 		currentAccount := accountCount % len(e.KnownAccounts)
 		currentDist := accountCount % len(accountDistribution)
 
 		accountDistribution[currentDist] = append(accountDistribution[currentDist], &e.KnownAccounts[currentAccount])
-
-		// exit condition - each thread has an assigned account, and we've run out of accounts.
-		if accountCount > len(e.KnownAccounts) && accountCount > len(accountDistribution) {
-			break
-		}
 
 		accountCount++
 	}
 
 	// 2. Generate the transactions
 	txID := 0
+	accountBatch := 0
 	for secondaryID := 0; secondaryID < e.BenchConfig.Secondaries; secondaryID++ {
 		// secondaryWorkload = [thread][interval][tx=[]byte]
 		// [][][][]byte
@@ -503,7 +504,7 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 				zap.Int("secondary", secondaryID),
 				zap.Int("thread", thread),
 				zap.Int("len", len(accountDistribution)))
-			accountsChoices := accountDistribution[thread+(secondaryID*e.BenchConfig.Threads)]
+			accountsChoices := accountDistribution[accountBatch]
 			for interval, txnum := range e.BenchConfig.TxInfo.Intervals {
 				// Debug print for each interval to monitor correctness.
 				zap.L().Debug("Making workload ",
@@ -545,6 +546,7 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 				threadWorkload = append(threadWorkload, intervalWorkload)
 			}
 			secondaryWorkload = append(secondaryWorkload, threadWorkload)
+			accountBatch++
 		}
 		totalWorkload = append(totalWorkload, secondaryWorkload)
 	}
