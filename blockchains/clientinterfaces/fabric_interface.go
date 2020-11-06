@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 )
 
+//FabricInterface is the Hyperledger Fabric implementation of the clientinterface
+// Provides functionality to communicate with the Fabric blockchain
 type FabricInterface struct {
 	Gateway *gateway.Gateway
 	Wallet  *gateway.Wallet
@@ -21,7 +23,7 @@ type FabricInterface struct {
 	GenericInterface
 }
 
-
+// Init initializes the wallet, gateway, network and map of contracts available in the network
 func (f *FabricInterface) Init(otherHosts []string) {
 	f.Nodes = otherHosts
 	f.NumTxDone = 0
@@ -79,6 +81,8 @@ func (f *FabricInterface) Init(otherHosts []string) {
 	f.Contracts[contract.Name()] = contract
 }
 
+// Called when the wallet hasn't been instantiated yet
+// Creates the wallet/identity of the gateway peer we connect to
 func populateWallet(wallet *gateway.Wallet) error {
 	log.Println("============ Populating wallet ============")
 	credPath := filepath.Join(
@@ -122,7 +126,7 @@ func populateWallet(wallet *gateway.Wallet) error {
 	return wallet.Put("appUser", identity)
 }
 
-// Finishes up and performs any post-benchmark operations.
+// Cleanup Finishes up and performs any post-benchmark operations.
 // Can be used to format the results to parse back
 func (f *FabricInterface) Cleanup() results.Results {
 	return results.Results{
@@ -141,7 +145,7 @@ func (f *FabricInterface) Cleanup() results.Results {
 // metrics
 func (f *FabricInterface) Start() {}
 
-// Handles the workload, converts the bytes to usable transactions.
+//ParseWorkload Handles the workload, converts the bytes to usable transactions.
 // This takes the worker's workload - and transitions to transactions
 func (f *FabricInterface) ParseWorkload(workload workloadgenerators.WorkerThreadWorkload) ([][]interface{}, error) {
 	return nil, nil
@@ -164,7 +168,7 @@ func (f *FabricInterface) DeploySmartContract(tx interface{}) (interface{}, erro
 	return nil, nil
 }
 
-// SendRawTransactions sends the raw transaction bytes to the blockchain
+// SendRawTransaction sends the raw transaction bytes to the blockchain
 // It is safe to assume that these bytes will be formatted correctly according to the chosen blockchain.
 // The transactions are generated through the workload to relieve the signing and encoding during timed
 // benchmarks
@@ -196,7 +200,7 @@ func (f *FabricInterface) GetBlockHeight() (uint64, error) {
 	return 0, nil
 }
 
-// Get Tx Done returns the number of transactions completed
+// GetTxDone returns the number of transactions completed
 // This is already implemented with the GenericInterface
 func (f *FabricInterface) GetTxDone() uint64 {
 	return 0
