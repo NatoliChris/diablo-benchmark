@@ -1,24 +1,24 @@
 package clientinterfaces
 
 import (
-
 	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/core/results"
 	"fmt"
-	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
-	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
+	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
 )
 
 //FabricInterface is the Hyperledger Fabric implementation of the clientinterface
 // Provides functionality to communicate with the Fabric blockchain
 type FabricInterface struct {
-	Gateway *gateway.Gateway
-	Wallet  *gateway.Wallet
-	Network *gateway.Network
+	Gateway   *gateway.Gateway
+	Wallet    *gateway.Wallet
+	Network   *gateway.Network
 	Contracts map[string][]*gateway.Contract
 	GenericInterface
 }
@@ -69,16 +69,15 @@ func (f *FabricInterface) Init(otherHosts []string) {
 		log.Fatalf("Failed to connect to gateway: %v", err)
 	}
 
-	f.Network,err = f.Gateway.GetNetwork("mychannel")
+	f.Network, err = f.Gateway.GetNetwork("mychannel")
 
 	if err != nil {
 		log.Fatalf("Failed to get network: %v", err)
 	}
 
-
 	contract := f.Network.GetContract("basic")
 
-	f.Contracts[contract.Name()] = contract
+	f.Contracts[contract.Name()] = []*gateway.Contract{contract}
 }
 
 // Called when the wallet hasn't been instantiated yet
