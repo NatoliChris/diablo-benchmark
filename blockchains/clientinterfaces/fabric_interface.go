@@ -14,6 +14,7 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
 	"go.uber.org/zap"
+	"github.com/segmentio/ksuid"
 )
 
 //FabricInterface is the Hyperledger Fabric implementation of the clientinterface
@@ -33,15 +34,15 @@ type FabricInterface struct {
 // Init initializes the wallet, gateway, network and map of contracts available in the network
 func (f *FabricInterface) Init(otherHosts []string) {
 	f.Nodes = otherHosts
+	// use otherHosts to produce the connection profile ?
 	f.NumTxDone = 0
 	f.Contracts = make(map[string]*gateway.Contract,0)
 	f.TransactionInfo = make(map[string][]time.Time, 0)
 
-	// create the gateaway, network and contract ?
 
 	err := os.Setenv("DISCOVERY_AS_LOCALHOST", "true")
 	if err != nil {
-		log.Fatalf("Error setting DISCOVERY_AS_LOCALHOST environemnt variable: %v", err)
+		zap.L().Warn("Error setting DISCOVERY_AS_LOCALHOST environemnt variable: " + err.Error())
 	}
 
 	wallet, err := gateway.NewFileSystemWallet("wallet")
@@ -215,18 +216,19 @@ func (f *FabricInterface) Start() {
 }
 
 //ParseWorkload Handles the workload, converts the bytes to usable transactions.
-// This takes the worker's workload - and transitions to transactions
+// This takes the worker's workload and transforms into transactions
 func (f *FabricInterface) ParseWorkload(workload workloadgenerators.WorkerThreadWorkload) ([][]interface{}, error) {
 	return nil, nil
 }
 
 // ConnectOne will connect  to the blockchain node in the array slot of the
-// given array
+// given array (NOT NEEDED ALREADY DONE IN INIT)
 func (f *FabricInterface) ConnectOne(id int) error {
 	return nil
 }
 
 // ConnectAll connects to all nodes given in the hosts
+// (NOT NEEDED ALREADY DONE IN INIT)
 func (f *FabricInterface) ConnectAll(primaryID int) error {
 	return nil
 }
@@ -239,20 +241,46 @@ func (f *FabricInterface) DeploySmartContract(tx interface{}) (interface{}, erro
 
 // SendRawTransaction sends the transaction by the gateway
 func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
-	s := tx.(string)
-	result,err := f.Contracts[s].SubmitTransaction(s)
+
+	go f.submitTransaction(tx)
+
+	return nil
+}
+
+func (f *FabricInterface) submitTransaction(tx interface{}){
+	s := tx.([]string)
+	//TODO we create a unique id for the tx because the tx we receive is not unique
+	// simpler way than a library ?
+	id := ksuid.New().String()
+	f.TransactionInfo[id] = []time.Time{time.Now()}
+	atomic.AddUint64(&f.NumTxSent, 1)
+
+	//FIRST ELEMENT IS CONTRACT NAME
+	//SECOND ELEMENT IS THE NAME OF THE TRANSACTION TO BE INVOKED
+	// OTHER ELEMENTS ARE THE ARGUMENTS TO THE TRANSACTION
+	contractName := s[0]
+	transactionFunction := s[1]
+	args := s[2:]
+	//submitTransaction does everything under the hood for us.
+	// Rather than interacting with a single peer, the SDK will send the submitTransaction proposal
+	//to every required organization’s peer in the blockchain network based on the chaincode’s endorsement policy.
+	//Each of these peers will execute the requested smart contract using this proposal, to generate a transaction response
+	//which it endorses (signs) and returns to the SDK. The SDK collects all the endorsed transaction responses into
+	//a single transaction, which it then submits to the orderer. The orderer collects and sequences transactions from various application clients into a block of transactions.
+	//These blocks are distributed to every peer in the network, where every transaction is validated and committed.
+	//Finally, the SDK is notified via an event, allowing it to return control to the application.
+	_,err := f.Contracts[contractName].SubmitTransaction(transactionFunction,args...)
 
 	if err != nil {
 		atomic.AddUint64(&f.Fail, 1)
 		atomic.AddUint64(&f.NumTxDone, 1)
-		return err
 	}
+	f.TransactionInfo[id] = append(f.TransactionInfo[id],time.Now())
+	atomic.AddUint64(&f.Success,1)
+	atomic.AddUint64(&f.NumTxDone,1)
 
-	f.TransactionInfo[string(result)] = []time.Time{time.Now()}
-	atomic.AddUint64(&f.NumTxSent, 1)
-
-	return nil
 }
+
 
 // SecureRead reads the value from the chain, this requires the client to connect to _multiple_ nodes and asks
 // for the value. This ensures that the value read is "secure" - the same value must be returned
