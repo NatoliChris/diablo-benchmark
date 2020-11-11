@@ -3,9 +3,10 @@ package communication
 import (
 	"encoding/binary"
 	"fmt"
-	"go.uber.org/zap"
 	"io"
 	"net"
+
+	"go.uber.org/zap"
 )
 
 // ConnClient provides an active connection from the secondary to
@@ -25,7 +26,7 @@ const READLENGTH int = 9
 // MAXREAD is the maximum value to read in a single read.
 // If the size we need to read is greater, then we need to read split amounts
 // and iterate through the reading.
-const MAXREAD uint64 = 65500
+const MAXREAD uint64 = 8192
 
 // SetupSecondaryTCP connects to the master TCP address and return the connected client
 func SetupSecondaryTCP(addr string) (*ConnClient, error) {
@@ -99,12 +100,12 @@ func (c *ConnClient) SendDataOK(data []byte) {
 func (c *ConnClient) InitialRead() ([]byte, error) {
 	buf := make([]byte, READLENGTH)
 
-	_, err := c.Conn.Read(buf)
+	n, err := c.Conn.Read(buf)
 	if err != nil {
 		return nil, err
 	}
 
-	return buf, nil
+	return buf[:n], nil
 }
 
 // ReadSplit reads information over a number of "reads".
@@ -112,11 +113,14 @@ func (c *ConnClient) InitialRead() ([]byte, error) {
 // size of a full read in go.
 func (c *ConnClient) ReadSplit(totalSize uint64) ([]byte, error) {
 	fullData := make([]byte, 0)
-	buffer := make([]byte, 1024)
 	readLen := 0
+
+	zap.L().Debug("Asked to read",
+		zap.Uint64("Size", totalSize))
 
 	// Loop through, iteratively reading until the EOF is reached.
 	for {
+		buffer := make([]byte, 1024)
 		numRead, err := c.Conn.Read(buffer)
 		if err != nil {
 			if err != io.EOF {
@@ -153,7 +157,7 @@ func (c *ConnClient) ReadSize(size uint64) ([]byte, error) {
 	zap.L().Debug("Read bytes",
 		zap.Int("number", n))
 
-	return buf, nil
+	return buf[:n], nil
 }
 
 // CloseConn closes the connection to the primary server

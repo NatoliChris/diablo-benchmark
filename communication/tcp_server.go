@@ -55,10 +55,10 @@ func (s *PrimaryServer) HandleSecondaries(readyChannel chan bool) {
 				zap.Error(err))
 		}
 
+		s.Secondaries = append(s.Secondaries, c)
+
 		zap.L().Info(fmt.Sprintf("Secondary %d / %d connected", len(s.Secondaries), s.ExpectedSecondaries),
 			zap.String("Addr:", c.RemoteAddr().String()))
-
-		s.Secondaries = append(s.Secondaries, c)
 
 		if len(s.Secondaries) == s.ExpectedSecondaries {
 			readyChannel <- true
@@ -78,7 +78,7 @@ func (s *PrimaryServer) sendAndWaitOKAsync(data []byte, secondary net.Conn, done
 
 	reply := make([]byte, 1)
 
-	_, err := secondary.Read(reply)
+	n, err := secondary.Read(reply)
 
 	if err != nil {
 		errCh <- err
@@ -89,7 +89,7 @@ func (s *PrimaryServer) sendAndWaitOKAsync(data []byte, secondary net.Conn, done
 
 	// If we got an error reply - it means
 	// something failed on the secondary machine
-	if bytes.Equal(MsgErr, reply) {
+	if bytes.Equal(MsgErr, reply[:n]) {
 		// TODO: Add a "get X bytes for the error reason"
 		errCh <- fmt.Errorf("failed to communicate with secondary %s", secondary.RemoteAddr().String())
 		doneCh <- 1
@@ -102,6 +102,10 @@ func (s *PrimaryServer) sendAndWaitOKAsync(data []byte, secondary net.Conn, done
 // SendAndWaitOKSync send a message to a secondary and wait for the okay without
 // the use of a channel (synchronous sending).
 func (s *PrimaryServer) SendAndWaitOKSync(data []byte, secondary net.Conn) error {
+
+	zap.L().Debug("SendSync",
+		zap.Int("len", len(data)))
+
 	if _, err := secondary.Write(data); err != nil {
 		// TODO: Log that we can't communicate with secondary
 		return &SecondaryCommError{
@@ -149,7 +153,7 @@ func (s *PrimaryServer) sendAndWaitData(data []byte, secondary net.Conn) ([]resu
 
 	// Read the reply AND response error (if it's an error, 1024 is to
 	// encapsulate any error string passed with the data).
-	initialReply := make([]byte, 512)
+	initialReply := make([]byte, 1024)
 
 	n, err := secondary.Read(initialReply)
 
@@ -185,7 +189,7 @@ func (s *PrimaryServer) sendAndWaitData(data []byte, secondary net.Conn) ([]resu
 		}}, nil
 	}
 
-	fullReply := initialReply[9:]
+	fullReply := initialReply[9:n]
 	zap.L().Debug("Reply from client",
 		zap.Uint64("length", dataLen),
 		zap.ByteString("reply", fullReply),
@@ -303,6 +307,10 @@ func (s *PrimaryServer) SendWorkload(workloads workloadgenerators.Workload) Seco
 
 		data = append(data, payloadLenBytes...)
 		data = append(data, payload...)
+
+		zap.L().Debug("Sending data",
+			zap.Uint64("length", payloadLen))
+
 		err = s.SendAndWaitOKSync(data, c)
 		if err != nil {
 			errorList = append(errorList, err)
@@ -331,6 +339,7 @@ func (s *PrimaryServer) RunBenchmark() SecondaryReplyErrors {
 	for {
 		select {
 		case secondaryDone := <-okCh:
+			// TODO change this
 			zap.L().Debug("Secondary Done")
 			numberDone++
 			numberOfErrors += secondaryDone
