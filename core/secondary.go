@@ -109,6 +109,11 @@ func (s *Secondary) Run() {
 
 			// Workload length = bytes 1-4
 			workloadLen := binary.BigEndian.Uint64(cmd[1:])
+
+			zap.L().Debug("Workload Length",
+				zap.Uint64("length", workloadLen),
+				zap.Binary("raw", cmd[1:]))
+
 			wl, err := s.PrimaryComms.ReadSize(workloadLen)
 
 			if err != nil {
@@ -122,7 +127,9 @@ func (s *Secondary) Run() {
 
 			if err != nil {
 				zap.L().Warn("failed to unmarshal workload",
-					zap.String("err", err.Error()))
+					zap.String("err", err.Error()),
+					zap.Uint64("expected_length", workloadLen),
+					zap.Int("length", len(wl)))
 				s.PrimaryComms.ReplyERR(err.Error())
 				continue
 			}
