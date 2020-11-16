@@ -1,0 +1,28 @@
+name: "assetTransfer test"
+description: "Do contracts even work?"
+secondaries: 1
+threads: 1
+
+bench:
+  type: "test"
+  txs:
+    0: 5
+    5: 5
+contract:
+  functions:
+    - name: "CreateAsset"
+      ftype: "write"
+      ratio: 100
+      params:
+        - type: "uint32"
+          value: "10"
+        - type: "string"
+          value: "assetID"
+        - type: "string"
+          value: "color"
+        - type: "string"
+          value: "size"
+        - type: "string"
+          value: "price"
+
+
