@@ -1,8 +1,10 @@
 package clientinterfaces
 
 import (
+	blockchains "diablo-benchmark/blockchains"
 	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/core/results"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -13,7 +15,6 @@ import (
 
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
-	"github.com/segmentio/ksuid"
 	"go.uber.org/zap"
 )
 
@@ -24,7 +25,7 @@ type FabricInterface struct {
 	Wallet    *gateway.Wallet				// Wallet containg user identity configured for the gateway
 	Network   *gateway.Network				// Network object originating from gateway
 	Contracts map[string]*gateway.Contract  // Map of all the smart contracts contained in the network
-	TransactionInfo  map[string][]time.Time // Transaction information
+	TransactionInfo  map[uint64][]time.Time // Transaction information
 	StartTime        time.Time              // Start time of the benchmark
 	ThroughputTicker *time.Ticker           // Ticker for throughput (1s)
 	Throughputs      []float64              // Throughput over time with 1 second intervals
@@ -37,7 +38,7 @@ func (f *FabricInterface) Init(otherHosts []string) {
 	// use otherHosts to produce the connection profile ?
 	f.NumTxDone = 0
 	f.Contracts = make(map[string]*gateway.Contract,0)
-	f.TransactionInfo = make(map[string][]time.Time, 0)
+	f.TransactionInfo = make(map[uint64][]time.Time, 0)
 
 
 	err := os.Setenv("DISCOVERY_AS_LOCALHOST", "true")
@@ -218,7 +219,28 @@ func (f *FabricInterface) Start() {
 //ParseWorkload Handles the workload, converts the bytes to usable transactions.
 // This takes the worker's workload and transforms into transactions
 func (f *FabricInterface) ParseWorkload(workload workloadgenerators.WorkerThreadWorkload) ([][]interface{}, error) {
-	return nil, nil
+
+	// Thread workload = list of transactions in intervals
+	// [interval][tx] = [][][]byte
+	parsedWorkload := make([][]interface{}, 0)
+
+	for _, v := range workload {
+		intervalTxs := make([]interface{}, 0)
+		for _, txBytes := range v {
+			var t blockchains.FabricTX
+			err := json.Unmarshal(txBytes,&t)
+			if err != nil {
+				return nil, err
+			}
+
+			intervalTxs = append(intervalTxs, &t)
+		}
+		parsedWorkload = append(parsedWorkload, intervalTxs)
+	}
+
+	f.TotalTx = len(parsedWorkload)
+
+	return parsedWorkload, nil
 }
 
 // ConnectOne will connect  to the blockchain node in the array slot of the given array
@@ -253,19 +275,12 @@ func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
 // submitTransaction utility function to submit a transaction, to be used in a different thread
 // as the main thread as it may hang
 func (f *FabricInterface) submitTransaction(tx interface{}){
-	s := tx.([]string)
-	//TODO we create a unique id for the tx because the tx we receive is not unique
-	// simpler way than a library ?
-	id := ksuid.New().String()
-	f.TransactionInfo[id] = []time.Time{time.Now()}
+	transaction := tx.(blockchains.FabricTX)
+
+	// making note of the time we send the transaction
+	f.TransactionInfo[transaction.ID] = []time.Time{time.Now()}
 	atomic.AddUint64(&f.NumTxSent, 1)
 
-	//FIRST ELEMENT IS CONTRACT NAME
-	//SECOND ELEMENT IS THE NAME OF THE TRANSACTION TO BE INVOKED
-	// OTHER ELEMENTS ARE THE ARGUMENTS TO THE TRANSACTION
-	contractName := s[0]
-	transactionFunction := s[1]
-	args := s[2:]
 	//submitTransaction does everything under the hood for us.
 	// Rather than interacting with a single peer, the SDK will send the submitTransaction proposal
 	//to every required organization’s peer in the blockchain network based on the chaincode’s endorsement policy.
@@ -274,13 +289,16 @@ func (f *FabricInterface) submitTransaction(tx interface{}){
 	//a single transaction, which it then submits to the orderer. The orderer collects and sequences transactions from various application clients into a block of transactions.
 	//These blocks are distributed to every peer in the network, where every transaction is validated and committed.
 	//Finally, the SDK is notified via an event, allowing it to return control to the application.
-	_,err := f.Contracts[contractName].SubmitTransaction(transactionFunction,args...)
+	_,err := f.Contracts[transaction.ContractName].SubmitTransaction(transaction.FunctionName,transaction.Args...)
 
+	// transaction failed, incrementing number of done and failed transactions
 	if err != nil {
 		atomic.AddUint64(&f.Fail, 1)
 		atomic.AddUint64(&f.NumTxDone, 1)
 	}
-	f.TransactionInfo[id] = append(f.TransactionInfo[id],time.Now())
+
+	//transaction validated, making the note of the time of return
+	f.TransactionInfo[transaction.ID] = append(f.TransactionInfo[transaction.ID],time.Now())
 	atomic.AddUint64(&f.Success,1)
 	atomic.AddUint64(&f.NumTxDone,1)
 
