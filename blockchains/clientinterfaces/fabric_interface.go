@@ -13,8 +13,8 @@ import (
 
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
-	"go.uber.org/zap"
 	"github.com/segmentio/ksuid"
+	"go.uber.org/zap"
 )
 
 //FabricInterface is the Hyperledger Fabric implementation of the clientinterface
@@ -221,20 +221,23 @@ func (f *FabricInterface) ParseWorkload(workload workloadgenerators.WorkerThread
 	return nil, nil
 }
 
-// ConnectOne will connect  to the blockchain node in the array slot of the
-// given array (NOT NEEDED ALREADY DONE IN INIT)
+// ConnectOne will connect  to the blockchain node in the array slot of the given array
+// (NOT NEEDED IN FABRIC) Init() already does it
 func (f *FabricInterface) ConnectOne(id int) error {
 	return nil
 }
 
 // ConnectAll connects to all nodes given in the hosts
-// (NOT NEEDED ALREADY DONE IN INIT)
+//
 func (f *FabricInterface) ConnectAll(primaryID int) error {
 	return nil
 }
 
-// DeploySmartContract deploys the smart contract but it is not needed as the contract is assumed
-// to be already deployed
+// DeploySmartContract deploys the smart contract
+// (NOT NEEDED IN FABRIC) Contract deployment is not something useful to
+// be benchmarked in a Hyperledger Fabric implementation as it is a permissioned
+// blockchain and contract deployment is something agreed upon by organisations and
+//not done regularly enough to hinder throughput (usually done during while low traffic)
 func (f *FabricInterface) DeploySmartContract(tx interface{}) (interface{}, error) {
 	return nil, nil
 }
@@ -247,6 +250,8 @@ func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
 	return nil
 }
 
+// submitTransaction utility function to submit a transaction, to be used in a different thread
+// as the main thread as it may hang
 func (f *FabricInterface) submitTransaction(tx interface{}){
 	s := tx.([]string)
 	//TODO we create a unique id for the tx because the tx we receive is not unique
@@ -310,6 +315,7 @@ func (f *FabricInterface) GetBlockHeight() (uint64, error) {
 
 // ParseBlocksForTransactions retrieves block information from start to end index and
 // is used as a post-benchmark check to learn about the block and transactions.
+// (NOT NEEDED IN FABRIC) As transactions are confirmed to be validated whenever we submit a transaction
 func (f *FabricInterface) ParseBlocksForTransactions(startNumber uint64, endNumber uint64) error {
 	return nil
 }
