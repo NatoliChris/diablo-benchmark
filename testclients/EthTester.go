@@ -12,7 +12,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -50,6 +52,107 @@ func getTransactionReceipt(E *clientinterfaces.EthereumInterface, hash common.Ha
 }
 
 func main() {
+	var wg sync.WaitGroup
+	wg.Add(1)
+ fabricTest(&wg)
+}
+
+
+	func fabricTest(wg *sync.WaitGroup) {
+		defer wg.Done()
+		config := zap.NewDevelopmentConfig()
+		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		logger, err := config.Build()
+		if err != nil {
+			os.Exit(1)
+		}
+		zap.ReplaceGlobals(logger)
+
+		cc, err := parsers.ParseChainConfig("configurations/blockchain-configs/fabric/fabric-basic.yaml")
+		if err != nil {
+			panic(err)
+		}
+
+		bc, err := parsers.ParseBenchConfig("configurations/workloads/fabric/testDiabloFabric.yaml")
+
+		if err != nil {
+			panic(err)
+		}
+
+		var generator workloadgenerators.WorkloadGenerator
+		intermediate := workloadgenerators.FabricWorkloadGenerator{}
+		generator = intermediate.NewGenerator(cc, bc)
+		client := clientinterfaces.FabricInterface{}
+		client.Init(cc.Nodes)
+
+
+		err = generator.BlockchainSetup()
+		if err != nil {
+			panic(err)
+		}
+
+		err = generator.InitParams()
+
+		if err != nil {
+			panic(err)
+		}
+
+
+
+		if err != nil {
+			panic(err)
+		}
+
+		var cParamList []configs.ContractParam
+
+		cParamList = append(cParamList,
+			configs.ContractParam{
+				Type:  "uint64",
+				Value: "1",
+			},
+			configs.ContractParam{
+				Type:  "string",
+				Value: "assetID",
+			},
+			configs.ContractParam{
+				Type:  "string",
+				Value: "color",
+			}, configs.ContractParam{
+				Type:  "string",
+				Value: "size",
+			}, configs.ContractParam{
+				Type:  "string",
+				Value: "price",
+			})
+
+
+		tx, err := generator.CreateInteractionTX(
+			nil,
+			"basic",
+			"CreateAsset",
+			cParamList,
+		)
+
+
+		var parsedTx clientinterfaces.FabricTX
+		_ = json.Unmarshal(tx, &parsedTx)
+
+		err = client.SendRawTransaction(&parsedTx)
+
+		result, err := client.Contracts["basic"].EvaluateTransaction("GetAllAssets")
+		if err != nil {
+			log.Fatalf("Failed to evaluate transaction: %v", err)
+		}
+		log.Println(string(result))
+
+		if err != nil {
+			panic(err)
+		}
+	}
+
+
+
+	func ethTest(){
 	//addr := "0x9e3cf23f6fc76b77d2113db93ef388e057c8cc12"
 	//a := common.HexToAddress(addr)
 	//
@@ -135,6 +238,8 @@ func main() {
 	}
 
 	_ = getTransactionReceipt(&E, parsedTx.Hash())
+
+}
 
 	// %---------------------------------------------------------%
 
@@ -365,4 +470,4 @@ func main() {
 	////
 	////fmt.Println("DONE, ALL OK")
 	////E.Close()
-}
+
