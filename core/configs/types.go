@@ -17,7 +17,7 @@ const TxTypeSimple BenchTransactionType = "simple"
 // contract interaction and deployment
 const TxTypeContract BenchTransactionType = "contract"
 
-const TxTypeTest BenchTransactionType = "test"
+const TxTypeTest BenchTransactionType = "basic"
 
 // DefaultTimeout is the default timeout for the benchmark if not provided
 // or overwritten by the args

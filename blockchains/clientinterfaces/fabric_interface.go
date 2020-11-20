@@ -1,7 +1,7 @@
 package clientinterfaces
 
 import (
-	blockchains "diablo-benchmark/blockchains"
+	"diablo-benchmark/blockchains"
 	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/core/results"
 	"encoding/json"
@@ -31,6 +31,9 @@ type FabricInterface struct {
 	Throughputs      []float64              // Throughput over time with 1 second intervals
 	GenericInterface
 }
+
+
+
 
 // Init initializes the wallet, gateway, network and map of contracts available in the network
 func (f *FabricInterface) Init(otherHosts []string) {

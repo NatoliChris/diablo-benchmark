@@ -14,8 +14,6 @@ contract:
       ftype: "write"
       ratio: 100
       params:
-        - type: "uint32"
-          value: "10"
         - type: "string"
           value: "assetID"
         - type: "string"
