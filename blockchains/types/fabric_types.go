@@ -1,4 +1,4 @@
-package blockchains
+package types
 
 type FabricTX struct {
 	ID uint64 `json:"id"`

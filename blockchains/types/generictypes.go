@@ -15,7 +15,7 @@
 // primary node. This handles the creation of the entire workload for each
 // given secondary thread, and handles the account information relevant to
 // the workload. Additionally, it will also create and deploy the smart contract.
-package blockchains
+package types
 
 // TransactionBenchmarkInformation contains generic information about the
 // transaction, stores hash, sent time and time that it was mined into a block

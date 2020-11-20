@@ -1,7 +1,7 @@
 package clientinterfaces
 
 import (
-	"diablo-benchmark/blockchains"
+	"diablo-benchmark/blockchains/types"
 	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/core/results"
 	"encoding/json"
@@ -72,8 +72,8 @@ func (f *FabricInterface) Init(otherHosts []string) {
 		"channel",
 		"crypto-config",
 		"peerOrganizations",
-		"org1.example.com",
-		"connection-org1.yaml",
+		"org2.example.com",
+		"connection-org2.yaml",
 	)
 
 	f.Gateway, err = gateway.Connect(
@@ -107,13 +107,13 @@ func populateWallet(wallet *gateway.Wallet) error {
 		"channel",
 		"crypto-config",
 		"peerOrganizations",
-		"org1.example.com",
+		"org2.example.com",
 		"users",
-		"User1@org1.example.com",
+		"User1@org2.example.com",
 		"msp",
 	)
 
-	certPath := filepath.Join(credPath, "signcerts", "User1@org1.example.com-cert.pem")
+	certPath := filepath.Join(credPath, "signcerts", "User1@org2.example.com-cert.pem")
 	// read the certificate pem
 	cert, err := ioutil.ReadFile(filepath.Clean(certPath))
 	if err != nil {
@@ -135,7 +135,7 @@ func populateWallet(wallet *gateway.Wallet) error {
 		return err
 	}
 
-	identity := gateway.NewX509Identity("Org1MSP", string(cert), string(key))
+	identity := gateway.NewX509Identity("Org2MSP", string(cert), string(key))
 
 	return wallet.Put("appUser", identity)
 }
@@ -230,7 +230,7 @@ func (f *FabricInterface) ParseWorkload(workload workloadgenerators.WorkerThread
 	for _, v := range workload {
 		intervalTxs := make([]interface{}, 0)
 		for _, txBytes := range v {
-			var t blockchains.FabricTX
+			var t types.FabricTX
 			err := json.Unmarshal(txBytes,&t)
 			if err != nil {
 				return nil, err
@@ -270,7 +270,7 @@ func (f *FabricInterface) DeploySmartContract(tx interface{}) (interface{}, erro
 // SendRawTransaction sends the transaction by the gateway
 func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
 
-	go f.submitTransaction(tx)
+	 f.submitTransaction(tx)
 
 	return nil
 }
@@ -278,11 +278,14 @@ func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
 // submitTransaction utility function to submit a transaction, to be used in a different thread
 // as the main thread as it may hang
 func (f *FabricInterface) submitTransaction(tx interface{}){
-	transaction := tx.(blockchains.FabricTX)
+	transaction := tx.(*types.FabricTX)
 
 	// making note of the time we send the transaction
 	f.TransactionInfo[transaction.ID] = []time.Time{time.Now()}
 	atomic.AddUint64(&f.NumTxSent, 1)
+
+	log.Println("Submitting Transaction ...")
+	log.Println(transaction)
 
 	//submitTransaction does everything under the hood for us.
 	// Rather than interacting with a single peer, the SDK will send the submitTransaction proposal
@@ -293,6 +296,8 @@ func (f *FabricInterface) submitTransaction(tx interface{}){
 	//These blocks are distributed to every peer in the network, where every transaction is validated and committed.
 	//Finally, the SDK is notified via an event, allowing it to return control to the application.
 	_,err := f.Contracts[transaction.ContractName].SubmitTransaction(transaction.FunctionName,transaction.Args...)
+
+	log.Println(err)
 
 	// transaction failed, incrementing number of done and failed transactions
 	if err != nil {

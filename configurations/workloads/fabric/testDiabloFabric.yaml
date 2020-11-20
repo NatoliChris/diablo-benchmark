@@ -4,7 +4,7 @@ secondaries: 1
 threads: 1
 
 bench:
-  type: "test"
+  type: "basic"
   txs:
     0: 5
     5: 5
@@ -20,6 +20,8 @@ contract:
           value: "color"
         - type: "string"
           value: "size"
+        - type: "string"
+          value: "owner"
         - type: "string"
           value: "price"
 

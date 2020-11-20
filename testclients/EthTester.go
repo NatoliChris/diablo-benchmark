@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"diablo-benchmark/blockchains/clientinterfaces"
+	types2 "diablo-benchmark/blockchains/types"
 	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/configs/parsers"
@@ -14,7 +15,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -52,102 +52,99 @@ func getTransactionReceipt(E *clientinterfaces.EthereumInterface, hash common.Ha
 }
 
 func main() {
-	var wg sync.WaitGroup
-	wg.Add(1)
- fabricTest(&wg)
+	config := zap.NewDevelopmentConfig()
+	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	logger, err := config.Build()
+	if err != nil {
+		os.Exit(1)
+	}
+	zap.ReplaceGlobals(logger)
+
+	cc, err := parsers.ParseChainConfig("configurations/blockchain-configs/fabric/fabric-basic.yaml")
+	if err != nil {
+		panic(err)
+	}
+
+	bc, err := parsers.ParseBenchConfig("configurations/workloads/fabric/testDiabloFabric.yaml")
+
+	if err != nil {
+		panic(err)
+	}
+
+	var generator workloadgenerators.WorkloadGenerator
+	intermediate := workloadgenerators.FabricWorkloadGenerator{}
+	generator = intermediate.NewGenerator(cc, bc)
+	client := clientinterfaces.FabricInterface{}
+
+	log.Println("Init client interface")
+	client.Init(cc.Nodes)
+
+
+	err = generator.BlockchainSetup()
+	if err != nil {
+		panic(err)
+	}
+
+	err = generator.InitParams()
+
+	if err != nil {
+		panic(err)
+	}
+
+
+	var cParamList []configs.ContractParam
+
+	cParamList = append(cParamList,
+		configs.ContractParam{
+			Type:  "uint64",
+			Value: "1",
+		},
+		configs.ContractParam{
+			Type:  "string",
+			Value: "assetID",
+		},
+		configs.ContractParam{
+			Type:  "string",
+			Value: "color",
+		}, configs.ContractParam{
+			Type:  "string",
+			Value: "100",
+		}, configs.ContractParam{
+			Type:  "string",
+			Value: "owner",
+		},configs.ContractParam{
+			Type:  "string",
+			Value: "2103",
+		})
+
+
+	tx, err := generator.CreateInteractionTX(
+		nil,
+		"basic",
+		"CreateAsset",
+		cParamList,
+	)
+
+
+	var parsedTx types2.FabricTX
+	_ = json.Unmarshal(tx, &parsedTx)
+
+	log.Println("sendRawTransaction")
+	err = client.SendRawTransaction(&parsedTx)
+
+	log.Println("--> Evaluate Transaction: ReadAsset, function returns an asset with a given assetID")
+	result, err := client.Contracts["basic"].EvaluateTransaction("ReadAsset", "asset1")
+	if err != nil {
+		log.Fatalf("Failed to evaluate transaction: %v\n", err)
+	}
+	log.Println(string(result))
+
 }
 
 
-	func fabricTest(wg *sync.WaitGroup) {
-		defer wg.Done()
-		config := zap.NewDevelopmentConfig()
-		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-		logger, err := config.Build()
-		if err != nil {
-			os.Exit(1)
-		}
-		zap.ReplaceGlobals(logger)
-
-		cc, err := parsers.ParseChainConfig("configurations/blockchain-configs/fabric/fabric-basic.yaml")
-		if err != nil {
-			panic(err)
-		}
-
-		bc, err := parsers.ParseBenchConfig("configurations/workloads/fabric/testDiabloFabric.yaml")
-
-		if err != nil {
-			panic(err)
-		}
-
-		var generator workloadgenerators.WorkloadGenerator
-		intermediate := workloadgenerators.FabricWorkloadGenerator{}
-		generator = intermediate.NewGenerator(cc, bc)
-		client := clientinterfaces.FabricInterface{}
-		client.Init(cc.Nodes)
+	func fabricTest() {
 
 
-		err = generator.BlockchainSetup()
-		if err != nil {
-			panic(err)
-		}
-
-		err = generator.InitParams()
-
-		if err != nil {
-			panic(err)
-		}
-
-
-
-		if err != nil {
-			panic(err)
-		}
-
-		var cParamList []configs.ContractParam
-
-		cParamList = append(cParamList,
-			configs.ContractParam{
-				Type:  "uint64",
-				Value: "1",
-			},
-			configs.ContractParam{
-				Type:  "string",
-				Value: "assetID",
-			},
-			configs.ContractParam{
-				Type:  "string",
-				Value: "color",
-			}, configs.ContractParam{
-				Type:  "string",
-				Value: "size",
-			}, configs.ContractParam{
-				Type:  "string",
-				Value: "price",
-			})
-
-
-		tx, err := generator.CreateInteractionTX(
-			nil,
-			"basic",
-			"CreateAsset",
-			cParamList,
-		)
-
-
-		var parsedTx clientinterfaces.FabricTX
-		_ = json.Unmarshal(tx, &parsedTx)
-
-		err = client.SendRawTransaction(&parsedTx)
-
-		result, err := client.Contracts["basic"].EvaluateTransaction("GetAllAssets")
-		if err != nil {
-			log.Fatalf("Failed to evaluate transaction: %v", err)
-		}
-		log.Println(string(result))
-
-		if err != nil {
-			panic(err)
-		}
 	}
 
 
@@ -233,11 +230,6 @@ func main() {
 
 	err = E.SendRawTransaction(&parsedTx)
 
-	if err != nil {
-		panic(err)
-	}
-
-	_ = getTransactionReceipt(&E, parsedTx.Hash())
 
 }
 

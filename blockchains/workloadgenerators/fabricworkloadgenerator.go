@@ -1,7 +1,7 @@
 package workloadgenerators
 
 import (
-	"diablo-benchmark/blockchains"
+	"diablo-benchmark/blockchains/types"
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/configs/parsers"
 	"encoding/json"
@@ -60,7 +60,7 @@ func (f FabricWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, cont
 
 //CreateInteractionTX main method to create transaction bytes for the workload
 func (f FabricWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []configs.ContractParam) ([]byte, error) {
-	var tx blockchains.FabricTX
+	var tx types.FabricTX
 
 
 
