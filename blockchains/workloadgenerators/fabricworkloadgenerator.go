@@ -17,6 +17,7 @@ type FabricWorkloadGenerator struct {
 	ChainConfig       *configs.ChainConfig // Chain configuration to get number of transactions to make
 }
 
+
 //NewGenerator returns a new instance of the generator
 func (f FabricWorkloadGenerator) NewGenerator(chainConfig *configs.ChainConfig, benchConfig *configs.BenchConfig) WorkloadGenerator {
 	return &FabricWorkloadGenerator{
@@ -140,9 +141,21 @@ func(f FabricWorkloadGenerator) generateTestWorkload() (Workload, error){
 						Value: id,
 					})
 
-					contractName := "basic"
+					functionToInvoke := f.BenchConfig.ContractInfo.Functions[0]
+
+					otherParams := functionToInvoke.Params
+					// transactions are of the form  (assetID, color, size, price)
+					 //to quickly make a unique transaction each time, i will only modifiy assetID
+
+					otherParams[0].Value = strconv.FormatUint(txID,10)
+					params = append(params, otherParams...)
+
+					// as we only support one contract worklaod for now, the TxType is the name of the contract
+					contractName := string(f.BenchConfig.TxInfo.TxType)
+					functionName := functionToInvoke.Name
+
 					
-					tx, txerr := f.CreateInteractionTX(nil,contractName,"",nil)
+					tx, txerr := f.CreateInteractionTX(nil, contractName,functionName,params)
 
 					if txerr != nil {
 						return nil, txerr
