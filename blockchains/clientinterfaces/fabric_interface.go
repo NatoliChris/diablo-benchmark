@@ -279,6 +279,7 @@ func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
 func (f *FabricInterface) submitTransaction(tx interface{}){
 	transaction := tx.(*types.FabricTX)
 
+
 	// making note of the time we send the transaction
 	f.TransactionInfo[transaction.ID] = []time.Time{time.Now()}
 	atomic.AddUint64(&f.NumTxSent, 1)
@@ -307,6 +308,7 @@ func (f *FabricInterface) submitTransaction(tx interface{}){
 		atomic.AddUint64(&f.Fail, 1)
 		atomic.AddUint64(&f.NumTxDone, 1)
 	}
+
 
 	//transaction validated, making the note of the time of return
 	f.TransactionInfo[transaction.ID] = append(f.TransactionInfo[transaction.ID],time.Now())
