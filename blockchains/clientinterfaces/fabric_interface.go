@@ -24,7 +24,7 @@ type FabricInterface struct {
 	Gateway   *gateway.Gateway              // The Gateway manages the network interaction on behalf of the application
 	Wallet    *gateway.Wallet				// Wallet containg user identity configured for the gateway
 	Network   *gateway.Network				// Network object originating from gateway
-	Contracts map[string]*gateway.Contract  // Map of all the smart contracts contained in the network
+	Contract  *gateway.Contract             // The smart contract we will be interacting with (only supporting one contract workload for now)
 	TransactionInfo  map[uint64][]time.Time // Transaction information
 	StartTime        time.Time              // Start time of the benchmark
 	ThroughputTicker *time.Ticker           // Ticker for throughput (1s)
@@ -40,7 +40,6 @@ func (f *FabricInterface) Init(otherHosts []string) {
 	f.Nodes = otherHosts
 	// use otherHosts to produce the connection profile ?
 	f.NumTxDone = 0
-	f.Contracts = make(map[string]*gateway.Contract,0)
 	f.TransactionInfo = make(map[uint64][]time.Time, 0)
 
 
@@ -92,7 +91,7 @@ func (f *FabricInterface) Init(otherHosts []string) {
 
 	contract := f.Network.GetContract("basic")
 
-	f.Contracts[contract.Name()] = contract
+	f.Contract = contract
 }
 
 // Called when the wallet hasn't been instantiated yet
@@ -284,20 +283,24 @@ func (f *FabricInterface) submitTransaction(tx interface{}){
 	f.TransactionInfo[transaction.ID] = []time.Time{time.Now()}
 	atomic.AddUint64(&f.NumTxSent, 1)
 
-	log.Println("Submitting Transaction ...")
-	log.Println(transaction)
+	var err error
 
-	//submitTransaction does everything under the hood for us.
-	// Rather than interacting with a single peer, the SDK will send the submitTransaction proposal
-	//to every required organization’s peer in the blockchain network based on the chaincode’s endorsement policy.
-	//Each of these peers will execute the requested smart contract using this proposal, to generate a transaction response
-	//which it endorses (signs) and returns to the SDK. The SDK collects all the endorsed transaction responses into
-	//a single transaction, which it then submits to the orderer. The orderer collects and sequences transactions from various application clients into a block of transactions.
-	//These blocks are distributed to every peer in the network, where every transaction is validated and committed.
-	//Finally, the SDK is notified via an event, allowing it to return control to the application.
-	_,err := f.Contracts[transaction.ContractName].SubmitTransaction(transaction.FunctionName,transaction.Args...)
+	if transaction.FunctionType == "write"{
+		//submitTransaction does everything under the hood for us.
+		// Rather than interacting with a single peer, the SDK will send the submitTransaction proposal
+		//to every required organization’s peer in the blockchain network based on the chaincode’s endorsement policy.
+		//Each of these peers will execute the requested smart contract using this proposal, to generate a transaction response
+		//which it endorses (signs) and returns to the SDK. The SDK collects all the endorsed transaction responses into
+		//a single transaction, which it then submits to the orderer. The orderer collects and sequences transactions from various application clients into a block of transactions.
+		//These blocks are distributed to every peer in the network, where every transaction is validated and committed.
+		//Finally, the SDK is notified via an event, allowing it to return control to the application.
+		_,err = f.Contract.SubmitTransaction(transaction.FunctionName, transaction.Args...)
 
-	log.Println(err)
+	} else {
+
+		//EvaluteTransaction is much less expensive and only queries one peer for its world state
+		_,err = f.Contract.EvaluateTransaction(transaction.FunctionName, transaction.Args...)
+	}
 
 	// transaction failed, incrementing number of done and failed transactions
 	if err != nil {
