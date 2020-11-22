@@ -2,8 +2,8 @@ package types
 
 type FabricTX struct {
 	ID uint64 `json:"id"`
-	ContractName string `json:"contract_name"`
 	FunctionName string  `json:"function_name"`
+	FunctionType string  `json:function_type`
 	Args []string `json:"args"`
 }
 

@@ -59,12 +59,12 @@ func (f FabricWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, cont
 }
 
 //CreateInteractionTX main method to create transaction bytes for the workload
-func (f FabricWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []configs.ContractParam) ([]byte, error) {
+func (f FabricWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, functionType string, functionName string, contractParams []configs.ContractParam) ([]byte, error) {
 	var tx types.FabricTX
 
 
 
-	tx.ContractName = contractAddress
+	tx.FunctionType = functionType
 	tx.FunctionName = functionName
 
 
@@ -132,8 +132,9 @@ func(f FabricWorkloadGenerator) generateTestWorkload() (Workload, error){
 				intervalWorkload := make([][]byte, 0)
 				for txIt := 0; txIt < txnum; txIt++ {
 
-					// the idea is that we need to get the function params from the benchconfig, get the functionName, get the contractName,
-					// put the the id in the contract params and then all good
+
+					// The list of contract
+
 					var params = make([]configs.ContractParam, 0)
 					id := strconv.FormatUint(txID,10)
 					params = append(params,configs.ContractParam{
@@ -150,12 +151,12 @@ func(f FabricWorkloadGenerator) generateTestWorkload() (Workload, error){
 					otherParams[0].Value = strconv.FormatUint(txID,10)
 					params = append(params, otherParams...)
 
-					// as we only support one contract worklaod for now, the TxType is the name of the contract
-					contractName := string(f.BenchConfig.TxInfo.TxType)
+
+					functionType := f.BenchConfig.ContractInfo.Functions[0].Type //function type gives us whether it a submit or read type transaction
 					functionName := functionToInvoke.Name
 
 					
-					tx, txerr := f.CreateInteractionTX(nil, contractName,functionName,params)
+					tx, txerr := f.CreateInteractionTX(nil, functionType,functionName,params)
 
 					if txerr != nil {
 						return nil, txerr
