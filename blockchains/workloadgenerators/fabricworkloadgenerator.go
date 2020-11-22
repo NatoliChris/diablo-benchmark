@@ -133,9 +133,10 @@ func(f FabricWorkloadGenerator) generateTestWorkload() (Workload, error){
 				for txIt := 0; txIt < txnum; txIt++ {
 
 
-					// The list of contract
 
 					var params = make([]configs.ContractParam, 0)
+
+					//creating the id for the transaction
 					id := strconv.FormatUint(txID,10)
 					params = append(params,configs.ContractParam{
 						Type:  "uint64",
@@ -145,7 +146,7 @@ func(f FabricWorkloadGenerator) generateTestWorkload() (Workload, error){
 					functionToInvoke := f.BenchConfig.ContractInfo.Functions[0]
 
 					otherParams := functionToInvoke.Params
-					// transactions are of the form  (assetID, color, size, price)
+					// transactions are of the form  (assetID, color, size, owner, price)
 					 //to quickly make a unique transaction each time, i will only modifiy assetID
 
 					otherParams[0].Value = strconv.FormatUint(txID,10)

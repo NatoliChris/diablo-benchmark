@@ -58,17 +58,23 @@ func main(){
 	log.Println("sendRawTransaction via client FIRST TIME EXPECTING BUG")
 	err = client.SendRawTransaction(createAssetTransaction(0,generator))
 
+	workload,err := generator.GenerateWorkload()
 
-	for i := 15; i < 30; i++ {
-
-
-		log.Println("sendRawTransaction via client for the " + strconv.Itoa(i) + "th time")
-		err = client.SendRawTransaction(createAssetTransaction(i,generator))
-
-
+	if err != nil {
+		panic(err)
 	}
 
+	parsedWorkload,err := client.ParseWorkload(workload[0][0])
 
+	if err != nil {
+		panic(err)
+	}
+
+	for _,intervals := range parsedWorkload {
+		for _, tx := range intervals{
+			client.SendRawTransaction(tx)
+		}
+	}
 
 	log.Println("--> Evaluate Transaction: GetAllAssets, function returns every asset")
 	result, err := client.Contract.EvaluateTransaction("GetAllAssets")

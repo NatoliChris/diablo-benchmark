@@ -16,13 +16,13 @@ contract:
       params:
         - type: "string"
           value: "assetID"
-        - type: "string"
-          value: "color"
-        - type: "string"
-          value: "size"
-        - type: "string"
-          value: "owner"
-        - type: "string"
-          value: "price"
+        - type: "color"
+          value: "blue"
+        - type: "size"
+          value: "420"
+        - type: "owner"
+          value: "Bob Ross"
+        - type: "price"
+          value: "1006"
 
 
