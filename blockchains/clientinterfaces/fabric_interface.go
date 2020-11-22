@@ -316,15 +316,14 @@ func (f *FabricInterface) submitTransaction(tx interface{}){
 }
 
 
-// SecureRead reads the value from the chain, this requires the client to connect to _multiple_ nodes and asks
-// for the value. This ensures that the value read is "secure" - the same value must be returned
-// from t+1 to be considered "correct".
+// SecureRead reads the value from the chain
+// (NOT NEEDED IN FABRIC) SecureRead is useful in permissionless blockchains where transaction
+// validation is not always clear but transactions are always clearly rejected or commited in Hyperledger Fabric
 func (f *FabricInterface) SecureRead(callFunc string, callParams []byte) (interface{}, error) {
 	return nil, nil
 }
 
 // GetBlockByNumber retrieves the block information at the given index
-// TODO: maybe implement getBlockByHash?
 func (f *FabricInterface) GetBlockByNumber(index uint64) (GenericBlock, error) {
 	return GenericBlock{
 		Hash:              "",
