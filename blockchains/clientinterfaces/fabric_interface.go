@@ -132,9 +132,9 @@ func populateWallet(wallet *gateway.Wallet) error {
 		return err
 	}
 
-	mspId := "Org2MSP"
+	mspID := "Org2MSP"
 
-	identity := gateway.NewX509Identity(mspId, string(cert), string(key))
+	identity := gateway.NewX509Identity(mspID, string(cert), string(key))
 
 	label := "appUser"
 
