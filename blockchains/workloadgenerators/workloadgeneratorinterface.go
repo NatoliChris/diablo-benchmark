@@ -1,5 +1,8 @@
 // Package workloadgenerators provides the workload generators for the
-// DIABLO benchmark. It handles the deployment and compilation of smart
+// DIABLO benchmark.
+// This handles the creation of the entire workload for each given secondary
+// thread, and handles the account information relevant to the workload.
+// It handles the deployment and compilation of smart
 // contracts and the generation/creation of transactions that will be used
 // to send the information through to the blockchain network.
 package workloadgenerators
