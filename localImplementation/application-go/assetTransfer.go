@@ -84,11 +84,11 @@ func main() {
 	}
 	log.Println(string(result))
 
-	//log.Println("--> Submit Transaction: CreateAsset, creates new asset with ID, color, owner, size, and appraisedValue arguments")
-	//result, err = contract.SubmitTransaction("CreateAsset", "asset13", "yellow", "5", "Tom", "1300")
-	//if err != nil {
-	//	log.Fatalf("Failed to Submit transaction: %v", err)
-	//}
+	log.Println("--> Submit Transaction: CreateAsset, creates new asset with ID, color, owner, size, and appraisedValue arguments")
+	result, err = contract.SubmitTransaction("CreateAsset", "asset13", "yellow", "5", "Tom", "1300")
+	if err != nil {
+		log.Fatalf("Failed to Submit transaction: %v", err)
+	}
 
 	strings := []string{"asset13","yellow","5","Tom", "1300"}
 	result,err = contract.SubmitTransaction("CreateAsset",strings...)
@@ -114,7 +114,7 @@ func main() {
 	}
 
 	log.Println("--> Evaluate Transaction: ReadAsset, function returns 'asset1' attributes")
-	result, err = contract.EvaluateTransaction("ReadAsset", "asset1")
+	result, err = contract.EvaluateTransaction("ReadAsset", "asset13")
 	if err != nil {
 		log.Fatalf("Failed to evaluate transaction: %v", err)
 	}

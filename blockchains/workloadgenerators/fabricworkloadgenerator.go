@@ -1,7 +1,7 @@
 package workloadgenerators
 
 import (
-	"diablo-benchmark/blockchains"
+	"diablo-benchmark/blockchains/types"
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/configs/parsers"
 	"encoding/json"
@@ -59,12 +59,12 @@ func (f FabricWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, cont
 }
 
 //CreateInteractionTX main method to create transaction bytes for the workload
-func (f FabricWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []configs.ContractParam) ([]byte, error) {
-	var tx blockchains.FabricTX
+func (f FabricWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, functionType string, functionName string, contractParams []configs.ContractParam) ([]byte, error) {
+	var tx types.FabricTX
 
 
 
-	tx.ContractName = contractAddress
+	tx.FunctionType = functionType
 	tx.FunctionName = functionName
 
 
@@ -132,9 +132,11 @@ func(f FabricWorkloadGenerator) generateTestWorkload() (Workload, error){
 				intervalWorkload := make([][]byte, 0)
 				for txIt := 0; txIt < txnum; txIt++ {
 
-					// the idea is that we need to get the function params from the benchconfig, get the functionName, get the contractName,
-					// put the the id in the contract params and then all good
+
+
 					var params = make([]configs.ContractParam, 0)
+
+					//creating the id for the transaction
 					id := strconv.FormatUint(txID,10)
 					params = append(params,configs.ContractParam{
 						Type:  "uint64",
@@ -144,18 +146,18 @@ func(f FabricWorkloadGenerator) generateTestWorkload() (Workload, error){
 					functionToInvoke := f.BenchConfig.ContractInfo.Functions[0]
 
 					otherParams := functionToInvoke.Params
-					// transactions are of the form  (assetID, color, size, price)
+					// transactions are of the form  (assetID, color, size, owner, price)
 					 //to quickly make a unique transaction each time, i will only modifiy assetID
 
 					otherParams[0].Value = strconv.FormatUint(txID,10)
 					params = append(params, otherParams...)
 
-					// as we only support one contract worklaod for now, the TxType is the name of the contract
-					contractName := string(f.BenchConfig.TxInfo.TxType)
+
+					functionType := f.BenchConfig.ContractInfo.Functions[0].Type //function type gives us whether it a submit or read type transaction
 					functionName := functionToInvoke.Name
 
 					
-					tx, txerr := f.CreateInteractionTX(nil, contractName,functionName,params)
+					tx, txerr := f.CreateInteractionTX(nil, functionType,functionName,params)
 
 					if txerr != nil {
 						return nil, txerr
@@ -204,7 +206,7 @@ func (f FabricWorkloadGenerator) GenerateWorkload() (Workload, error) {
 	)
 
 	switch f.BenchConfig.TxInfo.TxType {
-	case configs.TxTypeTest:
+	case configs.TxTypeBasic:
 		return f.generateTestWorkload()
 
 	default:
