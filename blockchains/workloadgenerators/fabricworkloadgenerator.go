@@ -206,7 +206,7 @@ func (f FabricWorkloadGenerator) GenerateWorkload() (Workload, error) {
 	)
 
 	switch f.BenchConfig.TxInfo.TxType {
-	case configs.TxTypeTest:
+	case configs.TxTypeBasic:
 		return f.generateTestWorkload()
 
 	default:
