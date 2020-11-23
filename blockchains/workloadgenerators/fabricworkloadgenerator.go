@@ -60,16 +60,13 @@ func (f FabricWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, cont
 
 //CreateInteractionTX main method to create transaction bytes for the workload
 func (f FabricWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, functionType string, functionName string, contractParams []configs.ContractParam) ([]byte, error) {
+
 	var tx types.FabricTX
-
-
-
-	tx.FunctionType = functionType
+	tx.FunctionType = functionType // "read" or "write" to indicate query or submit
 	tx.FunctionName = functionName
 
 
-
-	// We use the first argument of contractParams as the id for the transaction
+	//First argument of contractParams is used as the id for the transaction
 	id,err := strconv.Atoi(contractParams[0].Value)
 	tx.ID = uint64(id)
 
@@ -143,10 +140,11 @@ func(f FabricWorkloadGenerator) generateTestWorkload() (Workload, error){
 						Value: id,
 					})
 
+					//function "CreateAsset" and its arguments
 					functionToInvoke := f.BenchConfig.ContractInfo.Functions[0]
 
-					otherParams := functionToInvoke.Params
 					// transactions are of the form  (assetID, color, size, owner, price)
+					otherParams := functionToInvoke.Params
 					 //to quickly make a unique transaction each time, i will only modifiy assetID
 
 					otherParams[0].Value = strconv.FormatUint(txID,10)
@@ -156,7 +154,7 @@ func(f FabricWorkloadGenerator) generateTestWorkload() (Workload, error){
 					functionType := f.BenchConfig.ContractInfo.Functions[0].Type //function type gives us whether it a submit or read type transaction
 					functionName := functionToInvoke.Name
 
-					
+					// The nil parameter is the key, which is not useful in Fabric
 					tx, txerr := f.CreateInteractionTX(nil, functionType,functionName,params)
 
 					if txerr != nil {
@@ -206,6 +204,7 @@ func (f FabricWorkloadGenerator) GenerateWorkload() (Workload, error) {
 	)
 
 	switch f.BenchConfig.TxInfo.TxType {
+	//asset transfer/creation/deletion based workload
 	case configs.TxTypeBasic:
 		return f.generateTestWorkload()
 

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -21,11 +20,11 @@ import (
 //FabricInterface is the Hyperledger Fabric implementation of the clientinterface
 // Provides functionality to communicate with the Fabric blockchain
 type FabricInterface struct {
-	Gateway   *gateway.Gateway              // The Gateway manages the network interaction on behalf of the application
-	Wallet    *gateway.Wallet				// Wallet containg user identity configured for the gateway
+	Gateway   *gateway.Gateway              // Gateway manages the network interaction on behalf of the application
+	Wallet    *gateway.Wallet				// Wallet containing user identity configured for the gateway
 	Network   *gateway.Network				// Network object originating from gateway
 	Contract  *gateway.Contract             // The smart contract we will be interacting with (only supporting one contract workload for now)
-	TransactionInfo  map[uint64][]time.Time // Transaction information
+	TransactionInfo  map[uint64][]time.Time // Transaction information (used for throughput calculation)
 	StartTime        time.Time              // Start time of the benchmark
 	ThroughputTicker *time.Ticker           // Ticker for throughput (1s)
 	Throughputs      []float64              // Throughput over time with 1 second intervals
@@ -38,7 +37,7 @@ type FabricInterface struct {
 // Init initializes the wallet, gateway, network and map of contracts available in the network
 func (f *FabricInterface) Init(otherHosts []string) {
 	f.Nodes = otherHosts
-	// use otherHosts to produce the connection profile ?
+	//TODO, use otherHosts to provide contract name, connection profile path and user id path ?
 	f.NumTxDone = 0
 	f.TransactionInfo = make(map[uint64][]time.Time, 0)
 
@@ -51,13 +50,13 @@ func (f *FabricInterface) Init(otherHosts []string) {
 	wallet, err := gateway.NewFileSystemWallet("wallet")
 	fmt.Println("FOUND WALLET")
 	if err != nil {
-		log.Fatalf("Failed to create wallet: %v", err)
+		zap.L().Warn("Failed to create wallet" + err.Error())
 	}
 
 	if !wallet.Exists("appUser") {
 		err = populateWallet(wallet)
 		if err != nil {
-			log.Fatalf("Failed to populate wallet contents: %v", err)
+			zap.L().Warn("Failed to populate wallet" + err.Error())
 		}
 	}
 
@@ -80,13 +79,13 @@ func (f *FabricInterface) Init(otherHosts []string) {
 		gateway.WithIdentity(wallet, "appUser"))
 
 	if err != nil {
-		log.Fatalf("Failed to connect to gateway: %v", err)
+		zap.L().Warn("Failed to connect to gateway" + err.Error())
 	}
 
 	f.Network, err = f.Gateway.GetNetwork("mychannel")
 
 	if err != nil {
-		log.Fatalf("Failed to get network: %v", err)
+		zap.L().Warn("Failed to get network" + err.Error())
 	}
 
 	contract := f.Network.GetContract("basic")
@@ -97,7 +96,6 @@ func (f *FabricInterface) Init(otherHosts []string) {
 // Called when the wallet hasn't been instantiated yet
 // Creates the wallet/identity of the gateway peer we connect to
 func populateWallet(wallet *gateway.Wallet) error {
-	log.Println("============ Populating wallet ============")
 	credPath := filepath.Join(
 		"..",
 		"..",
@@ -134,9 +132,13 @@ func populateWallet(wallet *gateway.Wallet) error {
 		return err
 	}
 
-	identity := gateway.NewX509Identity("Org2MSP", string(cert), string(key))
+	mspId := "Org2MSP"
 
-	return wallet.Put("appUser", identity)
+	identity := gateway.NewX509Identity(mspId, string(cert), string(key))
+
+	label := "appUser"
+
+	return wallet.Put(label, identity)
 }
 
 // Cleanup Finishes up and performs any post-benchmark operations.

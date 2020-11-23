@@ -32,7 +32,7 @@ type TPSIntervals map[int]int
 // the blockchain.
 type ChainKey struct {
 	PrivateKey []byte `yaml:"private"` // Private key information
-	Address    string `yaml:address`   // Address that it is from
+	Address    string `yaml:"address"`   // Address that it is from
 }
 
 // checkPrefix Naive check if the prefixed PrivateKey has "0x" leading.
