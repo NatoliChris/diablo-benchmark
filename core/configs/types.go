@@ -17,8 +17,8 @@ const TxTypeSimple BenchTransactionType = "simple"
 // contract interaction and deployment
 const TxTypeContract BenchTransactionType = "contract"
 
-// TxTypeBasic indicates the we are running the test workload used in end-to-end testing
-const TxTypeBasic BenchTransactionType = "basic"
+// TxTypeTest indicates the we are running the test workload used in end-to-end testing
+const TxTypeTest BenchTransactionType = "test"
 
 // DefaultTimeout is the default timeout for the benchmark if not provided
 // or overwritten by the args
@@ -143,8 +143,8 @@ func (bt *BenchTransactionType) UnmarshalYAML(unmarshal func(interface{}) error)
 		*bt = TxTypeSimple
 	case "contract":
 		*bt = TxTypeContract
-	case "basic":
-		*bt = TxTypeBasic
+	case "test":
+		*bt = TxTypeTest
 	default:
 		return errors.New("TX Type is incorrectly defined")
 	}

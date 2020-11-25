@@ -4,7 +4,7 @@ secondaries: 1
 threads: 1
 
 bench:
-  type: "basic"
+  type: "test"
   txs:
     0: 5
     5: 5

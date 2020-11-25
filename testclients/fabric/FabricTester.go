@@ -23,7 +23,7 @@ func main(){
 	}
 	zap.ReplaceGlobals(logger)
 
-	cc, err := parsers.ParseChainConfig("configurations/blockchain-configs/fabric/fabric-basic.yaml")
+	cc, err := parsers.ParseChainConfig("configurations/blockchain-configs/fabric/fabric-test.yaml")
 	if err != nil {
 		panic(err)
 	}
@@ -37,10 +37,11 @@ func main(){
 	var generator workloadgenerators.WorkloadGenerator
 	intermediate := workloadgenerators.FabricWorkloadGenerator{}
 	generator = intermediate.NewGenerator(cc, bc)
-	client := clientinterfaces.FabricInterface{}
+	client1 := clientinterfaces.FabricInterface{}
 
-	log.Println("Init client interface")
-	client.Init(cc.Nodes)
+
+	log.Println("Init client1 interface")
+	client1.Init(cc.Nodes)
 
 
 	err = generator.BlockchainSetup()
@@ -55,8 +56,8 @@ func main(){
 	}
 
 
-	log.Println("sendRawTransaction via client FIRST TIME EXPECTING BUG")
-	err = client.SendRawTransaction(createAssetTransaction(0,generator))
+	log.Println("sendRawTransaction via client1 FIRST TIME EXPECTING BUG")
+	err = client1.SendRawTransaction(createAssetTransaction(0,generator))
 
 	workload,err := generator.GenerateWorkload()
 
@@ -64,7 +65,7 @@ func main(){
 		panic(err)
 	}
 
-	parsedWorkload,err := client.ParseWorkload(workload[0][0])
+	parsedWorkload,err := client1.ParseWorkload(workload[0][0])
 
 	if err != nil {
 		panic(err)
@@ -72,12 +73,14 @@ func main(){
 
 	for _,intervals := range parsedWorkload {
 		for _, tx := range intervals{
-			client.SendRawTransaction(tx)
+			client1.SendRawTransaction(tx)
 		}
 	}
 
+
+
 	log.Println("--> Evaluate Transaction: GetAllAssets, function returns every asset")
-	result, err := client.Contract.EvaluateTransaction("GetAllAssets")
+	result, err := client1.Contract.EvaluateTransaction("GetAllAssets")
 	if err != nil {
 		log.Fatalf("Failed to evaluate transaction: %v\n", err)
 	}
