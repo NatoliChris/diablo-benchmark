@@ -176,8 +176,6 @@ func(f FabricWorkloadGenerator) generateTestWorkload() (Workload, error){
 
 }
 
-
-
 //GenerateWorkload generates a workload given the benchmark config and the blockchain config files
 // returns: Workload ([secondary][threads][time][tx]) -> [][][][]byte
 func (f FabricWorkloadGenerator) GenerateWorkload() (Workload, error) {
@@ -205,7 +203,7 @@ func (f FabricWorkloadGenerator) GenerateWorkload() (Workload, error) {
 
 	switch f.BenchConfig.TxInfo.TxType {
 	//asset transfer/creation/deletion based workload
-	case configs.TxTypeBasic:
+	case configs.TxTypeTest:
 		return f.generateTestWorkload()
 
 	default:
