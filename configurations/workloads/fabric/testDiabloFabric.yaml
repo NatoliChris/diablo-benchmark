@@ -1,7 +1,7 @@
 name: "assetTransfer test"
 description: "Do contracts even work?"
 secondaries: 1
-threads: 1
+threads: 2
 
 bench:
   type: "test"

@@ -183,3 +183,31 @@ func (s *SmartContract) GetAllAssets(ctx contractapi.TransactionContextInterface
 
 	return assets, nil
 }
+
+// GetAllAssets returns all assets found in world state
+func (s *SmartContract) GetAllAssetsID(ctx contractapi.TransactionContextInterface) ([]string, error) {
+	// range query with empty string for startKey and endKey does an
+	// open-ended query of all assets in the chaincode namespace.
+	resultsIterator, err := ctx.GetStub().GetStateByRange("", "")
+	if err != nil {
+		return nil, err
+	}
+	defer resultsIterator.Close()
+
+	var assets []string
+	for resultsIterator.HasNext() {
+		queryResponse, err := resultsIterator.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		var asset Asset
+		err = json.Unmarshal(queryResponse.Value, &asset)
+		if err != nil {
+			return nil, err
+		}
+		assets = append(assets, asset.ID)
+	}
+
+	return assets, nil
+}
