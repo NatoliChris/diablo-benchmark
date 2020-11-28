@@ -222,7 +222,7 @@ chaincodeInvokeInit() {
 
 
 
- #packageChaincode
+ packageChaincode
  installChaincode
  queryInstalled
  approveForMyOrg1

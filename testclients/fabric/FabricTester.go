@@ -38,10 +38,11 @@ func main(){
 	intermediate := workloadgenerators.FabricWorkloadGenerator{}
 	generator = intermediate.NewGenerator(cc, bc)
 	client1 := clientinterfaces.FabricInterface{}
-
+	client2 := clientinterfaces.FabricInterface{}
 
 	log.Println("Init client1 interface")
 	client1.Init(cc.Nodes)
+	client2.Init(cc.Nodes)
 
 
 	err = generator.BlockchainSetup()
@@ -58,6 +59,7 @@ func main(){
 
 	log.Println("sendRawTransaction via client1 FIRST TIME EXPECTING BUG")
 	err = client1.SendRawTransaction(createAssetTransaction(0,generator))
+	err = client2.SendRawTransaction(createAssetTransaction(0,generator))
 
 	workload,err := generator.GenerateWorkload()
 
@@ -65,25 +67,33 @@ func main(){
 		panic(err)
 	}
 
-	parsedWorkload,err := client1.ParseWorkload(workload[0][0])
+	parsedWorkload1,err := client1.ParseWorkload(workload[0][0])
 
 	if err != nil {
 		panic(err)
 	}
 
-	for _,intervals := range parsedWorkload {
-		for _, tx := range intervals{
+
+	for _,intervals := range parsedWorkload1 {
+		for _, tx := range intervals {
 			client1.SendRawTransaction(tx)
 		}
 	}
 
+	parsedWorkload2,err := client2.ParseWorkload(workload[0][1])
+		for _,intervals := range parsedWorkload2 {
+			for _, tx := range intervals{
+			client2.SendRawTransaction(tx)
+		}
+	}
 
 
 	log.Println("--> Evaluate Transaction: GetAllAssets, function returns every asset")
-	result, err := client1.Contract.EvaluateTransaction("GetAllAssets")
+	result, err := client1.Contract.EvaluateTransaction("GetAllAssetsID")
 	if err != nil {
 		log.Fatalf("Failed to evaluate transaction: %v\n", err)
 	}
+	log.Println("ALL TRANSACTIONS IDS IN THE LEDGER")
 	log.Println(string(result))
 
 }
