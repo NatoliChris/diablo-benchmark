@@ -48,7 +48,6 @@ func (f *FabricInterface) Init(otherHosts []string) {
 	}
 
 	wallet, err := gateway.NewFileSystemWallet("wallet")
-	fmt.Println("FOUND WALLET")
 	if err != nil {
 		zap.L().Warn("Failed to create wallet" + err.Error())
 	}
@@ -74,6 +73,7 @@ func (f *FabricInterface) Init(otherHosts []string) {
 		"connection-org2.yaml",
 	)
 
+
 	f.Gateway, err = gateway.Connect(
 		gateway.WithConfig(config.FromFile(filepath.Clean(ccpPath))),
 		gateway.WithIdentity(wallet, "appUser"))
@@ -82,11 +82,13 @@ func (f *FabricInterface) Init(otherHosts []string) {
 		zap.L().Warn("Failed to connect to gateway" + err.Error())
 	}
 
+
 	f.Network, err = f.Gateway.GetNetwork("mychannel")
 
 	if err != nil {
 		zap.L().Warn("Failed to get network" + err.Error())
 	}
+
 
 	contract := f.Network.GetContract("basic")
 
