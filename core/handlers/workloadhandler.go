@@ -40,10 +40,11 @@ func NewWorkloadHandler(numThread uint32, clients []clientinterfaces.BlockchainI
 }
 
 // Connect initialises the clients and connects to the nodes
-func (wh *WorkloadHandler) Connect(nodes []string, ID int) error {
+func (wh *WorkloadHandler) Connect(nodes []string, ID int, window int) error {
 	var combinedErr []string
 	for _, v := range wh.activeClients {
 		v.Init(nodes)
+		v.SetWindow(window)
 		e := v.ConnectAll(ID)
 		if e != nil {
 			combinedErr = append(combinedErr, e.Error())

@@ -447,6 +447,7 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, 
 	zap.L().Debug("transaction params",
 		zap.String("addrFrom", addrFrom.String()),
 		zap.String("addrTo", toAddress),
+		zap.Uint64("nonce", e.Nonces[strings.ToLower(addrFrom.String())]),
 	)
 
 	// Make and sign the transaction

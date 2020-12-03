@@ -1,7 +1,6 @@
 GOBIN := go
 BUILDFLAGS := -v
 PKG := "diablo-benchmark"
-PKG_LIST := $(shell go list ${PKG}/... | grep -v vendor/)
 
 default: diablo
 
@@ -13,7 +12,7 @@ reqs:
 	# $(GOBIN) mod vendor
 
 lint:
-	@golint -set_exit_status ${PKG_LIST}
+	@golint -set_exit_status ./...
 
 diablo:
 	$(GOBIN) build $(BUILDFLAGS) -o $@
