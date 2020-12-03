@@ -87,7 +87,7 @@ func (s *Secondary) Run() {
 
 			s.WorkloadHandler = wHandler
 
-			err := s.WorkloadHandler.Connect(s.ChainConfig.Nodes, s.ID)
+			err := s.WorkloadHandler.Connect(s.ChainConfig.Nodes, s.ID, s.ChainConfig.ThroughputWindow)
 			if err != nil {
 				s.PrimaryComms.ReplyERR(err.Error())
 				continue
