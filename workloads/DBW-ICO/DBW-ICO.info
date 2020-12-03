@@ -1,0 +1,47 @@
+Diablo Benchmark Workload                                               Dec 2020
+
+================================================================================
+
+                           Initial Coin Offering
+                              (TENX WORKLOAD)
+
+================================================================================
+
+
+Description of the workload
+
+    This workload represents the request rates observed during an Initial Coin
+    Offering (ICO) presented in the Ethereum Mainnet. The ICO offers a unique
+    request environment where high requests are made to secure a limited number
+    of coins, similar to a public offering observed by companies in an IPO.
+    These events act as a natural stress on the blockchain network, and have
+    been observed multiple times.
+    By benchmarking with this workload, we can observe the blockchain's ability
+    to handle high request rates with a curve equivalent to that seen in an
+    ICO.
+
+Curve Definition:
+    
+
+
+
+Contract:
+
+
+Justification:
+    In resource [1], the request rate is measured through passive measurement.
+    This highlighted the number of requests per minute observed in the P2P
+    network messages distribtued in the system.
+
+
+
+
+Resources:
+
+    [1] Spain, Michael, Sean Foley, and Vincent Gramoli. "The Impact of
+    Ethereum Throughput and Fees on Transaction Latency During ICOs."
+    International Conference on Blockchain Economics, Security and Protocols
+    (Tokenomics 2019). Schloss Dagstuhl-Leibniz-Zentrum für Informatik, 2020.
+
+    [2] TENX Contract:
+    https://etherscan.io/address/0xd43d09ec1bc5e57c8f3d0c64020d403b04c7f783#code
