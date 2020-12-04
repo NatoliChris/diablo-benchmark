@@ -1,0 +1,17 @@
+name: "TenX Contract Sale"
+description: "TenX Token Sale ICO as measured in the Ethereum blockchain"
+secondaries: 1
+threads: 1
+bench:
+  type: "contract"
+  txs:
+    0: 100
+    3: 500
+    10: 500
+contract:
+  path: "./workloads/DBW-ICO-TENX/eth-solidity/tenx.sol"
+  functions:
+    - name: "()"
+    - ftype: "pay"
+      value: 1
+      ratio: 100
