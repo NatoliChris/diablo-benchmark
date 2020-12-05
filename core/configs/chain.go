@@ -7,4 +7,5 @@ type ChainConfig struct {
 	Nodes   []string   `yaml:nodes`                // Address of the nodes.
 	KeyFile string     `yaml:"key_file,omitempty"` // JSON file with privkey:address pairs
 	Keys    []ChainKey `yaml:keys,flow`            // Key information
+	Extra   []interface{} `yaml:"extra,flow,omitempty"`
 }
