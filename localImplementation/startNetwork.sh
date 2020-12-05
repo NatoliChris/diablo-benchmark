@@ -2,10 +2,7 @@
 #./artifacts/channel/create-artifacts.sh
 
 docker-compose -f ./artifacts/docker-compose.yaml up -d
-
-sleep 20
+wait
 ./createChannel.sh
-
-sleep 10
-
+wait
 ./deployChaincode.sh

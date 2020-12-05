@@ -9,6 +9,8 @@ type FabricTX struct {
 	Args []string `json:"args"`	// arguments to invoke the chaincode
 }
 
+//FabricUser represents a user/account which is the identity by
+// which the secondary will contact the Fabric network
 type FabricUser struct {
 	Label string  `yaml:label`		// user label in the identity wallet used by the gateway
 	MspID string  `yaml:"mspID"`
