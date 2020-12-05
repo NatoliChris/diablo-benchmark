@@ -2,7 +2,7 @@
  *Submitted for verification at Etherscan.io on 2017-06-16
 */
 
-pragma solidity >=0.4.11;
+pragma solidity 0.4.11;
 
 
 /**
@@ -18,7 +18,7 @@ contract Ownable {
    * @dev The Ownable constructor sets the original `owner` of the contract to the sender
    * account.
    */
-  constructor() {
+  function Ownable() {
     owner = msg.sender;
   }
 
@@ -28,7 +28,7 @@ contract Ownable {
    */
   modifier onlyOwner() {
     if (msg.sender != owner) {
-      revert();
+      throw;
     }
     _;
   }
@@ -38,7 +38,7 @@ contract Ownable {
    * @dev Allows the current owner to transfer control of the contract to a newOwner.
    * @param newOwner The address to transfer ownership to. 
    */
-  function transferOwnership(address newOwner) external onlyOwner {
+  function transferOwnership(address newOwner) onlyOwner {
     if (newOwner != address(0)) {
       owner = newOwner;
     }
@@ -53,7 +53,7 @@ contract Ownable {
  * @dev Allows to authorize access to certain function calls
  * 
  * ABI
- * [{"view":true,"inputs":[{"name":"authorizerIndex","type":"uint256"}],"name":"getAuthorizer","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"view":false,"inputs":[{"name":"_addr","type":"address"}],"name":"addAuthorized","outputs":[],"payable":false,"type":"function"},{"view":true,"inputs":[{"name":"_addr","type":"address"}],"name":"isAuthorized","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"inputs":[],"payable":false,"type":"constructor"}]
+ * [{"constant":true,"inputs":[{"name":"authorizerIndex","type":"uint256"}],"name":"getAuthorizer","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"_addr","type":"address"}],"name":"addAuthorized","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"_addr","type":"address"}],"name":"isAuthorized","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"inputs":[],"payable":false,"type":"constructor"}]
  */
 contract Authorizable {
 
@@ -71,18 +71,19 @@ contract Authorizable {
   /**
    * @dev Contructor that authorizes the msg.sender. 
    */
-  constructor() {
-    authorizers.push(msg.sender);
+  function Authorizable() {
+    authorizers.length = 2;
+    authorizers[1] = msg.sender;
     authorizerIndex[msg.sender] = 1;
   }
 
   /**
    * @dev Function to get a specific authorizer
-   * @param givenIndex index of the authorizer to be retrieved.
+   * @param authorizerIndex index of the authorizer to be retrieved.
    * @return The address of the authorizer.
    */
-  function getAuthorizer(uint givenIndex) external view returns(address) {
-    return address(authorizers[givenIndex + 1]);
+  function getAuthorizer(uint authorizerIndex) external constant returns(address) {
+    return address(authorizers[authorizerIndex + 1]);
   }
 
   /**
@@ -90,7 +91,7 @@ contract Authorizable {
    * @param _addr the address to check if it is authorized.
    * @return boolean flag if address is authorized.
    */
-  function isAuthorized(address _addr) public view returns(bool) {
+  function isAuthorized(address _addr) constant returns(bool) {
     return authorizerIndex[_addr] > 0;
   }
 
@@ -100,7 +101,8 @@ contract Authorizable {
    */
   function addAuthorized(address _addr) external onlyAuthorized {
     authorizerIndex[_addr] = authorizers.length;
-    authorizers.push(_addr);
+    authorizers.length++;
+    authorizers[authorizers.length - 1] = _addr;
   }
 
 }
@@ -110,7 +112,7 @@ contract Authorizable {
  * @dev Allows updating and retrieveing of Conversion Rates for PAY tokens
  *
  * ABI
- * [{"view":false,"inputs":[{"name":"_symbol","type":"string"},{"name":"_rate","type":"uint256"}],"name":"updateRate","outputs":[],"payable":false,"type":"function"},{"view":false,"inputs":[{"name":"data","type":"uint256[]"}],"name":"updateRates","outputs":[],"payable":false,"type":"function"},{"view":true,"inputs":[{"name":"_symbol","type":"string"}],"name":"getRate","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"view":true,"inputs":[],"name":"owner","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"view":true,"inputs":[{"name":"","type":"bytes32"}],"name":"rates","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"view":false,"inputs":[{"name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"payable":false,"type":"function"},{"anonymous":false,"inputs":[{"indexed":false,"name":"timestamp","type":"uint256"},{"indexed":false,"name":"symbol","type":"bytes32"},{"indexed":false,"name":"rate","type":"uint256"}],"name":"RateUpdated","type":"event"}]
+ * [{"constant":false,"inputs":[{"name":"_symbol","type":"string"},{"name":"_rate","type":"uint256"}],"name":"updateRate","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"data","type":"uint256[]"}],"name":"updateRates","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"_symbol","type":"string"}],"name":"getRate","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"owner","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"","type":"bytes32"}],"name":"rates","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"payable":false,"type":"function"},{"anonymous":false,"inputs":[{"indexed":false,"name":"timestamp","type":"uint256"},{"indexed":false,"name":"symbol","type":"bytes32"},{"indexed":false,"name":"rate","type":"uint256"}],"name":"RateUpdated","type":"event"}]
  */
 contract ExchangeRate is Ownable {
 
@@ -123,7 +125,7 @@ contract ExchangeRate is Ownable {
    * @param _symbol The symbol to be updated. 
    * @param _rate the rate for the symbol. 
    */
-  function updateRate(string memory _symbol, uint _rate) public onlyOwner {
+  function updateRate(string _symbol, uint _rate) public onlyOwner {
     rates[sha3(_symbol)] = _rate;
     RateUpdated(now, sha3(_symbol), _rate);
   }
@@ -132,9 +134,9 @@ contract ExchangeRate is Ownable {
    * @dev Allows the current owner to update multiple rates.
    * @param data an array that alternates sha3 hashes of the symbol and the corresponding rate . 
    */
-  function updateRates(uint[] memory data) public onlyOwner {
+  function updateRates(uint[] data) public onlyOwner {
     if (data.length % 2 > 0)
-      revert();
+      throw;
     uint i = 0;
     while (i < data.length / 2) {
       bytes32 symbol = bytes32(data[i * 2]);
@@ -149,7 +151,7 @@ contract ExchangeRate is Ownable {
    * @dev Allows the anyone to read the current rate.
    * @param _symbol the symbol to be retrieved. 
    */
-  function getRate(string memory _symbol) public view returns(uint) {
+  function getRate(string _symbol) public constant returns(uint) {
     return rates[sha3(_symbol)];
   }
 
@@ -183,25 +185,25 @@ library SafeMath {
     return c;
   }
 
-  function max64(uint64 a, uint64 b) internal view returns (uint64) {
+  function max64(uint64 a, uint64 b) internal constant returns (uint64) {
     return a >= b ? a : b;
   }
 
-  function min64(uint64 a, uint64 b) internal view returns (uint64) {
+  function min64(uint64 a, uint64 b) internal constant returns (uint64) {
     return a < b ? a : b;
   }
 
-  function max256(uint256 a, uint256 b) internal view returns (uint256) {
+  function max256(uint256 a, uint256 b) internal constant returns (uint256) {
     return a >= b ? a : b;
   }
 
-  function min256(uint256 a, uint256 b) internal view returns (uint256) {
+  function min256(uint256 a, uint256 b) internal constant returns (uint256) {
     return a < b ? a : b;
   }
 
   function assert(bool assertion) internal {
     if (!assertion) {
-      revert();
+      throw;
     }
   }
 }
@@ -212,9 +214,9 @@ library SafeMath {
  * @dev Simpler version of ERC20 interface
  * @dev see https://github.com/ethereum/EIPs/issues/20
  */
-abstract contract ERC20Basic {
+contract ERC20Basic {
   uint public totalSupply;
-  function balanceOf(address who) view returns (uint);
+  function balanceOf(address who) constant returns (uint);
   function transfer(address to, uint value);
   event Transfer(address indexed from, address indexed to, uint value);
 }
@@ -227,7 +229,7 @@ abstract contract ERC20Basic {
  * @dev see https://github.com/ethereum/EIPs/issues/20
  */
 contract ERC20 is ERC20Basic {
-  function allowance(address owner, address spender) view returns (uint);
+  function allowance(address owner, address spender) constant returns (uint);
   function transferFrom(address from, address to, uint value);
   function approve(address spender, uint value);
   event Approval(address indexed owner, address indexed spender, uint value);
@@ -271,7 +273,7 @@ contract BasicToken is ERC20Basic {
   * @param _owner The address to query the the balance of. 
   * @return An uint representing the amount owned by the passed address.
   */
-  function balanceOf(address _owner) view returns (uint balance) {
+  function balanceOf(address _owner) constant returns (uint balance) {
     return balances[_owner];
   }
 
@@ -299,7 +301,7 @@ contract StandardToken is BasicToken, ERC20 {
    * @param _value uint the amout of tokens to be transfered
    */
   function transferFrom(address _from, address _to, uint _value) onlyPayloadSize(3 * 32) {
-    uint _allowance = allowed[_from][msg.sender];
+    var _allowance = allowed[_from][msg.sender];
 
     // Check is not needed because sub(_allowance, _value) will already throw if this condition is not met
     // if (_value > _allowance) throw;
@@ -333,7 +335,7 @@ contract StandardToken is BasicToken, ERC20 {
    * @param _spender address The address which will spend the funds.
    * @return A uint specifing the amount of tokens still avaible for the spender.
    */
-  function allowance(address _owner, address _spender) view returns (uint remaining) {
+  function allowance(address _owner, address _spender) constant returns (uint remaining) {
     return allowed[_owner][_spender];
   }
 
@@ -394,7 +396,7 @@ contract MintableToken is StandardToken, Ownable {
  * @dev The main PAY token contract
  * 
  * ABI 
- * [{"view":true,"inputs":[],"name":"mintingFinished","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"view":true,"inputs":[],"name":"name","outputs":[{"name":"","type":"string"}],"payable":false,"type":"function"},{"view":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"}],"name":"approve","outputs":[],"payable":false,"type":"function"},{"view":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"view":false,"inputs":[{"name":"_from","type":"address"},{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transferFrom","outputs":[],"payable":false,"type":"function"},{"view":false,"inputs":[],"name":"startTrading","outputs":[],"payable":false,"type":"function"},{"view":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"view":false,"inputs":[{"name":"_to","type":"address"},{"name":"_amount","type":"uint256"}],"name":"mint","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"view":true,"inputs":[],"name":"tradingStarted","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"view":true,"inputs":[{"name":"_owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"payable":false,"type":"function"},{"view":false,"inputs":[],"name":"finishMinting","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"view":true,"inputs":[],"name":"owner","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"view":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"payable":false,"type":"function"},{"view":false,"inputs":[{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transfer","outputs":[],"payable":false,"type":"function"},{"view":true,"inputs":[{"name":"_owner","type":"address"},{"name":"_spender","type":"address"}],"name":"allowance","outputs":[{"name":"remaining","type":"uint256"}],"payable":false,"type":"function"},{"view":false,"inputs":[{"name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"payable":false,"type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"name":"to","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Mint","type":"event"},{"anonymous":false,"inputs":[],"name":"MintFinished","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"},{"indexed":true,"name":"spender","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"from","type":"address"},{"indexed":true,"name":"to","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Transfer","type":"event"}]
+ * [{"constant":true,"inputs":[],"name":"mintingFinished","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"name","outputs":[{"name":"","type":"string"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"}],"name":"approve","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"_from","type":"address"},{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transferFrom","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[],"name":"startTrading","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"_to","type":"address"},{"name":"_amount","type":"uint256"}],"name":"mint","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"tradingStarted","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"_owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[],"name":"finishMinting","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"owner","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transfer","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"_owner","type":"address"},{"name":"_spender","type":"address"}],"name":"allowance","outputs":[{"name":"remaining","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"payable":false,"type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"name":"to","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Mint","type":"event"},{"anonymous":false,"inputs":[],"name":"MintFinished","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"},{"indexed":true,"name":"spender","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"from","type":"address"},{"indexed":true,"name":"to","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Transfer","type":"event"}]
  */
 contract PayToken is MintableToken {
 
@@ -415,7 +417,7 @@ contract PayToken is MintableToken {
   /**
    * @dev Allows the owner to enable the trading. This can not be undone
    */
-  function startTrading() internal onlyOwner override {
+  function startTrading() onlyOwner {
     tradingStarted = true;
   }
 
@@ -424,7 +426,7 @@ contract PayToken is MintableToken {
    * @param _to the recipient address of the tokens. 
    * @param _value number of tokens to be transfered. 
    */
-  function transfer(address _to, uint _value) internal hasStartedTrading override {
+  function transfer(address _to, uint _value) hasStartedTrading {
     super.transfer(_to, _value);
   }
 
@@ -434,7 +436,7 @@ contract PayToken is MintableToken {
    * @param _to address The address which you want to transfer to
    * @param _value uint the amout of tokens to be transfered
    */
-  function transferFrom(address _from, address _to, uint _value) internal hasStartedTrading override {
+  function transferFrom(address _from, address _to, uint _value) hasStartedTrading {
     super.transferFrom(_from, _to, _value);
   }
 
@@ -446,7 +448,7 @@ contract PayToken is MintableToken {
  * @dev The main PAY token sale contract
  * 
  * ABI
- * [{"view":false,"inputs":[{"name":"_multisigVault","type":"address"}],"name":"setMultisigVault","outputs":[],"payable":false,"type":"function"},{"view":true,"inputs":[{"name":"authorizerIndex","type":"uint256"}],"name":"getAuthorizer","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"view":true,"inputs":[],"name":"exchangeRate","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"view":true,"inputs":[],"name":"altDeposits","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"view":false,"inputs":[{"name":"recipient","type":"address"},{"name":"tokens","type":"uint256"}],"name":"authorizedCreateTokens","outputs":[],"payable":false,"type":"function"},{"view":false,"inputs":[],"name":"finishMinting","outputs":[],"payable":false,"type":"function"},{"view":true,"inputs":[],"name":"owner","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"view":false,"inputs":[{"name":"_exchangeRate","type":"address"}],"name":"setExchangeRate","outputs":[],"payable":false,"type":"function"},{"view":false,"inputs":[{"name":"_token","type":"address"}],"name":"retrieveTokens","outputs":[],"payable":false,"type":"function"},{"view":false,"inputs":[{"name":"totalAltDeposits","type":"uint256"}],"name":"setAltDeposit","outputs":[],"payable":false,"type":"function"},{"view":true,"inputs":[],"name":"start","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"view":false,"inputs":[{"name":"recipient","type":"address"}],"name":"createTokens","outputs":[],"payable":true,"type":"function"},{"view":false,"inputs":[{"name":"_addr","type":"address"}],"name":"addAuthorized","outputs":[],"payable":false,"type":"function"},{"view":true,"inputs":[],"name":"multisigVault","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"view":false,"inputs":[{"name":"_hardcap","type":"uint256"}],"name":"setHardCap","outputs":[],"payable":false,"type":"function"},{"view":false,"inputs":[{"name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"payable":false,"type":"function"},{"view":false,"inputs":[{"name":"_start","type":"uint256"}],"name":"setStart","outputs":[],"payable":false,"type":"function"},{"view":true,"inputs":[],"name":"token","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"view":true,"inputs":[{"name":"_addr","type":"address"}],"name":"isAuthorized","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"payable":true,"type":"fallback"},{"anonymous":false,"inputs":[{"indexed":false,"name":"recipient","type":"address"},{"indexed":false,"name":"ether_amount","type":"uint256"},{"indexed":false,"name":"pay_amount","type":"uint256"},{"indexed":false,"name":"exchangerate","type":"uint256"}],"name":"TokenSold","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"recipient","type":"address"},{"indexed":false,"name":"pay_amount","type":"uint256"}],"name":"AuthorizedCreate","type":"event"},{"anonymous":false,"inputs":[],"name":"MainSaleClosed","type":"event"}]
+ * [{"constant":false,"inputs":[{"name":"_multisigVault","type":"address"}],"name":"setMultisigVault","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"authorizerIndex","type":"uint256"}],"name":"getAuthorizer","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"exchangeRate","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"altDeposits","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"recipient","type":"address"},{"name":"tokens","type":"uint256"}],"name":"authorizedCreateTokens","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[],"name":"finishMinting","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"owner","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"_exchangeRate","type":"address"}],"name":"setExchangeRate","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"_token","type":"address"}],"name":"retrieveTokens","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"totalAltDeposits","type":"uint256"}],"name":"setAltDeposit","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"start","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"recipient","type":"address"}],"name":"createTokens","outputs":[],"payable":true,"type":"function"},{"constant":false,"inputs":[{"name":"_addr","type":"address"}],"name":"addAuthorized","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"multisigVault","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"_hardcap","type":"uint256"}],"name":"setHardCap","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"_start","type":"uint256"}],"name":"setStart","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"token","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"_addr","type":"address"}],"name":"isAuthorized","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"payable":true,"type":"fallback"},{"anonymous":false,"inputs":[{"indexed":false,"name":"recipient","type":"address"},{"indexed":false,"name":"ether_amount","type":"uint256"},{"indexed":false,"name":"pay_amount","type":"uint256"},{"indexed":false,"name":"exchangerate","type":"uint256"}],"name":"TokenSold","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"recipient","type":"address"},{"indexed":false,"name":"pay_amount","type":"uint256"}],"name":"AuthorizedCreate","type":"event"},{"anonymous":false,"inputs":[],"name":"MainSaleClosed","type":"event"}]
  */
 contract MainSale is Ownable, Authorizable {
   using SafeMath for uint;
@@ -478,10 +480,6 @@ contract MainSale is Ownable, Authorizable {
   modifier isUnderHardCap() {
     require(multisigVault.balance + altDeposits <= hardcap);
     _;
-  }
-
-  constructor() {
-    start = now;
   }
 
   /**
@@ -572,18 +570,13 @@ contract MainSale is Ownable, Authorizable {
     ERC20 token = ERC20(_token);
     token.transfer(multisigVault, token.balanceOf(this));
   }
-  
-  receive() external payable {
-    createTokens(msg.sender);
-  }
 
   /**
    * @dev Fallback function which receives ether and created the appropriate number of tokens for the 
    * msg.sender.
    */
-  //fallback() external payable {
-    //createTokens(msg.sender);
-  //}
+  function() external payable {
+    createTokens(msg.sender);
+  }
 
 }
-
