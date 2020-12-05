@@ -20,12 +20,14 @@ thus requires trust and we enable this
  purchases, every purchase order is stored indefinitely on the ledger to
  provide tracability</p>
  
+ 
  ## Why benchmark it ?
  
- From the use case cited above :
+<p> From the use case cited above :
   "Among the critical factors Honeywell needed were 
   low latency, high throughput, and fast send rates." As it is an Amazon type
   marketplace, thoses are legitimate requirements. 
+  </p>
  
  ## Implementation
  
