@@ -3,10 +3,9 @@ package clientinterfaces
 import (
 	"diablo-benchmark/blockchains/types"
 	"diablo-benchmark/blockchains/workloadgenerators"
+	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/results"
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -24,6 +23,8 @@ type FabricInterface struct {
 	Wallet    *gateway.Wallet				// Wallet containing user identity configured for the gateway
 	Network   *gateway.Network				// Network object originating from gateway
 	Contract  *gateway.Contract             // The smart contract we will be interacting with (only supporting one contract workload for now)
+	ccpPath   string						// connection-profile path to configure the gateway
+
 	TransactionInfo  map[uint64][]time.Time // Transaction information (used for throughput calculation)
 	StartTime        time.Time              // Start time of the benchmark
 	ThroughputTicker *time.Ticker           // Ticker for throughput (1s)
@@ -35,9 +36,15 @@ type FabricInterface struct {
 
 
 // Init initializes the wallet, gateway, network and map of contracts available in the network
-func (f *FabricInterface) Init(otherHosts []string) {
-	f.Nodes = otherHosts
-	//TODO, use otherHosts to provide contract name, connection profile path and user id path ?
+func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
+	f.Nodes = chainConfig.Nodes
+	temp := chainConfig.Extra[0].(map[string]interface{})
+	user := types.FabricUser{
+		Label: temp["label"].(string),
+		MspID: temp["mspID"].(string),
+		Cert:  temp["cert"].(string),
+		Key:   temp["key"].(string),
+	}
 	f.NumTxDone = 0
 	f.TransactionInfo = make(map[uint64][]time.Time, 0)
 
@@ -52,8 +59,9 @@ func (f *FabricInterface) Init(otherHosts []string) {
 		zap.L().Warn("Failed to create wallet" + err.Error())
 	}
 
-	if !wallet.Exists("appUser") {
-		err = populateWallet(wallet)
+
+	if !wallet.Exists(user.Label) {
+		err = f.populateWallet(wallet,user)
 		if err != nil {
 			zap.L().Warn("Failed to populate wallet" + err.Error())
 		}
@@ -76,7 +84,7 @@ func (f *FabricInterface) Init(otherHosts []string) {
 
 	f.Gateway, err = gateway.Connect(
 		gateway.WithConfig(config.FromFile(filepath.Clean(ccpPath))),
-		gateway.WithIdentity(wallet, "appUser"))
+		gateway.WithIdentity(wallet,user.Label))
 
 	if err != nil {
 		zap.L().Warn("Failed to connect to gateway" + err.Error())
@@ -97,50 +105,10 @@ func (f *FabricInterface) Init(otherHosts []string) {
 
 // Called when the wallet hasn't been instantiated yet
 // Creates the wallet/identity of the gateway peer we connect to
-func populateWallet(wallet *gateway.Wallet) error {
-	credPath := filepath.Join(
-		"..",
-		"..",
-		"localImplementation",
-		"artifacts",
-		"channel",
-		"crypto-config",
-		"peerOrganizations",
-		"org2.example.com",
-		"users",
-		"User1@org2.example.com",
-		"msp",
-	)
+func (f *FabricInterface) populateWallet(wallet *gateway.Wallet, user types.FabricUser) error {
+	identity := gateway.NewX509Identity(user.MspID, user.Cert, user.Key)
 
-	certPath := filepath.Join(credPath, "signcerts", "User1@org2.example.com-cert.pem")
-	// read the certificate pem
-	cert, err := ioutil.ReadFile(filepath.Clean(certPath))
-	if err != nil {
-		return err
-	}
-
-	keyDir := filepath.Join(credPath, "keystore")
-	// there's a single file in this dir containing the private key
-	files, err := ioutil.ReadDir(keyDir)
-	if err != nil {
-		return err
-	}
-	if len(files) != 1 {
-		return fmt.Errorf("keystore folder should have contain one file")
-	}
-	keyPath := filepath.Join(keyDir, files[0].Name())
-	key, err := ioutil.ReadFile(filepath.Clean(keyPath))
-	if err != nil {
-		return err
-	}
-
-	mspID := "Org2MSP"
-
-	identity := gateway.NewX509Identity(mspID, string(cert), string(key))
-
-	label := "appUser"
-
-	return wallet.Put(label, identity)
+	return wallet.Put(user.Label, identity)
 }
 
 // Cleanup Finishes up and performs any post-benchmark operations.
