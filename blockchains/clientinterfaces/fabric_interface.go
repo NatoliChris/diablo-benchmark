@@ -38,18 +38,18 @@ type FabricInterface struct {
 // Init initializes the wallet, gateway, network and map of contracts available in the network
 func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
 	f.Nodes = chainConfig.Nodes
-	temp := chainConfig.Extra[0].(map[string]interface{})
+	mapConfig := chainConfig.Extra[0].(map[string]interface{})
 	user := types.FabricUser{
-		Label: temp["label"].(string),
-		MspID: temp["mspID"].(string),
-		Cert:  temp["cert"].(string),
-		Key:   temp["key"].(string),
+		Label: mapConfig["label"].(string),
+		MspID: mapConfig["mspID"].(string),
+		Cert:  mapConfig["cert"].(string),
+		Key:   mapConfig["key"].(string),
 	}
 	f.NumTxDone = 0
 	f.TransactionInfo = make(map[uint64][]time.Time, 0)
 
 
-	err := os.Setenv("DISCOVERY_AS_LOCALHOST", "true")
+	err := os.Setenv("DISCOVERY_AS_LOCALHOST", mapConfig["localHost"].(string))
 	if err != nil {
 		zap.L().Warn("Error setting DISCOVERY_AS_LOCALHOST environemnt variable: " + err.Error())
 	}
@@ -69,18 +69,7 @@ func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
 
 	//TODO : function to fetch connection-profile 
 
-	ccpPath := filepath.Join(
-		"..",
-		"..",
-		"localImplementation",
-		"artifacts",
-		"channel",
-		"crypto-config",
-		"peerOrganizations",
-		"org2.example.com",
-		"connection-org2.yaml",
-	)
-
+	ccpPath := mapConfig["ccpPath"].(string)
 
 	f.Gateway, err = gateway.Connect(
 		gateway.WithConfig(config.FromFile(filepath.Clean(ccpPath))),
@@ -91,14 +80,14 @@ func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
 	}
 
 
-	f.Network, err = f.Gateway.GetNetwork("mychannel")
+	f.Network, err = f.Gateway.GetNetwork(mapConfig["channelName"].(string))
 
 	if err != nil {
 		zap.L().Warn("Failed to get network" + err.Error())
 	}
 
 
-	contract := f.Network.GetContract("basic")
+	contract := f.Network.GetContract(mapConfig["contractName"].(string))
 
 	f.Contract = contract
 }
