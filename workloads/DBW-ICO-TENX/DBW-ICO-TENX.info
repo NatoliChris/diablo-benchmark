@@ -31,8 +31,8 @@ Curve Definition:
 
 
     ICO duration: 7 minutes
-    Contract Function: () "fallback function" - send ether and it will convert
-    to the contract.
+    Contract Function: () "fallback function" or "receive()" - send ether and
+    it will convert to the tokens for the token sale.
 
 
 Experimental Setup:
@@ -46,23 +46,40 @@ Experimental Setup:
         Initially, ICOs were released to the public on public blockchains,
         often through Ethereum or Bitcoin.
         As new blockchains are released, we should aim to find the "optimal"
-        environment for handling throughput to the point of degradation.
+        environment for handling throughput to the point of degradation for
+        the blockchain available.
+        The blockchains MUST support smart-contract like functionality and
+        are classified to partake in environments where IPO/ICOs may occur.
         It must be noted, that certain closed/permissioned blockchains operate
         under an assumed environment (e.g. already set up consortium of fixed
         numbers), and should be honoured during the testing setup and provided
         in the workload configurations.
 
+    Blockchain Classifications:
+
+        Ethereum-based VM supporting contracts.
+            Ethereum POA
+            Quorum
+            Burrow
+            Ether/Tendermint
+            Mulga Chain
+
 Contract:
-    The contract to be deployed is a simplification of the Tezos token sale
-    contract in [2], modified for ease of deployment in the benchmark, but
-    equal function signatures (minus constructor).
+
+    The deployed contract will be taken directly from the TenX token sale
+    contract as listed on the Etherscan website [2] and modified for simplicity
+    in the benchmark. The contract will be a modified version that contains
+    the same core functions, with minimal changes.
+    The highlighted changes can be found in the ".diff" file in the
+    "eth-solidity" folder.
 
 
 Justification:
     In resource [1], the request rate is measured through passive measurement.
     This highlighted the number of requests per minute observed in the P2P
-    network messages distribtued in the system.
-
+    network messages distribtued in the system. The rate of sending peaks
+    when the ICO time is reached, with maximal sends, and slowly tapers off
+    in the 7 minutes to finally settle at the base transaction request rate.
 
 Resources:
 
