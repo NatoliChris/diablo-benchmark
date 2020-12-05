@@ -5,11 +5,23 @@ threads: 1
 bench:
   type: "contract"
   txs:
-    0: 100
-    3: 500
-    10: 500
+    0: 500
+    60: 3000
+    120: 3000
+    180: 2500
+    230: 2500
+    240: 2000
+    355: 2000
+    360: 1500
+    480: 1500
+    481: 1000
+    600: 1000
+    720: 1000
+    750: 500
+    780: 500
+
 contract:
-  path: "./workloads/DBW-ICO-TENX/eth-solidity/tenx.sol"
+  path: "./workloads/DBW-ICO-TENX/eth-solidity/tenx-fixed.sol"
   functions:
     - name: "()"
     - ftype: "pay"
