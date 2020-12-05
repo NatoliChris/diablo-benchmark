@@ -19,11 +19,11 @@ import (
 //FabricInterface is the Hyperledger Fabric implementation of the clientinterface
 // Provides functionality to communicate with the Fabric blockchain
 type FabricInterface struct {
-	Gateway   *gateway.Gateway              // Gateway manages the network interaction on behalf of the application
-	Wallet    *gateway.Wallet				// Wallet containing user identity configured for the gateway
-	Network   *gateway.Network				// Network object originating from gateway
-	Contract  *gateway.Contract             // The smart contract we will be interacting with (only supporting one contract workload for now)
-	ccpPath   string						// connection-profile path to configure the gateway
+	Gateway  *gateway.Gateway  // Gateway manages the network interaction on behalf of the application
+	Wallet   *gateway.Wallet   // Wallet containing user identity configured for the gateway
+	Network  *gateway.Network  // Network object originating from gateway
+	Contract *gateway.Contract // The smart contract we will be interacting with (only supporting one contract workload for now)
+	ccpPath  string            // connection-profile path to configure the gateway
 
 	TransactionInfo  map[uint64][]time.Time // Transaction information (used for throughput calculation)
 	StartTime        time.Time              // Start time of the benchmark
@@ -31,9 +31,6 @@ type FabricInterface struct {
 	Throughputs      []float64              // Throughput over time with 1 second intervals
 	GenericInterface
 }
-
-
-
 
 // Init initializes the wallet, gateway, network and map of contracts available in the network
 func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
@@ -48,7 +45,6 @@ func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
 	f.NumTxDone = 0
 	f.TransactionInfo = make(map[uint64][]time.Time, 0)
 
-
 	err := os.Setenv("DISCOVERY_AS_LOCALHOST", mapConfig["localHost"].(string))
 	if err != nil {
 		zap.L().Warn("Error setting DISCOVERY_AS_LOCALHOST environemnt variable: " + err.Error())
@@ -59,33 +55,28 @@ func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
 		zap.L().Warn("Failed to create wallet" + err.Error())
 	}
 
-
 	if !wallet.Exists(user.Label) {
-		err = f.populateWallet(wallet,user)
+		err = f.populateWallet(wallet, user)
 		if err != nil {
 			zap.L().Warn("Failed to populate wallet" + err.Error())
 		}
 	}
 
-	//TODO : function to fetch connection-profile 
-
 	ccpPath := mapConfig["ccpPath"].(string)
 
 	f.Gateway, err = gateway.Connect(
 		gateway.WithConfig(config.FromFile(filepath.Clean(ccpPath))),
-		gateway.WithIdentity(wallet,user.Label))
+		gateway.WithIdentity(wallet, user.Label))
 
 	if err != nil {
 		zap.L().Warn("Failed to connect to gateway" + err.Error())
 	}
-
 
 	f.Network, err = f.Gateway.GetNetwork(mapConfig["channelName"].(string))
 
 	if err != nil {
 		zap.L().Warn("Failed to get network" + err.Error())
 	}
-
 
 	contract := f.Network.GetContract(mapConfig["contractName"].(string))
 
@@ -106,7 +97,6 @@ func (f *FabricInterface) Cleanup() results.Results {
 
 	// Stop the ticker
 	f.ThroughputTicker.Stop()
-
 
 	txLatencies := make([]float64, 0)
 	var avgLatency float64
@@ -155,7 +145,6 @@ func (f *FabricInterface) Cleanup() results.Results {
 	}
 }
 
-
 // throughputSeconds calculates the throughput over time, to show dynamic
 func (f *FabricInterface) throughputSeconds() {
 	f.ThroughputTicker = time.NewTicker(time.Second)
@@ -169,7 +158,6 @@ func (f *FabricInterface) throughputSeconds() {
 		}
 	}
 }
-
 
 // Start handles the starting aspects of the benchmark
 // Is primarily used for setting the start time and allocating resources for
@@ -191,7 +179,7 @@ func (f *FabricInterface) ParseWorkload(workload workloadgenerators.WorkerThread
 		intervalTxs := make([]interface{}, 0)
 		for _, txBytes := range v {
 			var t types.FabricTX
-			err := json.Unmarshal(txBytes,&t)
+			err := json.Unmarshal(txBytes, &t)
 			if err != nil {
 				return nil, err
 			}
@@ -230,16 +218,15 @@ func (f *FabricInterface) DeploySmartContract(tx interface{}) (interface{}, erro
 // SendRawTransaction sends the transaction by the gateway
 func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
 
-	 f.submitTransaction(tx)
+	f.submitTransaction(tx)
 
 	return nil
 }
 
 // submitTransaction utility function to submit a transaction, to be used in a different thread
 // as the main thread as it may hang
-func (f *FabricInterface) submitTransaction(tx interface{}){
+func (f *FabricInterface) submitTransaction(tx interface{}) {
 	transaction := tx.(*types.FabricTX)
-
 
 	// making note of the time we send the transaction
 	f.TransactionInfo[transaction.ID] = []time.Time{time.Now()}
@@ -247,7 +234,7 @@ func (f *FabricInterface) submitTransaction(tx interface{}){
 
 	var err error
 
-	if transaction.FunctionType == "write"{
+	if transaction.FunctionType == "write" {
 		//submitTransaction does everything under the hood for us.
 		// Rather than interacting with a single peer, the SDK will send the submitTransaction proposal
 		//to every required organization’s peer in the blockchain network based on the chaincode’s endorsement policy.
@@ -256,12 +243,12 @@ func (f *FabricInterface) submitTransaction(tx interface{}){
 		//a single transaction, which it then submits to the orderer. The orderer collects and sequences transactions from various application clients into a block of transactions.
 		//These blocks are distributed to every peer in the network, where every transaction is validated and committed.
 		//Finally, the SDK is notified via an event, allowing it to return control to the application.
-		_,err = f.Contract.SubmitTransaction(transaction.FunctionName, transaction.Args...)
+		_, err = f.Contract.SubmitTransaction(transaction.FunctionName, transaction.Args...)
 
 	} else {
 
 		//EvaluteTransaction is much less expensive and only queries one peer for its world state
-		_,err = f.Contract.EvaluateTransaction(transaction.FunctionName, transaction.Args...)
+		_, err = f.Contract.EvaluateTransaction(transaction.FunctionName, transaction.Args...)
 	}
 
 	// transaction failed, incrementing number of done and failed transactions
@@ -270,14 +257,12 @@ func (f *FabricInterface) submitTransaction(tx interface{}){
 		atomic.AddUint64(&f.NumTxDone, 1)
 	}
 
-
 	//transaction validated, making the note of the time of return
-	f.TransactionInfo[transaction.ID] = append(f.TransactionInfo[transaction.ID],time.Now())
-	atomic.AddUint64(&f.Success,1)
-	atomic.AddUint64(&f.NumTxDone,1)
+	f.TransactionInfo[transaction.ID] = append(f.TransactionInfo[transaction.ID], time.Now())
+	atomic.AddUint64(&f.Success, 1)
+	atomic.AddUint64(&f.NumTxDone, 1)
 
 }
-
 
 // SecureRead reads the value from the chain
 // (NOT NEEDED IN FABRIC) SecureRead is useful in permissionless blockchains where transaction
@@ -301,8 +286,6 @@ func (f *FabricInterface) GetBlockByNumber(index uint64) (GenericBlock, error) {
 func (f *FabricInterface) GetBlockHeight() (uint64, error) {
 	return 0, nil
 }
-
-
 
 // ParseBlocksForTransactions retrieves block information from start to end index and
 // is used as a post-benchmark check to learn about the block and transactions.

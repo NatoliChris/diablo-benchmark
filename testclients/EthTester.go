@@ -81,7 +81,7 @@ func main() {
 	intermediate := workloadgenerators.EthereumWorkloadGenerator{}
 	G = intermediate.NewGenerator(cc, bc)
 	E := clientinterfaces.EthereumInterface{}
-	E.Init()
+	E.Init(cc)
 	err = E.ConnectOne(0)
 
 	if err != nil {

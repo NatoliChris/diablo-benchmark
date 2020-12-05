@@ -145,7 +145,7 @@ func createAssetTransaction(transactionID int, generator workloadgenerators.Work
 	return &parsedTxAsset
 }
 
-func readAssetTransaction(transactionID int, assetToRead string, generator workloadgenerators.WorkloadGenerator) (*blockchaintypes.FabricTX){
+func readAssetTransaction(transactionID int, assetToRead string, generator workloadgenerators.WorkloadGenerator) *blockchaintypes.FabricTX {
 
 	var CParamListQuery []configs.ContractParam
 
