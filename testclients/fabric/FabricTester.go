@@ -7,6 +7,7 @@ import (
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/configs/parsers"
 	"encoding/json"
+	"fmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"log"
@@ -38,11 +39,16 @@ func main(){
 	intermediate := workloadgenerators.FabricWorkloadGenerator{}
 	generator = intermediate.NewGenerator(cc, bc)
 	client1 := clientinterfaces.FabricInterface{}
-	client2 := clientinterfaces.FabricInterface{}
+	//client2 := clientinterfaces.FabricInterface{}
 
 	log.Println("Init client1 interface")
-	client1.Init(cc.Nodes)
-	client2.Init(cc.Nodes)
+	if cc.Extra == nil{
+		fmt.Println("EXTRA IS NIL")
+		return
+	}
+
+	client1.Init(cc)
+	//client2.Init(cc.Nodes, nil)
 
 
 	err = generator.BlockchainSetup()
@@ -59,7 +65,7 @@ func main(){
 
 	log.Println("sendRawTransaction via client1 FIRST TIME EXPECTING BUG")
 	err = client1.SendRawTransaction(createAssetTransaction(0,generator))
-	err = client2.SendRawTransaction(createAssetTransaction(0,generator))
+	//err = client2.SendRawTransaction(createAssetTransaction(0,generator))
 
 	workload,err := generator.GenerateWorkload()
 
@@ -80,12 +86,12 @@ func main(){
 		}
 	}
 
-	parsedWorkload2,err := client2.ParseWorkload(workload[0][1])
-		for _,intervals := range parsedWorkload2 {
-			for _, tx := range intervals{
-			client2.SendRawTransaction(tx)
-		}
-	}
+	//parsedWorkload2,err := client2.ParseWorkload(workload[0][1])
+	//	for _,intervals := range parsedWorkload2 {
+	//		for _, tx := range intervals{
+	//		client2.SendRawTransaction(tx)
+	//	}
+	//}
 
 
 	log.Println("--> Evaluate Transaction: GetAllAssets, function returns every asset")
@@ -139,7 +145,7 @@ func createAssetTransaction(transactionID int, generator workloadgenerators.Work
 	return &parsedTxAsset
 }
 
-func readAssetTransaction(transactionID int, assetToRead string, generator workloadgenerators.WorkloadGenerator) (*blockchaintypes.FabricTX){
+func readAssetTransaction(transactionID int, assetToRead string, generator workloadgenerators.WorkloadGenerator) *blockchaintypes.FabricTX {
 
 	var CParamListQuery []configs.ContractParam
 

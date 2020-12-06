@@ -3,10 +3,9 @@ package clientinterfaces
 import (
 	"diablo-benchmark/blockchains/types"
 	"diablo-benchmark/blockchains/workloadgenerators"
+	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/results"
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -20,10 +19,12 @@ import (
 //FabricInterface is the Hyperledger Fabric implementation of the clientinterface
 // Provides functionality to communicate with the Fabric blockchain
 type FabricInterface struct {
-	Gateway   *gateway.Gateway              // Gateway manages the network interaction on behalf of the application
-	Wallet    *gateway.Wallet				// Wallet containing user identity configured for the gateway
-	Network   *gateway.Network				// Network object originating from gateway
-	Contract  *gateway.Contract             // The smart contract we will be interacting with (only supporting one contract workload for now)
+	Gateway  *gateway.Gateway  // Gateway manages the network interaction on behalf of the application
+	Wallet   *gateway.Wallet   // Wallet containing user identity configured for the gateway
+	Network  *gateway.Network  // Network object originating from gateway
+	Contract *gateway.Contract // The smart contract we will be interacting with (only supporting one contract workload for now)
+	ccpPath  string            // connection-profile path to configure the gateway
+
 	TransactionInfo  map[uint64][]time.Time // Transaction information (used for throughput calculation)
 	StartTime        time.Time              // Start time of the benchmark
 	ThroughputTicker *time.Ticker           // Ticker for throughput (1s)
@@ -31,18 +32,20 @@ type FabricInterface struct {
 	GenericInterface
 }
 
-
-
-
 // Init initializes the wallet, gateway, network and map of contracts available in the network
-func (f *FabricInterface) Init(otherHosts []string) {
-	f.Nodes = otherHosts
-	//TODO, use otherHosts to provide contract name, connection profile path and user id path ?
+func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
+	f.Nodes = chainConfig.Nodes
+	mapConfig := chainConfig.Extra[0].(map[string]interface{})
+	user := types.FabricUser{
+		Label: mapConfig["label"].(string),
+		MspID: mapConfig["mspID"].(string),
+		Cert:  mapConfig["cert"].(string),
+		Key:   mapConfig["key"].(string),
+	}
 	f.NumTxDone = 0
 	f.TransactionInfo = make(map[uint64][]time.Time, 0)
 
-
-	err := os.Setenv("DISCOVERY_AS_LOCALHOST", "true")
+	err := os.Setenv("DISCOVERY_AS_LOCALHOST", mapConfig["localHost"].(string))
 	if err != nil {
 		zap.L().Warn("Error setting DISCOVERY_AS_LOCALHOST environemnt variable: " + err.Error())
 	}
@@ -52,95 +55,40 @@ func (f *FabricInterface) Init(otherHosts []string) {
 		zap.L().Warn("Failed to create wallet" + err.Error())
 	}
 
-	if !wallet.Exists("appUser") {
-		err = populateWallet(wallet)
+	if !wallet.Exists(user.Label) {
+		err = f.populateWallet(wallet, user)
 		if err != nil {
 			zap.L().Warn("Failed to populate wallet" + err.Error())
 		}
 	}
 
-	//TODO : function to fetch connection-profile 
-
-	ccpPath := filepath.Join(
-		"..",
-		"..",
-		"localImplementation",
-		"artifacts",
-		"channel",
-		"crypto-config",
-		"peerOrganizations",
-		"org2.example.com",
-		"connection-org2.yaml",
-	)
-
+	ccpPath := mapConfig["ccpPath"].(string)
 
 	f.Gateway, err = gateway.Connect(
 		gateway.WithConfig(config.FromFile(filepath.Clean(ccpPath))),
-		gateway.WithIdentity(wallet, "appUser"))
+		gateway.WithIdentity(wallet, user.Label))
 
 	if err != nil {
 		zap.L().Warn("Failed to connect to gateway" + err.Error())
 	}
 
-
-	f.Network, err = f.Gateway.GetNetwork("mychannel")
+	f.Network, err = f.Gateway.GetNetwork(mapConfig["channelName"].(string))
 
 	if err != nil {
 		zap.L().Warn("Failed to get network" + err.Error())
 	}
 
-
-	contract := f.Network.GetContract("basic")
+	contract := f.Network.GetContract(mapConfig["contractName"].(string))
 
 	f.Contract = contract
 }
 
 // Called when the wallet hasn't been instantiated yet
 // Creates the wallet/identity of the gateway peer we connect to
-func populateWallet(wallet *gateway.Wallet) error {
-	credPath := filepath.Join(
-		"..",
-		"..",
-		"localImplementation",
-		"artifacts",
-		"channel",
-		"crypto-config",
-		"peerOrganizations",
-		"org2.example.com",
-		"users",
-		"User1@org2.example.com",
-		"msp",
-	)
+func (f *FabricInterface) populateWallet(wallet *gateway.Wallet, user types.FabricUser) error {
+	identity := gateway.NewX509Identity(user.MspID, user.Cert, user.Key)
 
-	certPath := filepath.Join(credPath, "signcerts", "User1@org2.example.com-cert.pem")
-	// read the certificate pem
-	cert, err := ioutil.ReadFile(filepath.Clean(certPath))
-	if err != nil {
-		return err
-	}
-
-	keyDir := filepath.Join(credPath, "keystore")
-	// there's a single file in this dir containing the private key
-	files, err := ioutil.ReadDir(keyDir)
-	if err != nil {
-		return err
-	}
-	if len(files) != 1 {
-		return fmt.Errorf("keystore folder should have contain one file")
-	}
-	keyPath := filepath.Join(keyDir, files[0].Name())
-	key, err := ioutil.ReadFile(filepath.Clean(keyPath))
-	if err != nil {
-		return err
-	}
-
-	mspID := "Org2MSP"
-
-	identity := gateway.NewX509Identity(mspID, string(cert), string(key))
-
-	label := "appUser"
-
-	return wallet.Put(label, identity)
+	return wallet.Put(user.Label, identity)
 }
 
 // Cleanup Finishes up and performs any post-benchmark operations.
@@ -149,7 +97,6 @@ func (f *FabricInterface) Cleanup() results.Results {
 
 	// Stop the ticker
 	f.ThroughputTicker.Stop()
-
 
 	txLatencies := make([]float64, 0)
 	var avgLatency float64
@@ -198,7 +145,6 @@ func (f *FabricInterface) Cleanup() results.Results {
 	}
 }
 
-
 // throughputSeconds calculates the throughput over time, to show dynamic
 func (f *FabricInterface) throughputSeconds() {
 	f.ThroughputTicker = time.NewTicker(time.Second)
@@ -212,7 +158,6 @@ func (f *FabricInterface) throughputSeconds() {
 		}
 	}
 }
-
 
 // Start handles the starting aspects of the benchmark
 // Is primarily used for setting the start time and allocating resources for
@@ -234,7 +179,7 @@ func (f *FabricInterface) ParseWorkload(workload workloadgenerators.WorkerThread
 		intervalTxs := make([]interface{}, 0)
 		for _, txBytes := range v {
 			var t types.FabricTX
-			err := json.Unmarshal(txBytes,&t)
+			err := json.Unmarshal(txBytes, &t)
 			if err != nil {
 				return nil, err
 			}
@@ -273,16 +218,15 @@ func (f *FabricInterface) DeploySmartContract(tx interface{}) (interface{}, erro
 // SendRawTransaction sends the transaction by the gateway
 func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
 
-	 f.submitTransaction(tx)
+	f.submitTransaction(tx)
 
 	return nil
 }
 
 // submitTransaction utility function to submit a transaction, to be used in a different thread
 // as the main thread as it may hang
-func (f *FabricInterface) submitTransaction(tx interface{}){
+func (f *FabricInterface) submitTransaction(tx interface{}) {
 	transaction := tx.(*types.FabricTX)
-
 
 	// making note of the time we send the transaction
 	f.TransactionInfo[transaction.ID] = []time.Time{time.Now()}
@@ -290,7 +234,7 @@ func (f *FabricInterface) submitTransaction(tx interface{}){
 
 	var err error
 
-	if transaction.FunctionType == "write"{
+	if transaction.FunctionType == "write" {
 		//submitTransaction does everything under the hood for us.
 		// Rather than interacting with a single peer, the SDK will send the submitTransaction proposal
 		//to every required organization’s peer in the blockchain network based on the chaincode’s endorsement policy.
@@ -299,12 +243,12 @@ func (f *FabricInterface) submitTransaction(tx interface{}){
 		//a single transaction, which it then submits to the orderer. The orderer collects and sequences transactions from various application clients into a block of transactions.
 		//These blocks are distributed to every peer in the network, where every transaction is validated and committed.
 		//Finally, the SDK is notified via an event, allowing it to return control to the application.
-		_,err = f.Contract.SubmitTransaction(transaction.FunctionName, transaction.Args...)
+		_, err = f.Contract.SubmitTransaction(transaction.FunctionName, transaction.Args...)
 
 	} else {
 
 		//EvaluteTransaction is much less expensive and only queries one peer for its world state
-		_,err = f.Contract.EvaluateTransaction(transaction.FunctionName, transaction.Args...)
+		_, err = f.Contract.EvaluateTransaction(transaction.FunctionName, transaction.Args...)
 	}
 
 	// transaction failed, incrementing number of done and failed transactions
@@ -313,14 +257,12 @@ func (f *FabricInterface) submitTransaction(tx interface{}){
 		atomic.AddUint64(&f.NumTxDone, 1)
 	}
 
-
 	//transaction validated, making the note of the time of return
-	f.TransactionInfo[transaction.ID] = append(f.TransactionInfo[transaction.ID],time.Now())
-	atomic.AddUint64(&f.Success,1)
-	atomic.AddUint64(&f.NumTxDone,1)
+	f.TransactionInfo[transaction.ID] = append(f.TransactionInfo[transaction.ID], time.Now())
+	atomic.AddUint64(&f.Success, 1)
+	atomic.AddUint64(&f.NumTxDone, 1)
 
 }
-
 
 // SecureRead reads the value from the chain
 // (NOT NEEDED IN FABRIC) SecureRead is useful in permissionless blockchains where transaction
@@ -344,8 +286,6 @@ func (f *FabricInterface) GetBlockByNumber(index uint64) (GenericBlock, error) {
 func (f *FabricInterface) GetBlockHeight() (uint64, error) {
 	return 0, nil
 }
-
-
 
 // ParseBlocksForTransactions retrieves block information from start to end index and
 // is used as a post-benchmark check to learn about the block and transactions.
