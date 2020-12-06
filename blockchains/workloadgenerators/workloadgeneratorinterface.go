@@ -46,7 +46,7 @@ type WorkloadGenerator interface {
 	CreateContractDeployTX(fromPrivKey []byte, contractPath string) ([]byte, error)
 
 	// CreateInteractionTX create a signed transaction that performs actions on a smart contract at the given address
-	CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []configs.ContractParam) ([]byte, error)
+	CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []configs.ContractParam, value string) ([]byte, error)
 
 	// CreateSignedTransaction creates a transaction that is signed and ready to send from the given private key.
 	CreateSignedTransaction(fromPrivKey []byte, toAddress string, value *big.Int, data []byte) ([]byte, error)
