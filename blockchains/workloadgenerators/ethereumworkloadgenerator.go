@@ -424,6 +424,9 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 	}
 
 	// Create the signed transaction
+	if value == "" {
+		value = "0"
+	}
 	sendVal, ok := big.NewInt(0).SetString(value, 16)
 	if !ok {
 		zap.L().Warn(fmt.Sprintf("Failed to set value of tx, could not convert %s to big number", value))
