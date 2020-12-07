@@ -6,6 +6,7 @@ package clientinterfaces
 import (
 	"context"
 	"diablo-benchmark/blockchains/workloadgenerators"
+	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/results"
 	"errors"
 	"fmt"
@@ -33,8 +34,8 @@ type EthereumInterface struct {
 }
 
 // Init initialises the list of nodes
-func (e *EthereumInterface) Init(otherHosts []string) {
-	e.Nodes = otherHosts
+func (e *EthereumInterface) Init(chainConfig *configs.ChainConfig) {
+	e.Nodes = chainConfig.Nodes
 	e.TransactionInfo = make(map[string][]time.Time, 0)
 	e.SubscribeDone = make(chan bool)
 	e.HandlersStarted = false
