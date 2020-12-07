@@ -17,6 +17,9 @@ const TxTypeSimple BenchTransactionType = "simple"
 // contract interaction and deployment
 const TxTypeContract BenchTransactionType = "contract"
 
+// TxTypeTest indicates the we are running the test workload used in end-to-end testing
+const TxTypeTest BenchTransactionType = "test"
+
 // DefaultTimeout is the default timeout for the benchmark if not provided
 // or overwritten by the args
 const DefaultTimeout int = 20
@@ -29,7 +32,7 @@ type TPSIntervals map[int]int
 // the blockchain.
 type ChainKey struct {
 	PrivateKey []byte `yaml:"private"` // Private key information
-	Address    string `yaml:address`   // Address that it is from
+	Address    string `yaml:"address"`   // Address that it is from
 }
 
 // checkPrefix Naive check if the prefixed PrivateKey has "0x" leading.
@@ -140,6 +143,8 @@ func (bt *BenchTransactionType) UnmarshalYAML(unmarshal func(interface{}) error)
 		*bt = TxTypeSimple
 	case "contract":
 		*bt = TxTypeContract
+	case "test":
+		*bt = TxTypeTest
 	default:
 		return errors.New("TX Type is incorrectly defined")
 	}

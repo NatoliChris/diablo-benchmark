@@ -2,11 +2,13 @@
 // specific blockchain interface. The "blockchain_interface" is the main interface
 // defining the required functionality of all implementations for the blockchain.
 // This package is defined to integrate the interactions of the different
-// blockchain RPC interactions.
+// blockchain RPC interactions and record the relevant statistics.
+// The client interface runs on each secondary node thread.
 package clientinterfaces
 
 import (
 	"diablo-benchmark/blockchains/workloadgenerators"
+	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/results"
 )
 
@@ -33,7 +35,7 @@ func (gi *GenericInterface) GetTxDone() uint64 {
 type BlockchainInterface interface {
 	// Provides the client with the list of all hosts, this is the pair of (host, port) in an array.
 	// This will be used for the secure reads.
-	Init(otherHosts []string)
+	Init(chainConfig *configs.ChainConfig)
 
 	// Finishes up and performs any post-benchmark operations.
 	// Can be used to format the results to parse back
