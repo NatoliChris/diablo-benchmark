@@ -1,6 +1,7 @@
 GOBIN := go
 BUILDFLAGS := -v
 PKG := "diablo-benchmark"
+PKGFOLDERS := blockchains/... communication/... core/...
 
 default: diablo
 
@@ -12,7 +13,7 @@ reqs:
 	# $(GOBIN) mod vendor
 
 lint:
-	@golint -set_exit_status ./...
+	@golint -set_exit_status $(PKGFOLDERS)
 
 diablo:
 	$(GOBIN) build $(BUILDFLAGS) -o $@
