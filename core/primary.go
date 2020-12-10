@@ -117,6 +117,9 @@ func (p *Primary) Run() {
 	if err != nil {
 		zap.L().Error("failed to generate workload",
 			zap.String("error", err.Error()))
+		p.Server.CloseSecondaries()
+		p.Server.Close()
+		return
 	}
 
 	// Step 4: Distribute benchmark
