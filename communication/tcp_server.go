@@ -182,11 +182,11 @@ func (s *PrimaryServer) sendAndWaitData(data []byte, secondary net.Conn) ([]resu
 	dataLen := binary.BigEndian.Uint64(initialReply[1:9])
 
 	if dataLen == 0 {
-		return []results.Results{results.Results{
+		return []results.Results{{
 			AverageLatency: 0,
 			Throughput:     0,
 			TxLatencies:    []float64{},
-		}}, nil
+				}}, nil
 	}
 
 	fullReply := initialReply[9:n]

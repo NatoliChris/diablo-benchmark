@@ -4,6 +4,7 @@ package handlers
 import (
 	"diablo-benchmark/blockchains/clientinterfaces"
 	"diablo-benchmark/blockchains/workloadgenerators"
+	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/results"
 	"errors"
 	"fmt"
@@ -40,10 +41,11 @@ func NewWorkloadHandler(numThread uint32, clients []clientinterfaces.BlockchainI
 }
 
 // Connect initialises the clients and connects to the nodes
-func (wh *WorkloadHandler) Connect(nodes []string, ID int) error {
+func (wh *WorkloadHandler) Connect(chainConfig *configs.ChainConfig, ID int) error {
 	var combinedErr []string
 	for _, v := range wh.activeClients {
-		v.Init(nodes)
+		v.Init(chainConfig)
+		v.SetWindow(chainConfig.ThroughputWindow)
 		e := v.ConnectAll(ID)
 		if e != nil {
 			combinedErr = append(combinedErr, e.Error())

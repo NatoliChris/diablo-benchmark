@@ -234,25 +234,32 @@ func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, c
 }
 
 // CreateInteractionTX forms a transaction that invokes a smart contract
-func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []configs.ContractParam) ([]byte, error) {
+func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []configs.ContractParam, value string) ([]byte, error) {
 	// Check that the contract has been compiled, if nto - then it's difficult to get the hashes from the ABI.
 	if e.CompiledContract == nil {
 		return nil, fmt.Errorf("contract does not exist in known generator")
 	}
 
+	// If there are empty params, warn - just because this isn't super common
 	if len(contractParams) < 1 {
 		// empty
-		return nil, fmt.Errorf("empty contract params for %s", functionName)
+		zap.L().Warn(fmt.Sprintf("empty contract params for %s", functionName))
 	}
 
 	// next - get the function hash
 	var funcHash string
-	val, ok := e.CompiledContract.Hashes[functionName]
-	if !ok {
-		return nil, fmt.Errorf("contract does not contain function: %s", functionName)
-	}
-	funcHash = val
 
+	// If we are targeting the fallback function, or, just sending ether - we can ignore the
+	// function name.
+	if functionName == "fallback" || functionName == "receive" || functionName == "()" {
+		funcHash = ""
+	} else {
+		val, ok := e.CompiledContract.Hashes[functionName]
+		if !ok {
+			return nil, fmt.Errorf("contract does not contain function: %s", functionName)
+		}
+		funcHash = val
+	}
 	// Now we need to parse the arguments to get them into the correct padding
 	payloadBytes, err := hex.DecodeString(funcHash)
 	if err != nil {
@@ -413,11 +420,19 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 
 	// Assume that the payload bytes have been correctly formed at this point?
 	if len(payloadBytes) < 1 {
-		return nil, fmt.Errorf("no payload generated")
+		zap.L().Warn(fmt.Sprintf("no payload generated, sending transaction with 0 data bytes"))
 	}
 
 	// Create the signed transaction
-	tx, err := e.CreateSignedTransaction(fromPrivKey, contractAddress, big.NewInt(0), payloadBytes)
+	if value == "" {
+		value = "0"
+	}
+	sendVal, ok := big.NewInt(0).SetString(value, 16)
+	if !ok {
+		zap.L().Warn(fmt.Sprintf("Failed to set value of tx, could not convert %s to big number", value))
+	}
+
+	tx, err := e.CreateSignedTransaction(fromPrivKey, contractAddress, sendVal, payloadBytes)
 
 	if err != nil {
 		return nil, err
@@ -447,6 +462,7 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, 
 	zap.L().Debug("transaction params",
 		zap.String("addrFrom", addrFrom.String()),
 		zap.String("addrTo", toAddress),
+		zap.Uint64("nonce", e.Nonces[strings.ToLower(addrFrom.String())]),
 	)
 
 	// Make and sign the transaction
@@ -638,6 +654,7 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 						contractAddr,
 						funcToCreate.Name,
 						funcToCreate.Params,
+						funcToCreate.PayValue,
 					)
 
 					if txerr != nil {

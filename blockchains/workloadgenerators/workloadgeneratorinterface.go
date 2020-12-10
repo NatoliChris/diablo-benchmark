@@ -1,5 +1,8 @@
 // Package workloadgenerators provides the workload generators for the
-// DIABLO benchmark. It handles the deployment and compilation of smart
+// DIABLO benchmark.
+// This handles the creation of the entire workload for each given secondary
+// thread, and handles the account information relevant to the workload.
+// It handles the deployment and compilation of smart
 // contracts and the generation/creation of transactions that will be used
 // to send the information through to the blockchain network.
 package workloadgenerators
@@ -46,7 +49,7 @@ type WorkloadGenerator interface {
 	CreateContractDeployTX(fromPrivKey []byte, contractPath string) ([]byte, error)
 
 	// CreateInteractionTX create a signed transaction that performs actions on a smart contract at the given address
-	CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []configs.ContractParam) ([]byte, error)
+	CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []configs.ContractParam, value string) ([]byte, error)
 
 	// CreateSignedTransaction creates a transaction that is signed and ready to send from the given private key.
 	CreateSignedTransaction(fromPrivKey []byte, toAddress string, value *big.Int, data []byte) ([]byte, error)
