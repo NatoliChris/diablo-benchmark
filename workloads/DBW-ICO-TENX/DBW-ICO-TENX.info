@@ -19,16 +19,17 @@ Description of the workload
 
 Curve Definition:
 
-   3500 |
-   3000 |    xx
-   2500 |    x xxxxxxx
-   2000 |    x        xxxxxxxxxxxxxxxxxxx
-   1500 |    x                           xxxxxxxxxxxxxxx
-   1000 |    x                                          xxxxxxxxxxx
-    500 |xxxx                                                      xxxxxxxxx
+   3500 |                                xxxxxxxxxxxxx
+   3000 |                    xxxxxxxxxxxx            x
+   2500 |   xxxxxxxxxxxxxxxxx                         x
+   2000 |   x                                         x
+   1500 |   x                                         x
+   1000 |   x                                         xxxxx
+    500 |xxxx                                              xxxxxxxx
       0 |______________________________________________________________________
-        0       120         240         360         480         600         720
-
+        0   60  120         240         360         480         620         720
+            |                                        |
+          ICO START                               ICO END
 
     ICO duration: 7 minutes
     Contract Function: () "fallback function" or "receive()" - send ether and
