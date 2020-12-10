@@ -15,11 +15,11 @@ bench:
     485: 1000
     500: 500
     620: 500
-
 contract:
   path: "./workloads/DBW-ICO-TENX/eth-solidity/tenx-fixed.sol"
+  name: MainSale
   functions:
     - name: "()"
-    - ftype: "pay"
-      value: 1
+      ftype: "write"
+      value: "100000"
       ratio: 100

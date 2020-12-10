@@ -30,7 +30,7 @@ contract Ownable {
    */
   modifier onlyOwner() {
     if (msg.sender != owner) {
-      revert();
+      revert("only owner allowed");
     }
     _;
   }
@@ -134,7 +134,7 @@ contract ExchangeRate is Ownable {
    */
   function updateRates(uint[] memory data) public onlyOwner {
     if (data.length % 2 > 0)
-      revert();
+      revert("datalength not correct");
     uint i = 0;
     while (i < data.length / 2) {
       bytes32 symbol = bytes32(data[i * 2]);
@@ -238,7 +238,7 @@ contract PayToken {
 
 
   modifier canMint() {
-      if(mintingFinished) revert();
+      if(mintingFinished) revert("minting finished");
       _;
   }
 
@@ -329,7 +329,7 @@ contract MainSale is Ownable, Authorizable {
   modifier saleIsOn() {
     // require(now > start && now < start + 28 days);
     // MODIFIED FOR BENCHMARK SCENARIOS
-    require(block.timestamp >= start);
+    // require(block.timestamp >= start);
     _;
   }
 
@@ -351,7 +351,7 @@ contract MainSale is Ownable, Authorizable {
    * @param recipient the recipient to receive tokens. 
    */
   function createTokens(address recipient) public isUnderHardCap saleIsOn payable {
-    uint rate = exchangeRate.getRate("ETH");
+    uint rate = uint(100);
     uint tokens = rate.mul(msg.value).div(1 ether);
     token.mint(recipient, tokens);
     require(multisigVault.send(msg.value));
