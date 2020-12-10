@@ -7,10 +7,11 @@ import (
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/configs/validators"
 	"errors"
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"math"
 	"sort"
+
+	"gopkg.in/yaml.v3"
 )
 
 // ParseBenchConfig parses the benchmark configuration file from YAML.

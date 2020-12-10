@@ -45,6 +45,7 @@ func (wh *WorkloadHandler) Connect(chainConfig *configs.ChainConfig, ID int) err
 	var combinedErr []string
 	for _, v := range wh.activeClients {
 		v.Init(chainConfig)
+		v.SetWindow(chainConfig.ThroughputWindow)
 		e := v.ConnectAll(ID)
 		if e != nil {
 			combinedErr = append(combinedErr, e.Error())

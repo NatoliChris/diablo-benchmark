@@ -79,8 +79,8 @@ func (e *EthereumInterface) Cleanup() results.Results {
 		zap.Uint("success", success),
 		zap.Uint("fail", fails))
 
+	// Calculate the throughput and latencies
 	var throughput float64
-
 	if len(txLatencies) > 0 {
 		throughput = float64(e.NumTxDone) / (endTime.Sub(e.StartTime).Seconds())
 		avgLatency = avgLatency / float64(len(txLatencies))
@@ -89,11 +89,16 @@ func (e *EthereumInterface) Cleanup() results.Results {
 		throughput = 0
 	}
 
+	var calculatedThroughputSeconds = []float64{e.Throughputs[0]}
+	for i := 1; i < len(e.Throughputs); i++ {
+		calculatedThroughputSeconds = append(calculatedThroughputSeconds, float64(e.Throughputs[i]-e.Throughputs[i-1]))
+	}
+
 	return results.Results{
 		TxLatencies:       txLatencies,
 		AverageLatency:    avgLatency,
 		Throughput:        throughput,
-		ThroughputSeconds: e.Throughputs,
+		ThroughputSeconds: calculatedThroughputSeconds,
 		Success:           success,
 		Fail:              fails,
 	}
@@ -101,14 +106,14 @@ func (e *EthereumInterface) Cleanup() results.Results {
 
 // throughputSeconds calculates the throughput over time, to show dynamic
 func (e *EthereumInterface) throughputSeconds() {
-	e.ThroughputTicker = time.NewTicker(time.Second)
+	e.ThroughputTicker = time.NewTicker((time.Duration(e.Window) * time.Second))
 	seconds := float64(0)
 
 	for {
 		select {
 		case <-e.ThroughputTicker.C:
-			seconds++
-			e.Throughputs = append(e.Throughputs, float64(e.NumTxDone-e.Fail)/seconds)
+			seconds += float64(e.Window)
+			e.Throughputs = append(e.Throughputs, float64(e.NumTxDone-e.Fail))
 		}
 	}
 }
@@ -288,26 +293,34 @@ func (e *EthereumInterface) DeploySmartContract(tx interface{}) (interface{}, er
 	return r.ContractAddress, nil
 }
 
+func (e *EthereumInterface) _sendTx(txSigned ethtypes.Transaction) {
+	// timoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
+
+	err := e.PrimaryNode.SendTransaction(context.Background(), &txSigned)
+
+	// The transaction failed - this could be if it was reproposed, or, just failed.
+	// We need to make sure that if it was re-proposed it doesn't count as a "success" on this node.
+	if err != nil {
+		zap.L().Debug("Err",
+			zap.Error(err),
+		)
+		atomic.AddUint64(&e.Fail, 1)
+		atomic.AddUint64(&e.NumTxDone, 1)
+	}
+
+	e.TransactionInfo[txSigned.Hash().String()] = []time.Time{time.Now()}
+	atomic.AddUint64(&e.NumTxSent, 1)
+}
+
 // SendRawTransaction sends a raw transaction to the blockchain node.
 // It assumes that the transaction is the correct type
 // and has already been signed and is ready to send into the network.
 func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
 	// NOTE: type conversion might be slow, there might be a better way to send this.
 	txSigned := tx.(*ethtypes.Transaction)
-	timoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	zap.L().Debug(fmt.Sprintf("%s", txSigned.Nonce))
+	go e._sendTx(*txSigned)
 
-	err := e.PrimaryNode.SendTransaction(timoutCTX, txSigned)
-
-	// The transaction failed - this could be if it was reproposed, or, just failed.
-	// We need to make sure that if it was re-proposed it doesn't count as a "success" on this node.
-	if err != nil {
-		atomic.AddUint64(&e.Fail, 1)
-		atomic.AddUint64(&e.NumTxDone, 1)
-		return err
-	}
-
-	e.TransactionInfo[txSigned.Hash().String()] = []time.Time{time.Now()}
-	atomic.AddUint64(&e.NumTxSent, 1)
 	return nil
 }
 

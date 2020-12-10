@@ -8,7 +8,7 @@ bench:
     0: 5
     5: 5
 contract:
-  path: "./contracts/Store.sol"
+  path: "./contracts/testing_contracts/ethereum/Store.sol"
   functions:
     - name: "storeVal(uint32)"
       ftype: "write"
