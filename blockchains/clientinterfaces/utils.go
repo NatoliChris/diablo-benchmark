@@ -12,6 +12,9 @@ func GetBlockchainInterface(config *configs.ChainConfig) (BlockchainInterface, e
 	case "ethereum":
 		bci := EthereumInterface{}
 		return &bci, nil
+	case "fabric":
+		bci := FabricInterface{}
+		return &bci,nil
 	default:
 		return nil, errors.New("unsupported blockchain in chain config")
 	}

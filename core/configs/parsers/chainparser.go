@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
@@ -65,6 +66,10 @@ func parseKeyFile(path string) ([]configs.ChainKey, error) {
 		return nil, fmt.Errorf("Unsupported filetype for key file: %s", fileType[len(fileType)-1])
 	}
 
+	zap.L().Debug("Loaded accounts",
+		zap.Int("accounts", len(keys)),
+	)
+
 	return keys, err
 }
 
@@ -89,6 +94,11 @@ func parseChainYaml(fileContents []byte, path string) (*configs.ChainConfig, err
 		}
 
 		chainConfig.Keys = kf
+	}
+
+	// Ensure that the window is at least 1 (second)
+	if chainConfig.ThroughputWindow <= 0 {
+		chainConfig.ThroughputWindow = 1
 	}
 
 	return &chainConfig, nil
