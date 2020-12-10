@@ -8,9 +8,8 @@ import (
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 
+// OwnerToIDCompositeName represents a string that shows owner->id.
 const OwnerToIDCompositeName = "owner->id"
-
-
 
 // SmartContract provides functions for managing the buying and selling of aircraft parts
 type SmartContract struct {
@@ -19,24 +18,21 @@ type SmartContract struct {
 
 // Asset describes basic details of what makes up a simple part
 type AircraftPart struct {
-	ID             string `json:"ID"`   //format is "PARTn" where n is a positive integer
-	Description	   string `json:"description"`
+	ID             string `json:"ID"` //format is "PARTn" where n is a positive integer
+	Description    string `json:"description"`
 	Certification  string `json:"certification"`
 	Owner          string `json:"owner"`
 	AppraisedValue int    `json:"appraisedValue"`
 }
 
-
-
-
+// PurchaseOrder represents the purchasing of an aircraft part.
+// It details all information of seller, buyer, part and unique ID.
 type PurchaseOrder struct {
-	ID              string `json:"ID"`   //format is "ORDERn" where n is a positive integer
-	From 			string `json:"from"` //seller name
-	To 				string `json:"to"`	// buyer name
-	SoldPart 		AircraftPart `json:"soldPart"` // the aircraft part sold in the purchase order
+	ID       string       `json:"ID"`       //format is "ORDERn" where n is a positive integer
+	From     string       `json:"from"`     //seller name
+	To       string       `json:"to"`       // buyer name
+	SoldPart AircraftPart `json:"soldPart"` // the aircraft part sold in the purchase order
 }
-
-
 
 //CreatePart issues a new part to the world state with given details.
 func (s *SmartContract) CreatePart(ctx contractapi.TransactionContextInterface, id string, description string, certification string,
@@ -52,7 +48,7 @@ func (s *SmartContract) CreatePart(ctx contractapi.TransactionContextInterface, 
 
 	asset := AircraftPart{
 		ID:             id,
-		Description:   description,
+		Description:    description,
 		Certification:  certification,
 		Owner:          owner,
 		AppraisedValue: appraisedValue,
@@ -63,19 +59,17 @@ func (s *SmartContract) CreatePart(ctx contractapi.TransactionContextInterface, 
 		return err
 	}
 
-
 	err = ctx.GetStub().PutState(id, assetJSON)
 	if err != nil {
 		return err
 	}
 
 	//creation of compositeKey, a composite key allows us to quickly query the ledger by the owner name
-	ownerPartIDIndexKey,err := ctx.GetStub().CreateCompositeKey(OwnerToIDCompositeName,[]string{owner,id})
+	ownerPartIDIndexKey, err := ctx.GetStub().CreateCompositeKey(OwnerToIDCompositeName, []string{owner, id})
 	value := []byte{0x00}
 
-	return ctx.GetStub().PutState(ownerPartIDIndexKey,value)
+	return ctx.GetStub().PutState(ownerPartIDIndexKey, value)
 }
-
 
 //QueryPartByID returns the part stored in the world state with given id.
 func (s *SmartContract) QueryPartByID(ctx contractapi.TransactionContextInterface, id string) (*AircraftPart, error) {
@@ -97,7 +91,7 @@ func (s *SmartContract) QueryPartByID(ctx contractapi.TransactionContextInterfac
 }
 
 //QueryPartsByOwner returns all of the parts tied to the specified owner, using composites keys for fast querying
-func (s *SmartContract) QueryPartsByOwner(ctx contractapi.TransactionContextInterface, owner string) ([]*AircraftPart, error){
+func (s *SmartContract) QueryPartsByOwner(ctx contractapi.TransactionContextInterface, owner string) ([]*AircraftPart, error) {
 
 	compositeKeyIterator, err := ctx.GetStub().GetStateByPartialCompositeKey(OwnerToIDCompositeName, []string{owner})
 	if err != nil {
@@ -113,7 +107,7 @@ func (s *SmartContract) QueryPartsByOwner(ctx contractapi.TransactionContextInte
 		}
 
 		// from composite key {owner->id, {owner,id}}, we get owner->id, {owner,id}, err
-		_,compositeKeyParts, err := ctx.GetStub().SplitCompositeKey(compositeKey.Key)
+		_, compositeKeyParts, err := ctx.GetStub().SplitCompositeKey(compositeKey.Key)
 		if err != nil {
 			return nil, err
 		}
@@ -121,7 +115,7 @@ func (s *SmartContract) QueryPartsByOwner(ctx contractapi.TransactionContextInte
 		// the aircraft part id associated to the owner
 		partID := compositeKeyParts[1]
 		// getting the part
-		partJSON,err := ctx.GetStub().GetState(partID)
+		partJSON, err := ctx.GetStub().GetState(partID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read from world state: %v", err)
 		}
@@ -154,13 +148,13 @@ func (s *SmartContract) DeletePart(ctx contractapi.TransactionContextInterface, 
 	}
 
 	var part AircraftPart
-	err = json.Unmarshal(partJSON,&part)
+	err = json.Unmarshal(partJSON, &part)
 	if err != nil {
 		return err
 	}
 
 	// deleting the composite key
-	ownerPartIDIndexKey,err := ctx.GetStub().CreateCompositeKey(OwnerToIDCompositeName,[]string{part.Owner,part.ID})
+	ownerPartIDIndexKey, err := ctx.GetStub().CreateCompositeKey(OwnerToIDCompositeName, []string{part.Owner, part.ID})
 
 	err = ctx.GetStub().DelState(ownerPartIDIndexKey)
 	if err != nil {
@@ -181,7 +175,7 @@ func (s *SmartContract) PartExists(ctx contractapi.TransactionContextInterface, 
 }
 
 // TransferAsset updates the owner field of asset with given id in world state.
-func (s *SmartContract) TransferPart(ctx contractapi.TransactionContextInterface, partID string, purchaseOrderID string,newOwner string) error {
+func (s *SmartContract) TransferPart(ctx contractapi.TransactionContextInterface, partID string, purchaseOrderID string, newOwner string) error {
 	part, err := s.QueryPartByID(ctx, partID)
 	if err != nil {
 		return err
@@ -200,7 +194,7 @@ func (s *SmartContract) TransferPart(ctx contractapi.TransactionContextInterface
 	if err != nil {
 		return err
 	}
-	err = ctx.GetStub().PutState(purchaseOrderID,purchaseOrderJSON)
+	err = ctx.GetStub().PutState(purchaseOrderID, purchaseOrderJSON)
 	if err != nil {
 		return err
 	}
@@ -208,7 +202,7 @@ func (s *SmartContract) TransferPart(ctx contractapi.TransactionContextInterface
 	//updating the composite key
 
 	//deleting it
-	ownerPartIDIndexKey,err := ctx.GetStub().CreateCompositeKey(OwnerToIDCompositeName,[]string{part.Owner,part.ID})
+	ownerPartIDIndexKey, err := ctx.GetStub().CreateCompositeKey(OwnerToIDCompositeName, []string{part.Owner, part.ID})
 	if err != nil {
 		return err
 	}
@@ -218,16 +212,15 @@ func (s *SmartContract) TransferPart(ctx contractapi.TransactionContextInterface
 	}
 
 	// putting the new in
-	ownerPartIDIndexKey,err = ctx.GetStub().CreateCompositeKey(OwnerToIDCompositeName,[]string{newOwner,part.ID})
+	ownerPartIDIndexKey, err = ctx.GetStub().CreateCompositeKey(OwnerToIDCompositeName, []string{newOwner, part.ID})
 	if err != nil {
 		return err
 	}
 	value := []byte{0x00}
-	err = ctx.GetStub().PutState(ownerPartIDIndexKey,value)
+	err = ctx.GetStub().PutState(ownerPartIDIndexKey, value)
 	if err != nil {
 		return err
 	}
-
 
 	// putting the updated part in the state
 	part.Owner = newOwner
@@ -266,7 +259,6 @@ func (s *SmartContract) GetAllParts(ctx contractapi.TransactionContextInterface)
 
 	return parts, nil
 }
-
 
 func main() {
 	assetChaincode, err := contractapi.NewChaincode(new(SmartContract))

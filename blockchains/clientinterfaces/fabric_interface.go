@@ -135,6 +135,11 @@ func (f *FabricInterface) Cleanup() results.Results {
 		throughput = 0
 	}
 
+	var calculatedThroughputSeconds = []float64{f.Throughputs[0]}
+	for i := 1; i < len(f.Throughputs); i++ {
+		calculatedThroughputSeconds = append(calculatedThroughputSeconds, float64(f.Throughputs[i]-f.Throughputs[i-1]))
+	}
+
 	return results.Results{
 		TxLatencies:       txLatencies,
 		AverageLatency:    avgLatency,
@@ -147,14 +152,14 @@ func (f *FabricInterface) Cleanup() results.Results {
 
 // throughputSeconds calculates the throughput over time, to show dynamic
 func (f *FabricInterface) throughputSeconds() {
-	f.ThroughputTicker = time.NewTicker(time.Second)
+	f.ThroughputTicker = time.NewTicker(time.Duration(f.Window) * time.Second)
 	seconds := float64(0)
 
 	for {
 		select {
 		case <-f.ThroughputTicker.C:
-			seconds++
-			f.Throughputs = append(f.Throughputs, float64(f.NumTxDone-f.Fail)/seconds)
+			seconds += float64(f.Window)
+			f.Throughputs = append(f.Throughputs, float64(f.NumTxDone-f.Fail))
 		}
 	}
 }
