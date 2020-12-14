@@ -6,7 +6,6 @@
 package core
 
 import (
-	"diablo-benchmark/blockchains"
 	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/communication"
 	"diablo-benchmark/core/configs"
@@ -93,22 +92,36 @@ func (p *Primary) Run() {
 
 	// Step 2: Blockchain type (tells which interface they should be using)
 	// get the blockchain byte
-	bcMessage, err := blockchains.MatchStringToMessage(p.chainConfig.Name)
 
-	if err != nil {
-		p.Server.CloseSecondaries()
-		p.Server.Close()
-	}
+	/////////////////////////////////////////////////////////////////////////
+	// Note; This feature has been DISABLED!
+	//       The primary function for this feature was to enable Diablo to
+	//       continue running on the machines and benchmark MULTIPLE
+	//       blockchains one after another to preserve the "same machines"
+	//       and same experimental setup.
+	//       This feature was disabled since we can easily re-run the binary
+	//       with separate configurations to achieve the same effect.
+	//
+	//       TODO: @Chris - Remove this feature entirely, since we decided
+	//                      against it.
+	/////////////////////////////////////////////////////////////////////////
 
-	errs = p.Server.SendBlockchainType(bcMessage)
+	// bcMessage, err := blockchains.MatchStringToMessage(p.chainConfig.Name)
 
-	if errs != nil {
-		zap.L().Error("failed to send blockchain type",
-			zap.Strings("errors", errs))
-		p.Server.CloseSecondaries()
-		p.Server.Close()
-		return
-	}
+	// if err != nil {
+	// 	p.Server.CloseSecondaries()
+	// 	p.Server.Close()
+	// }
+
+	// errs = p.Server.SendBlockchainType(bcMessage)
+
+	// if errs != nil {
+	// 	zap.L().Error("failed to send blockchain type",
+	// 		zap.Strings("errors", errs))
+	// 	p.Server.CloseSecondaries()
+	// 	p.Server.Close()
+	// 	return
+	// }
 
 	// Step 3: Prepare the workload for the benchmark
 	// TODO: generate workloads
