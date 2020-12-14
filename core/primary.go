@@ -42,6 +42,12 @@ func InitPrimary(listenAddr string, expectedSecondaries int, wg workloadgenerato
 	}
 }
 
+// closeAllConns closes all connections and exits
+func (p *Primary) closeAllConns() {
+	p.Server.CloseSecondaries()
+	p.Server.Close()
+}
+
 // Run provides the main functionality to run
 // Holds the majority of the work
 // TODO: under construction!
@@ -78,8 +84,7 @@ func (p *Primary) Run() {
 
 	if errs != nil {
 		// We have errors
-		p.Server.CloseSecondaries()
-		p.Server.Close()
+		p.closeAllConns()
 		zap.L().Error("Encountered errors in secondaries",
 			zap.Strings("errors", errs))
 	}
@@ -130,18 +135,25 @@ func (p *Primary) Run() {
 	if err != nil {
 		zap.L().Error("failed to generate workload",
 			zap.String("error", err.Error()))
+		p.closeAllConns()
 	}
 
 	// Step 4: Distribute benchmark
 	errs = p.Server.SendWorkload(workload)
 	if errs != nil {
-		fmt.Println(errs)
+		zap.L().Error("Encountered Error sending workload",
+			zap.String("errs", fmt.Sprintf("%v", errs)),
+		)
+		p.closeAllConns()
 	}
 
 	// Step 5: run the bench
 	errs = p.Server.RunBenchmark()
 	if errs != nil {
-		fmt.Println(errs)
+		zap.L().Error("Encountered Error sending workload",
+			zap.String("errs", fmt.Sprintf("%v", errs)),
+		)
+		p.closeAllConns()
 	}
 
 	// Wait until everyone is done and give some room for final messages
@@ -153,6 +165,7 @@ func (p *Primary) Run() {
 	if errs != nil {
 		zap.L().Error("GetResults returned client errors",
 			zap.Strings("errors", errs))
+		p.closeAllConns()
 	}
 
 	// TODO: @CHRIS
