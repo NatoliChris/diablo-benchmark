@@ -59,9 +59,8 @@ func (s *Secondary) Run() {
 			return
 		}
 
-		zap.L().Debug("Received message",
-			zap.Binary("CMD", cmd[:0]),
-			zap.Binary("DATA", cmd[1:]),
+		zap.L().Debug("Received Command Message",
+			zap.Binary("CMD", cmd),
 		)
 
 		switch cmd[0] {

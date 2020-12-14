@@ -87,6 +87,7 @@ func (p *Primary) Run() {
 		p.closeAllConns()
 		zap.L().Error("Encountered errors in secondaries",
 			zap.Strings("errors", errs))
+		return
 	}
 
 	// Number of secondaries connected
@@ -136,6 +137,7 @@ func (p *Primary) Run() {
 		zap.L().Error("failed to generate workload",
 			zap.String("error", err.Error()))
 		p.closeAllConns()
+		return
 	}
 
 	// Step 4: Distribute benchmark
@@ -145,6 +147,7 @@ func (p *Primary) Run() {
 			zap.String("errs", fmt.Sprintf("%v", errs)),
 		)
 		p.closeAllConns()
+		return
 	}
 
 	// Step 5: run the bench
@@ -154,6 +157,7 @@ func (p *Primary) Run() {
 			zap.String("errs", fmt.Sprintf("%v", errs)),
 		)
 		p.closeAllConns()
+		return
 	}
 
 	// Wait until everyone is done and give some room for final messages
