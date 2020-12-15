@@ -72,7 +72,7 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 	// Min/Max/Average Latency
 	maxTotalLatency := float64(0)
 	averageTotalLatency := float64(0)
-	minTotalLatency := float64(-1)
+	minTotalLatency := float64(0)
 
 	var latencyPerSecondary []float64
 
