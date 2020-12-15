@@ -109,23 +109,20 @@ func WriteResultsToFile(benchConfig string, chainConfig string, results Aggregat
 // TODO: future - this can be made to show graphs, and present the results in a much nicer way!
 func Display(results AggregatedResults) {
 
-	var secondaryThroughputs []float64
-	var secondaryLatency []float64
-	for _, v := range results.ResultsPerSecondary {
-		secondaryThroughputs = append(secondaryThroughputs, v.Throughput)
-		secondaryLatency = append(secondaryLatency, v.AverageLatency)
-	}
-
 	fmt.Println()
 	fmt.Println("--------------------------")
 	fmt.Println("Benchmark Complete")
 	fmt.Println("--------------------------")
 	fmt.Println("[*] Aggregated Stats")
-	fmt.Println(fmt.Sprintf("- Throughput: %.3f [Min: %.3f | Max: %.3f]", results.OverallThroughput, results.MinThroughput, results.MaxThroughput))
-	fmt.Println(fmt.Sprintf("- Latency: %.3f [Min: %+v | Max: %+v]", results.AverageLatency, results.MinLatency, results.MaxLatency))
-	fmt.Println("[*] Secondary Stats")
-	fmt.Println(fmt.Sprintf("- Throughputs: %.3f", secondaryThroughputs))
-	fmt.Println(fmt.Sprintf("- Latencies: %.3f", secondaryLatency))
+	fmt.Println(fmt.Sprintf("\t [-] Throughput [tx/sec]: %.3f [Min: %.3f | Max: %.3f]", results.OverallThroughput, results.MinThroughput, results.MaxThroughput))
+	fmt.Println(fmt.Sprintf("\t [-] Latency        [ms]: %.3f [Min: %+v | Max: %+v]", results.AverageLatency, results.MinLatency, results.MaxLatency))
+
+	for i, v := range results.ResultsPerSecondary {
+		fmt.Println(fmt.Sprintf("[*] Secondary %d Stats", i))
+		fmt.Println(fmt.Sprintf("\t [-] Throughput [tx/sec]: %.3f", v.Throughput))
+		fmt.Println(fmt.Sprintf("\t [-] Latency        [ms]: %.3f", v.AverageLatency))
+	}
+
 	fmt.Println()
-	fmt.Println()
+
 }
