@@ -59,6 +59,10 @@ func (s *Secondary) Run() {
 			return
 		}
 
+		zap.L().Debug("Received Command Message",
+			zap.Binary("CMD", cmd),
+		)
+
 		switch cmd[0] {
 		case communication.MsgPrepare[0]:
 			// Prepare message, did we connect, and are we prepared for work?
@@ -92,6 +96,10 @@ func (s *Secondary) Run() {
 				s.PrimaryComms.ReplyERR(err.Error())
 				continue
 			}
+
+			zap.L().Debug("Connect and Init of workload handler and client interface OK",
+				zap.Int("ID", s.ID),
+			)
 		case communication.MsgBc[0]:
 			// What type of blockchain are we running?
 			// NOTE: see blockchains/bctypemessage.go for details about why feature
@@ -141,6 +149,10 @@ func (s *Secondary) Run() {
 				s.PrimaryComms.ReplyERR(err.Error())
 				continue
 			}
+
+			zap.L().Debug("Workload unmarshal OK",
+				zap.Int("Length", len(unmarshaledWorkload)),
+			)
 
 		case communication.MsgRun[0]:
 			zap.L().Info("Got command from primary",
