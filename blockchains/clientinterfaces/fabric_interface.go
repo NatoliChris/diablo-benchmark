@@ -6,6 +6,7 @@ import (
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/results"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -139,6 +140,12 @@ func (f *FabricInterface) Cleanup() results.Results {
 	for i := 1; i < len(f.Throughputs); i++ {
 		calculatedThroughputSeconds = append(calculatedThroughputSeconds, float64(f.Throughputs[i]-f.Throughputs[i-1]))
 	}
+
+	zap.L().Debug("Results being returned",
+		zap.Float64("throughput", throughput),
+		zap.Float64("latency", avgLatency),
+		zap.String("ThroughputWindow", fmt.Sprintf("%v", f.Throughputs)),
+	)
 
 	return results.Results{
 		TxLatencies:       txLatencies,
