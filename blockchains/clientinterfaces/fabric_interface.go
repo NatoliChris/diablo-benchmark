@@ -103,8 +103,7 @@ func (f *FabricInterface) Cleanup() results.Results {
 
 	var endTime time.Time
 
-	success := uint(0)
-	fails := uint(f.Fail)
+
 
 	for _, v := range f.TransactionInfo {
 		if len(v) > 1 {
@@ -114,12 +113,11 @@ func (f *FabricInterface) Cleanup() results.Results {
 			if v[1].After(endTime) {
 				endTime = v[1]
 			}
-
-			success++
-		} else {
-			fails++
 		}
 	}
+
+	success := uint(f.Success)
+	fails := uint(f.Fail)
 
 	zap.L().Debug("Statistics being returned",
 		zap.Uint("success", success),
@@ -128,7 +126,7 @@ func (f *FabricInterface) Cleanup() results.Results {
 	var throughput float64
 
 	if len(txLatencies) > 0 {
-		throughput = float64(f.NumTxDone) / (endTime.Sub(f.StartTime).Seconds())
+		throughput = float64(f.NumTxDone) - float64(f.Fail) / (endTime.Sub(f.StartTime).Seconds())
 		avgLatency = avgLatency / float64(len(txLatencies))
 	} else {
 		avgLatency = 0
@@ -144,7 +142,7 @@ func (f *FabricInterface) Cleanup() results.Results {
 		TxLatencies:       txLatencies,
 		AverageLatency:    avgLatency,
 		Throughput:        throughput,
-		ThroughputSeconds: f.Throughputs,
+		ThroughputSeconds: calculatedThroughputSeconds,
 		Success:           success,
 		Fail:              fails,
 	}
@@ -260,6 +258,7 @@ func (f *FabricInterface) submitTransaction(tx interface{}) {
 	if err != nil {
 		atomic.AddUint64(&f.Fail, 1)
 		atomic.AddUint64(&f.NumTxDone, 1)
+		return
 	}
 
 	//transaction validated, making the note of the time of return
