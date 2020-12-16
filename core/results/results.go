@@ -6,7 +6,12 @@
 // available information.
 package results
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+
+	"go.uber.org/zap"
+)
 
 // Results is the generic result structure that will be encoded and sent back to the primary and combined
 type Results struct {
@@ -84,7 +89,7 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 	totalFails := uint(0)
 
 	// Iterate through the results
-	for _, secondaryResult := range secondaryResults {
+	for secondaryID, secondaryResult := range secondaryResults {
 		txLatencies := make([]float64, 0)
 		averageLatencyPerSecondary := float64(0)
 		secondaryThroughputs := make([]float64, 0)
@@ -93,7 +98,7 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 		// For each worker
 		numSuccess := uint(0)
 		numFails := uint(0)
-		for _, workerResult := range secondaryResult {
+		for workerID, workerResult := range secondaryResult {
 			// 1. get the latency average per secondary
 			latencyEntries += float64(len(workerResult.TxLatencies))
 			numSuccess += workerResult.Success
@@ -127,6 +132,11 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 				secondaryThroughputs[timeIndex] += v
 			}
 			avgThroughputPerSecondary += workerResult.Throughput
+
+			zap.L().Debug(fmt.Sprintf("Partial Calculations [S: %d, W: %d]", secondaryID, workerID),
+				zap.Float64("Sec Throughput Total", avgThroughputPerSecondary),
+				zap.Float64("Worker Throughput", workerResult.Throughput),
+			)
 		}
 
 		// fix the average latencies
@@ -191,6 +201,18 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 	}
 
 	averageTotalThroughput = averageTotalThroughput / float64(len(totalThroughputOverTime))
+
+	// DEBUG PURPOSES ONLY
+	var avgThroughputAvg float64
+	for _, v := range ResultsPerSecondary {
+		avgThroughputAvg += v.Throughput
+	}
+	// END
+
+	zap.L().Debug("Total Throughput Calculations",
+		zap.Float64("averageTotal over time", averageTotalThroughput),
+		zap.Float64("averageTotal average", avgThroughputAvg),
+	)
 
 	// Return the absolute mass of results chunked together!
 	return AggregatedResults{

@@ -168,7 +168,7 @@ func (wh *WorkloadHandler) statusPrinter(stopCh chan bool) {
 			return
 		case <-timer.C:
 			// print
-			zap.L().Info(fmt.Sprintf("%d tx | %d errors", wh.numTx, wh.numErrors))
+			zap.L().Info(fmt.Sprintf("SENT: %d tx (%d errors)", wh.numTx, wh.numErrors))
 		}
 	}
 }

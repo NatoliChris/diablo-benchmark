@@ -233,6 +233,9 @@ func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
 func (f *FabricInterface) submitTransaction(tx interface{}) {
 	transaction := tx.(*types.FabricTX)
 
+	zap.L().Debug("Submitting TX",
+		zap.Uint64("ID", transaction.ID))
+
 	// making note of the time we send the transaction
 	f.TransactionInfo[transaction.ID] = []time.Time{time.Now()}
 	atomic.AddUint64(&f.NumTxSent, 1)
@@ -258,6 +261,8 @@ func (f *FabricInterface) submitTransaction(tx interface{}) {
 
 	// transaction failed, incrementing number of done and failed transactions
 	if err != nil {
+		zap.L().Debug("Failed transaction",
+			zap.Error(err))
 		atomic.AddUint64(&f.Fail, 1)
 		atomic.AddUint64(&f.NumTxDone, 1)
 	}
