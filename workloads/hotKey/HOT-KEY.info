@@ -1,0 +1,61 @@
+Diablo Benchmark Workload                                          2020
+
+================================================================================
+
+        HOT KEY CORNERCASE
+
+================================================================================
+
+
+Description of the workload
+
+    This workload is an artificial workload created to showcase the limitations of the execute-order scheme (X0) used in Hyperledger Fabric.
+    It is heavily inspired by *insert XOX fabric*
+
+Curve Definition:
+
+        (Small visual representation of the curve of the benchmark)
+
+        |
+        |
+        |
+        |
+        |
+        |
+        |xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+        |
+        |
+      0 |______________________________________________________________________
+        0
+
+
+
+Experimental Setup:
+
+    Number of Nodes (blockchain): < 1
+    Number of Secondaries: < 1
+    Number of Threads: <= 1
+
+    Justification:
+
+     Here the idea is to showcase that even a constant flow of transactions can lead to a denial of service on Fabric.
+
+
+    Blockchain Classifications:
+
+        Hyperledger Fabric
+
+
+Contract:
+
+    The smart contract source code is available in ./chaincode-go
+
+    The contract will be very simple and consist of creating assets and modifying those assets.
+
+Justification:
+
+    *insert wanting to showcase limitations of Fabric*
+
+Resources
+
+
