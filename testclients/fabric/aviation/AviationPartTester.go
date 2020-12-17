@@ -29,15 +29,15 @@ func main(){
 		panic(err)
 	}
 
-	bc, err := parsers.ParseBenchConfig("configurations/workloads/fabric/testDiabloFabric.yaml")
+	//bc, err := parsers.ParseBenchConfig("configurations/workloads/fabric/testDiabloFabric.yaml")
+//
+	//if err != nil {
+	//	panic(err)
+	//}
 
-	if err != nil {
-		panic(err)
-	}
-
-	var generator workloadgenerators.WorkloadGenerator
-	intermediate := workloadgenerators.FabricWorkloadGenerator{}
-	generator = intermediate.NewGenerator(cc, bc)
+	//var generator workloadgenerators.WorkloadGenerator
+	//intermediate := workloadgenerators.FabricWorkloadGenerator{}
+	//generator = intermediate.NewGenerator(cc, bc)
 	client1 := clientinterfaces.FabricInterface{}
 	//client2 := clientinterfaces.FabricInterface{}
 
@@ -51,41 +51,41 @@ func main(){
 	//client2.Init(cc.Nodes, nil)
 
 
-	err = generator.BlockchainSetup()
-	if err != nil {
-		panic(err)
-	}
-
-	err = generator.InitParams()
-
-	if err != nil {
-		panic(err)
-	}
+	//err = generator.BlockchainSetup()
+	//if err != nil {
+	//	panic(err)
+	//}
+//
+	//err = generator.InitParams()
+//
+	//if err != nil {
+	//	panic(err)
+	//}
 
 
 	log.Println("sendRawTransaction via client1 FIRST TIME EXPECTING BUG")
-	err = client1.SendRawTransaction(createAssetTransaction(0,generator))
-	//err = client2.SendRawTransaction(createAssetTransaction(0,generator))
-
-	workload,err := generator.GenerateWorkload()
-
-	if err != nil {
-		panic(err)
-	}
-
-	parsedWorkload1,err := client1.ParseWorkload(workload[0][0])
-
-	if err != nil {
-		panic(err)
-	}
+	//err = client1.SendRawTransaction(createAssetTransaction(0,generator))
 
 
-	for _,intervals := range parsedWorkload1 {
-		for _, tx := range intervals {
-			client1.SendRawTransaction(tx)
-		}
-	}
-
+	//workload,err := generator.GenerateWorkload()
+//
+	//if err != nil {
+	//	panic(err)
+	//}
+//
+	//parsedWorkload1,err := client1.ParseWorkload(workload[0][0])
+//
+	//if err != nil {
+	//	panic(err)
+	//}
+//
+//
+	//for _,intervals := range parsedWorkload1 {
+	//	for _, tx := range intervals {
+	//		client1.SendRawTransaction(tx)
+	//	}
+	//}
+//
 	//parsedWorkload2,err := client2.ParseWorkload(workload[0][1])
 	//	for _,intervals := range parsedWorkload2 {
 	//		for _, tx := range intervals{
@@ -137,6 +137,7 @@ func createAssetTransaction(transactionID int, generator workloadgenerators.Work
 		"write",
 		"CreateAsset",
 		cParamList,
+		"",
 	)
 
 	var parsedTxAsset blockchaintypes.FabricTX
@@ -163,7 +164,8 @@ func readAssetTransaction(transactionID int, assetToRead string, generator workl
 		nil,
 		"read",
 		"ReadAsset",
-		CParamListQuery)
+		CParamListQuery,
+		"")
 
 	if err != nil{
 		panic(err)
