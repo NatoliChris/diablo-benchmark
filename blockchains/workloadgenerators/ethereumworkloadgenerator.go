@@ -181,69 +181,45 @@ func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, c
 		if err != nil {
 			return []byte{}, err
 		}
-		if len(contracts) == 0 {
-			return nil, fmt.Errorf("no contracts to compile")
-		}
 
 		// TODO handle case where number of contracts is greater than one
-		var contract *compiler.Contract
-
-		if e.BenchConfig.ContractInfo.Name != "" {
-			for k, v := range contracts {
-				s := strings.Split(k, ":")
-				if s[len(s)-1] == e.BenchConfig.ContractInfo.Name {
-					contract = v
-					break
-				}
-			}
-
-			if contract == nil {
-				zap.L().Error(fmt.Sprintf("Failed to find contract %v in %v", e.BenchConfig.ContractInfo.Name, contracts))
-				return nil, fmt.Errorf("failed to find contract in compiled")
-			}
-		} else {
-			for k, v := range contracts {
-				zap.L().Warn("Name not provided, compiling first contract",
-					zap.String("contract", k),
-				)
-				contract = v
-				break
-			}
+		if len(contracts) > 1 {
+			zap.L().Warn("multiple contracts compiled, only deploying first")
 		}
 
-		zap.L().Info("Deploying Contract",
-			zap.String("contract", e.BenchConfig.ContractInfo.Name),
-			zap.String("path", e.BenchConfig.ContractInfo.Path),
-		)
+		for k, v := range contracts {
+			zap.L().Info("contract deploy transaction",
+				zap.String("contract", k))
 
-		bytecodeBytes, err := hex.DecodeString(contract.Code[2:])
+			bytecodeBytes, err := hex.DecodeString(v.Code[2:])
 
-		if err != nil {
-			return []byte{}, err
+			if err != nil {
+				return []byte{}, err
+			}
+
+			// TODO maybe estimate gas rather than have an upper bound
+			gasLimit := uint64(300000)
+
+			zap.L().Debug("tx params",
+				zap.String("from", addrFrom.String()),
+				zap.Uint64("Nonce", e.Nonces[strings.ToLower(addrFrom.String())]),
+				zap.Uint64("gaslimit", gasLimit),
+			)
+			tx := types.NewContractCreation(
+				e.Nonces[strings.ToLower(addrFrom.String())],
+				big.NewInt(0),
+				gasLimit,
+				e.SuggestedGasPrice,
+				bytecodeBytes,
+			)
+			signedTx, err := types.SignTx(tx, types.NewEIP155Signer(e.ChainID), priv)
+
+			// Update nonce
+			e.Nonces[strings.ToLower(addrFrom.String())]++
+			e.CompiledContract = v
+
+			return signedTx.MarshalJSON()
 		}
-
-		// TODO maybe estimate gas rather than have an upper bound
-		gasLimit := uint64(2000000)
-
-		zap.L().Debug("tx params",
-			zap.String("from", addrFrom.String()),
-			zap.Uint64("Nonce", e.Nonces[strings.ToLower(addrFrom.String())]),
-			zap.Uint64("gaslimit", gasLimit),
-		)
-		tx := types.NewContractCreation(
-			e.Nonces[strings.ToLower(addrFrom.String())],
-			big.NewInt(0),
-			gasLimit,
-			e.SuggestedGasPrice,
-			bytecodeBytes,
-		)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(e.ChainID), priv)
-
-		// Update nonce
-		e.Nonces[strings.ToLower(addrFrom.String())]++
-		e.CompiledContract = contract
-
-		return signedTx.MarshalJSON()
 
 	} else if os.IsNotExist(err) {
 		// Path doesn't exist - return an error
@@ -487,8 +463,6 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, 
 		zap.String("addrFrom", addrFrom.String()),
 		zap.String("addrTo", toAddress),
 		zap.Uint64("nonce", e.Nonces[strings.ToLower(addrFrom.String())]),
-		zap.String("data", hex.EncodeToString(data)),
-		zap.String("val", value.String()),
 	)
 
 	// Make and sign the transaction
