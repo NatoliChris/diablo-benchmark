@@ -24,7 +24,7 @@ func main(){
 	}
 	zap.ReplaceGlobals(logger)
 
-	cc, err := parsers.ParseChainConfig("configurations/blockchain-configs/fabric/fabric-test.yaml")
+	cc, err := parsers.ParseChainConfig("workloads/aviationParts/configurations/aviationChainConfig.yaml")
 	if err != nil {
 		panic(err)
 	}
@@ -35,9 +35,12 @@ func main(){
 	//	panic(err)
 	//}
 
-	//var generator workloadgenerators.WorkloadGenerator
-	//intermediate := workloadgenerators.FabricWorkloadGenerator{}
-	//generator = intermediate.NewGenerator(cc, bc)
+
+	var generator workloadgenerators.WorkloadGenerator
+
+	intermediate := workloadgenerators.FabricWorkloadGenerator{}
+
+	generator = intermediate.NewGenerator(cc, nil)
 	client1 := clientinterfaces.FabricInterface{}
 	//client2 := clientinterfaces.FabricInterface{}
 
@@ -64,8 +67,16 @@ func main(){
 
 
 	log.Println("sendRawTransaction via client1 FIRST TIME EXPECTING BUG")
-	//err = client1.SendRawTransaction(createAssetTransaction(0,generator))
+	err = client1.SendRawTransaction(createPartTransaction(0,"Alice",generator))
 
+	for i := 1; i < 10; i++ {
+		if i%2 == 0 {
+			client1.SendRawTransaction(createPartTransaction(i,"Alice",generator))
+		}else {
+			client1.SendRawTransaction(createPartTransaction(i,"Bob",generator))
+		}
+
+	}
 
 	//workload,err := generator.GenerateWorkload()
 //
@@ -94,48 +105,101 @@ func main(){
 	//}
 
 
-	log.Println("--> Evaluate Transaction: GetAllAssets, function returns every asset")
-	result, err := client1.Contract.EvaluateTransaction("GetAllAssetsID")
+	log.Println("--> Evaluate Transaction: GetAllParts, function returns every part")
+	result, err := client1.Contract.EvaluateTransaction("GetAllParts")
 	if err != nil {
 		log.Fatalf("Failed to evaluate transaction: %v\n", err)
 	}
-	log.Println("ALL TRANSACTIONS IDS IN THE LEDGER")
+	log.Println("ALL PARTS IN THE LEDGER")
 	log.Println(string(result))
+
+	log.Println("-----------------------------------------------------------")
+
+
+	log.Println("--> Evaluate Transaction: GetQueryPartsByOwner, function returns every part owned by ALice")
+	result, err = client1.Contract.EvaluateTransaction("QueryPartsByOwner", "Alice")
+	if err != nil {
+		log.Fatalf("Failed to evaluate transaction: %v\n", err)
+	}
+	log.Println(string(result))
+
+	log.Println("-----------------------------------------------------------")
+
+
+	log.Println("--> Evaluate Transaction: GetQueryPartsByOwner, function returns every part owned by Bob")
+	result, err = client1.Contract.EvaluateTransaction("QueryPartsByOwner", "Bob")
+	if err != nil {
+		log.Fatalf("Failed to evaluate transaction: %v\n", err)
+	}
+	log.Println(string(result))
+
+	log.Println("-----------------------------------------------------------")
+
+	log.Println("--> SubmitTransaction : TransferPart, transfering part#1 from Bob to Alice and checking if a purchase order is made !")
+	result, err = client1.Contract.SubmitTransaction("TransferPart", "part#1", "purchaseOrder#0", "Alice")
+	if err != nil {
+		log.Fatalf("Failed to evaluate transaction: %v\n", err)
+	}
+	log.Println(string(result))
+
+	log.Println("-----------------------------------------------------------")
+
+
+	log.Println("--> Evaluate Transaction: GetAllParts, function returns every part")
+	result, err = client1.Contract.EvaluateTransaction("GetAllParts")
+	if err != nil {
+		log.Fatalf("Failed to evaluate transaction: %v\n", err)
+	}
+	log.Println("ALL PARTS IN THE LEDGER")
+	log.Println(string(result))
+
+	log.Println("-----------------------------------------------------------")
+
+
+	log.Println("--> Evaluate Transaction: GetPurchaseOrderByID, function returns every part")
+	result, err = client1.Contract.EvaluateTransaction("QueryPurchaseOrderByID", "purchaseOrder#0")
+	if err != nil {
+		log.Fatalf("Failed to evaluate transaction: %v\n", err)
+	}
+	log.Println("ALL PARTS IN THE LEDGER")
+	log.Println(string(result))
+
+
+
 
 }
 
-func createAssetTransaction(transactionID int, generator workloadgenerators.WorkloadGenerator) *blockchaintypes.FabricTX {
+func createPartTransaction(transactionID int, owner string, generator workloadgenerators.WorkloadGenerator) *blockchaintypes.FabricTX {
 
 	var cParamList []configs.ContractParam
 
 	cParamList = append(cParamList,
 		configs.ContractParam{
-			Type:  "uint64",
+			Type:  "ID for FabricTx",
 			Value: strconv.Itoa(transactionID),
 		},
 		configs.ContractParam{
-			Type:  "string",
-			Value: "asset#" + strconv.Itoa(transactionID),
+			Type:  "ID of the part",
+			Value: "part#" + strconv.Itoa(transactionID),
 		},
 		configs.ContractParam{
-			Type:  "color",
-			Value: "c",
+			Type:  "description",
+			Value: "",
 		}, configs.ContractParam{
-			Type:  "size",
-			Value: "100",
+			Type:  "certification",
+			Value: "",
 		}, configs.ContractParam{
 			Type:  "owner",
-			Value: "Bob Ross",
+			Value: owner,
 		},configs.ContractParam{
 			Type:  "price",
-			Value: "420",
+			Value: "0",
 		})
-
 
 	txAsset,_ := generator.CreateInteractionTX(
 		nil,
 		"write",
-		"CreateAsset",
+		"CreatePart",
 		cParamList,
 		"",
 	)

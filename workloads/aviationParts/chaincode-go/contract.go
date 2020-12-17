@@ -90,6 +90,25 @@ func (s *SmartContract) QueryPartByID(ctx contractapi.TransactionContextInterfac
 	return &part, nil
 }
 
+//QueryPartByID returns the part stored in the world state with given id.
+func (s *SmartContract) QueryPurchaseOrderByID(ctx contractapi.TransactionContextInterface, id string) (*PurchaseOrder, error) {
+	purchaseOrderJSON, err := ctx.GetStub().GetState(id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read from world state: %v", err)
+	}
+	if purchaseOrderJSON == nil {
+		return nil, fmt.Errorf("the part %s does not exist", id)
+	}
+
+	var part PurchaseOrder
+	err = json.Unmarshal(purchaseOrderJSON, &part)
+	if err != nil {
+		return nil, err
+	}
+
+	return &part, nil
+}
+
 //QueryPartsByOwner returns all of the parts tied to the specified owner, using composites keys for fast querying
 func (s *SmartContract) QueryPartsByOwner(ctx contractapi.TransactionContextInterface, owner string) ([]*AircraftPart, error) {
 
