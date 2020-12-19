@@ -24,7 +24,7 @@ type FabricInterface struct {
 	Network  *gateway.Network             // Network object originating from gateway
 	Contract *gateway.Contract            // The smart contract we will be interacting with (only supporting one contract workload for now)
 	ccpPath  string                       // connection-profile path to configure the gateway
-	commitChannel chan types.FabricCommitEvent // channel where we continuously listen to commit events to register throughput
+	commitChannel chan *types.FabricCommitEvent // channel where we continuously listen to commit events to register throughput
 
 	TransactionInfo  map[uint64][]time.Time // Transaction information (used for throughput calculation)
 	StartTime        time.Time              // Start time of the benchmark
@@ -48,7 +48,7 @@ func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
 	}
 	f.NumTxDone = 0
 	f.TransactionInfo = make(map[uint64][]time.Time, 0)
-	f.commitChannel = make(chan types.FabricCommitEvent, MAX_CHANNELS)
+	f.commitChannel = make(chan *types.FabricCommitEvent, MAX_CHANNELS)
 
 	err := os.Setenv("DISCOVERY_AS_LOCALHOST", mapConfig["localHost"].(string))
 	if err != nil {
@@ -167,34 +167,28 @@ func (f *FabricInterface) throughputSeconds() {
 	}
 }
 
-func (f *FabricInterface) listenForCommits(mainChannel chan types.FabricCommitEvent){
+func (f *FabricInterface) listenForCommits(mainChannel chan *types.FabricCommitEvent){
 	for  {
 		select {
-		case newChan := <-mainChannel:
+		case commit := <-mainChannel:
 			zap.L().Info("received fabric event")
-			go func(commit types.FabricCommitEvent) {
+			go func(commit *types.FabricCommitEvent) {
 
 				ID := commit.ID
-				zap.L().Info("waiting commit event")
-				event := <-commit.Channel
-				zap.L().Info("received commit event")
-				validation := event.TxValidationCode.String()
 
 				// transaction failed, incrementing number of done and failed transactions
-				if  validation != "VALID"{
-					zap.L().Info(validation)
+				if commit.Valid {
 					atomic.AddUint64(&f.Fail, 1)
 					atomic.AddUint64(&f.NumTxDone, 1)
 					return
 				}
-				zap.L().Info(validation)
 				//transaction validated, making the note of the time of return
 				f.TransactionInfo[ID] = append(f.TransactionInfo[ID], time.Now())
 				atomic.AddUint64(&f.Success, 1)
 				atomic.AddUint64(&f.NumTxDone, 1)
 
 
-			}(newChan)
+			}(commit)
 		default:
 
 		}
@@ -281,13 +275,6 @@ func (f *FabricInterface) submitTransaction(tx interface{}) error {
 		return err
 	}
 
-	c := t.RegisterCommitEvent()
-	commit := types.FabricCommitEvent{
-		Channel: c,
-		ID:      transaction.ID,
-	}
-	f.commitChannel <- commit
-
 	if transaction.FunctionType == "write" {
 		//submitTransaction does everything under the hood for us.
 		// Rather than interacting with a single peer, the SDK will send the submitTransaction proposal
@@ -299,14 +286,34 @@ func (f *FabricInterface) submitTransaction(tx interface{}) error {
 		//Finally, the SDK is notified via an event, allowing it to return control to the application.
 		go func(tr *gateway.Transaction) {
 			zap.L().Info("submitting transaction")
-			t.Submit(transaction.Args...)
+			_,err := tr.Submit(transaction.Args...)
 			zap.L().Info("submitted transaction")
+			valid := err == nil
+
+			commit := types.FabricCommitEvent{
+				Valid: valid,
+				ID:transaction.ID,
+			}
+
+			f.commitChannel <- &commit
+
 		}(t)
 
 	} else {
 
 		//EvaluteTransaction is much less expensive and only queries one peer for its world state
-		go t.Evaluate(transaction.Args...)
+		go func(tr *gateway.Transaction) {
+			zap.L().Info("submitting transaction")
+			_,err := tr.Evaluate(transaction.Args...)
+			zap.L().Info("submitted transaction")
+			valid := err == nil
+			commit := types.FabricCommitEvent{
+				Valid: valid,
+				ID:transaction.ID,
+			}
+
+			f.commitChannel <- &commit
+		}(t)
 	}
 
 	return nil
