@@ -19,11 +19,12 @@ import (
 //FabricInterface is the Hyperledger Fabric implementation of the clientinterface
 // Provides functionality to communicate with the Fabric blockchain
 type FabricInterface struct {
-	Gateway  *gateway.Gateway  // Gateway manages the network interaction on behalf of the application
-	Wallet   *gateway.Wallet   // Wallet containing user identity configured for the gateway
-	Network  *gateway.Network  // Network object originating from gateway
-	Contract *gateway.Contract // The smart contract we will be interacting with (only supporting one contract workload for now)
-	ccpPath  string            // connection-profile path to configure the gateway
+	Gateway  *gateway.Gateway             // Gateway manages the network interaction on behalf of the application
+	Wallet   *gateway.Wallet              // Wallet containing user identity configured for the gateway
+	Network  *gateway.Network             // Network object originating from gateway
+	Contract *gateway.Contract            // The smart contract we will be interacting with (only supporting one contract workload for now)
+	ccpPath  string                       // connection-profile path to configure the gateway
+	commitChannel chan types.FabricCommitEvent // channel where we continuously listen to commit events to register throughput
 
 	TransactionInfo  map[uint64][]time.Time // Transaction information (used for throughput calculation)
 	StartTime        time.Time              // Start time of the benchmark
@@ -31,6 +32,9 @@ type FabricInterface struct {
 	Throughputs      []float64              // Throughput over time with 1 second intervals
 	GenericInterface
 }
+
+const MAX_CHANNELS = 1000
+
 
 // Init initializes the wallet, gateway, network and map of contracts available in the network
 func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
@@ -44,6 +48,7 @@ func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
 	}
 	f.NumTxDone = 0
 	f.TransactionInfo = make(map[uint64][]time.Time, 0)
+	f.commitChannel = make(chan types.FabricCommitEvent, MAX_CHANNELS)
 
 	err := os.Setenv("DISCOVERY_AS_LOCALHOST", mapConfig["localHost"].(string))
 	if err != nil {
@@ -162,12 +167,48 @@ func (f *FabricInterface) throughputSeconds() {
 	}
 }
 
+func (f *FabricInterface) listenForCommits(mainChannel chan types.FabricCommitEvent){
+	for  {
+		select {
+		case newChan := <-mainChannel:
+			zap.L().Info("received fabric event")
+			go func(commit types.FabricCommitEvent) {
+
+				ID := commit.ID
+				zap.L().Info("waiting commit event")
+				event := <-commit.Channel
+				zap.L().Info("received commit event")
+				validation := event.TxValidationCode.String()
+
+				// transaction failed, incrementing number of done and failed transactions
+				if  validation != "VALID"{
+					zap.L().Info(validation)
+					atomic.AddUint64(&f.Fail, 1)
+					atomic.AddUint64(&f.NumTxDone, 1)
+					return
+				}
+				zap.L().Info(validation)
+				//transaction validated, making the note of the time of return
+				f.TransactionInfo[ID] = append(f.TransactionInfo[ID], time.Now())
+				atomic.AddUint64(&f.Success, 1)
+				atomic.AddUint64(&f.NumTxDone, 1)
+
+
+			}(newChan)
+		default:
+
+		}
+	}
+
+}
+
 // Start handles the starting aspects of the benchmark
 // Is primarily used for setting the start time and allocating resources for
 // metrics
 func (f *FabricInterface) Start() {
 	f.StartTime = time.Now()
 	go f.throughputSeconds()
+	go f.listenForCommits(f.commitChannel)
 }
 
 //ParseWorkload Handles the workload, converts the bytes to usable transactions.
@@ -220,22 +261,32 @@ func (f *FabricInterface) DeploySmartContract(tx interface{}) (interface{}, erro
 
 // SendRawTransaction sends the transaction by the gateway
 func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
-
-	f.submitTransaction(tx)
-
-	return nil
+	return f.submitTransaction(tx)
 }
 
 // submitTransaction utility function to submit a transaction, to be used in a different thread
 // as the main thread as it may hang
-func (f *FabricInterface) submitTransaction(tx interface{}) {
+func (f *FabricInterface) submitTransaction(tx interface{}) error {
 	transaction := tx.(*types.FabricTX)
 
 	// making note of the time we send the transaction
 	f.TransactionInfo[transaction.ID] = []time.Time{time.Now()}
 	atomic.AddUint64(&f.NumTxSent, 1)
 
-	var err error
+
+	// creating the transaction and creating the commitEvent that we will listen to
+	t,err := f.Contract.CreateTransaction(transaction.FunctionName)
+
+	if err != nil {
+		return err
+	}
+
+	c := t.RegisterCommitEvent()
+	commit := types.FabricCommitEvent{
+		Channel: c,
+		ID:      transaction.ID,
+	}
+	f.commitChannel <- commit
 
 	if transaction.FunctionType == "write" {
 		//submitTransaction does everything under the hood for us.
@@ -246,25 +297,19 @@ func (f *FabricInterface) submitTransaction(tx interface{}) {
 		//a single transaction, which it then submits to the orderer. The orderer collects and sequences transactions from various application clients into a block of transactions.
 		//These blocks are distributed to every peer in the network, where every transaction is validated and committed.
 		//Finally, the SDK is notified via an event, allowing it to return control to the application.
-		_, err = f.Contract.SubmitTransaction(transaction.FunctionName, transaction.Args...)
+		go func(tr *gateway.Transaction) {
+			zap.L().Info("submitting transaction")
+			t.Submit(transaction.Args...)
+			zap.L().Info("submitted transaction")
+		}(t)
 
 	} else {
 
 		//EvaluteTransaction is much less expensive and only queries one peer for its world state
-		_, err = f.Contract.EvaluateTransaction(transaction.FunctionName, transaction.Args...)
+		go t.Evaluate(transaction.Args...)
 	}
 
-	// transaction failed, incrementing number of done and failed transactions
-	if err != nil {
-		atomic.AddUint64(&f.Fail, 1)
-		atomic.AddUint64(&f.NumTxDone, 1)
-		return
-	}
-
-	//transaction validated, making the note of the time of return
-	f.TransactionInfo[transaction.ID] = append(f.TransactionInfo[transaction.ID], time.Now())
-	atomic.AddUint64(&f.Success, 1)
-	atomic.AddUint64(&f.NumTxDone, 1)
+	return nil
 
 }
 
