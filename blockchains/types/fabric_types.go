@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 //FabricTX represents all the necessary information for an
 // Hyperledger Fabric transaction
 type FabricTX struct {
@@ -18,7 +20,10 @@ type FabricUser struct {
 	Key   string `yaml:"key"`
 }
 
+//FabricCommitEvent represents a commit event which we construct after having submitted a transaction
+// and received the answer (valid or not)
 type FabricCommitEvent struct {
 	Valid bool
 	ID     uint64 // the ID used in client to keep track of the transaction and register throughput
+	CommitTime time.Time // the time the transaction was committed
 }

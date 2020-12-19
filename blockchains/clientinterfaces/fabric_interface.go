@@ -32,8 +32,8 @@ type FabricInterface struct {
 	Throughputs      []float64              // Throughput over time with 1 second intervals
 	GenericInterface
 }
-
-const MAX_CHANNELS = 1000
+// MaxCommits determines the buffer size of commitChannel
+const MaxCommits = 1000
 
 
 // Init initializes the wallet, gateway, network and map of contracts available in the network
@@ -48,7 +48,7 @@ func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
 	}
 	f.NumTxDone = 0
 	f.TransactionInfo = make(map[uint64][]time.Time, 0)
-	f.commitChannel = make(chan *types.FabricCommitEvent, MAX_CHANNELS)
+	f.commitChannel = make(chan *types.FabricCommitEvent, MaxCommits)
 
 	err := os.Setenv("DISCOVERY_AS_LOCALHOST", mapConfig["localHost"].(string))
 	if err != nil {
@@ -167,11 +167,16 @@ func (f *FabricInterface) throughputSeconds() {
 	}
 }
 
+//listenForCommits listens continuously for FabricCommitEvent and updates
+// relevant fields whether if the transaction was valid or not
+// This functions is important because it forces synchronous access to the transactionInfo map.
+// A current problem with this implementation is that mainChannel receives more quickly than
+// it consumes. Hence, it may falsify throughput calculation, as throughputSeconds() keeps ticking
+// while we are emptying the channel 
 func (f *FabricInterface) listenForCommits(mainChannel chan *types.FabricCommitEvent){
 	for  {
 		select {
 		case commit := <-mainChannel:
-			go func(commit *types.FabricCommitEvent) {
 
 				ID := commit.ID
 
@@ -182,12 +187,9 @@ func (f *FabricInterface) listenForCommits(mainChannel chan *types.FabricCommitE
 					return
 				}
 				//transaction validated, making the note of the time of return
-				f.TransactionInfo[ID] = append(f.TransactionInfo[ID], time.Now())
+				f.TransactionInfo[ID] = append(f.TransactionInfo[ID], commit.CommitTime)
 				atomic.AddUint64(&f.Success, 1)
 				atomic.AddUint64(&f.NumTxDone, 1)
-
-
-			}(commit)
 
 		}
 	}
@@ -253,12 +255,6 @@ func (f *FabricInterface) DeploySmartContract(tx interface{}) (interface{}, erro
 
 // SendRawTransaction sends the transaction by the gateway
 func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
-	return f.submitTransaction(tx)
-}
-
-// submitTransaction utility function to submit a transaction, to be used in a different thread
-// as the main thread as it may hang
-func (f *FabricInterface) submitTransaction(tx interface{}) error {
 	transaction := tx.(*types.FabricTX)
 
 	// making note of the time we send the transaction
@@ -284,13 +280,13 @@ func (f *FabricInterface) submitTransaction(tx interface{}) error {
 		//Finally, the SDK is notified via an event, allowing it to return control to the application.
 		go func(tr *gateway.Transaction) {
 			_,err := tr.Submit(transaction.Args...)
+			time := time.Now()
 			valid := err == nil
-
 			commit := types.FabricCommitEvent{
 				Valid: valid,
 				ID:transaction.ID,
+				CommitTime: time,
 			}
-
 			f.commitChannel <- &commit
 
 		}(t)
@@ -299,15 +295,14 @@ func (f *FabricInterface) submitTransaction(tx interface{}) error {
 
 		//EvaluteTransaction is much less expensive and only queries one peer for its world state
 		go func(tr *gateway.Transaction) {
-			zap.L().Info("submitting transaction")
 			_,err := tr.Evaluate(transaction.Args...)
-			zap.L().Info("submitted transaction")
+			time := time.Now()
 			valid := err == nil
 			commit := types.FabricCommitEvent{
 				Valid: valid,
 				ID:transaction.ID,
+				CommitTime: time,
 			}
-
 			f.commitChannel <- &commit
 		}(t)
 	}
