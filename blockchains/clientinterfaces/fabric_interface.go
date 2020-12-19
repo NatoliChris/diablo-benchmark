@@ -176,7 +176,7 @@ func (f *FabricInterface) listenForCommits(mainChannel chan *types.FabricCommitE
 				ID := commit.ID
 
 				// transaction failed, incrementing number of done and failed transactions
-				if commit.Valid {
+				if !commit.Valid {
 					atomic.AddUint64(&f.Fail, 1)
 					atomic.AddUint64(&f.NumTxDone, 1)
 					return
