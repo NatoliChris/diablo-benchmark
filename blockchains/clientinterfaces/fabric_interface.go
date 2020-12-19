@@ -171,7 +171,6 @@ func (f *FabricInterface) listenForCommits(mainChannel chan *types.FabricCommitE
 	for  {
 		select {
 		case commit := <-mainChannel:
-			zap.L().Info("received fabric event")
 			go func(commit *types.FabricCommitEvent) {
 
 				ID := commit.ID
@@ -285,9 +284,7 @@ func (f *FabricInterface) submitTransaction(tx interface{}) error {
 		//These blocks are distributed to every peer in the network, where every transaction is validated and committed.
 		//Finally, the SDK is notified via an event, allowing it to return control to the application.
 		go func(tr *gateway.Transaction) {
-			zap.L().Info("submitting transaction")
 			_,err := tr.Submit(transaction.Args...)
-			zap.L().Info("submitted transaction")
 			valid := err == nil
 
 			commit := types.FabricCommitEvent{

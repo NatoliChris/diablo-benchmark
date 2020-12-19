@@ -13,7 +13,6 @@ import (
 	"log"
 	"os"
 	"strconv"
-	"time"
 )
 
 func main(){
@@ -125,9 +124,7 @@ func main(){
 //
 //
 	//log.Println("submitted transaction")
-
-	time.Sleep(10 * time.Second)
-
+	
 
 	log.Println("--> Evaluate Transaction: GetAllAssets, function returns every asset")
 	result, err := client1.Contract.EvaluateTransaction("GetAllAssetsID")
