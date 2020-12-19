@@ -8,13 +8,12 @@ import (
 	"diablo-benchmark/core/configs/parsers"
 	"encoding/json"
 	"fmt"
-	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
-	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"log"
 	"os"
 	"strconv"
+	"time"
 )
 
 func main(){
@@ -50,7 +49,9 @@ func main(){
 	}
 
 	client1.Init(cc)
+	client1.SetWindow(2)
 	//client2.Init(cc.Nodes, nil)
+	client1.Start()
 
 
 	err = generator.BlockchainSetup()
@@ -69,24 +70,24 @@ func main(){
 	err = client1.SendRawTransaction(createAssetTransaction(0,generator))
 	//err = client2.SendRawTransaction(createAssetTransaction(0,generator))
 
-	//workload,err := generator.GenerateWorkload()
+	workload,err := generator.GenerateWorkload()
 
 	if err != nil {
 		panic(err)
 	}
 
-	//parsedWorkload1,err := client1.ParseWorkload(workload[0][0])
-//
-	//if err != nil {
-	//	panic(err)
-	//}
-//
-//
-	//for _,intervals := range parsedWorkload1 {
-	//	for _, tx := range intervals {
-	//		client1.SendRawTransaction(tx)
-	//	}
-	//}
+	parsedWorkload1,err := client1.ParseWorkload(workload[0][0])
+
+	if err != nil {
+		panic(err)
+	}
+
+
+	for _,intervals := range parsedWorkload1 {
+		for _, tx := range intervals {
+			client1.SendRawTransaction(tx)
+		}
+	}
 
 	//parsedWorkload2,err := client2.ParseWorkload(workload[0][1])
 	//	for _,intervals := range parsedWorkload2 {
@@ -95,36 +96,37 @@ func main(){
 	//	}
 	//}
 
-	var txs []*gateway.Transaction
-	var listeners [] <- chan *fab.TxStatusEvent
+	//var txs []*gateway.Transaction
+	//var listeners [] <- chan *fab.TxStatusEvent
+//
+	//for i := 0; i < 100; i++ {
+	//	tx,err := client1.Contract.CreateTransaction("CreateAsset")
+//
+	//	if err != nil {
+	//		log.Println(err)
+	//	}
+	//	ls := tx.RegisterCommitEvent()
+//
+	//	txs = append(txs,tx)
+	//	listeners = append(listeners,ls)
+	//}
+//
+	//for i, tx := range txs {
+	//	s := strconv.FormatInt(int64(i),10)
+	//	go tx.Submit(s,s,s,s,s)
+	//}
+//
+	//for _,ls := range listeners {
+	//	s := <- ls
+	//	log.Println(s.SourceURL)
+	//	log.Println(s.TxValidationCode.String())
+	//	log.Println("block",s.BlockNumber)
+	//}
+//
+//
+	//log.Println("submitted transaction")
 
-	for i := 0; i < 100; i++ {
-		tx,err := client1.Contract.CreateTransaction("CreateAsset")
-
-		if err != nil {
-			log.Println(err)
-		}
-		ls := tx.RegisterCommitEvent()
-
-		txs = append(txs,tx)
-		listeners = append(listeners,ls)
-	}
-
-	for i, tx := range txs {
-		s := strconv.FormatInt(int64(i),10)
-		go tx.Submit(s,s,s,s,s)
-	}
-
-	for _,ls := range listeners {
-		s := <- ls
-		log.Println(s.SourceURL)
-		log.Println(s.TxValidationCode.String())
-		log.Println("block",s.BlockNumber)
-	}
-
-
-	log.Println("submitted transaction")
-
+	time.Sleep(10 * time.Second)
 
 
 	log.Println("--> Evaluate Transaction: GetAllAssets, function returns every asset")
