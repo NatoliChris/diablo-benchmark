@@ -188,7 +188,6 @@ func (f *FabricInterface) listenForCommits(mainChannel chan *types.FabricCommitE
 
 
 			}(commit)
-		default:
 
 		}
 	}
@@ -350,4 +349,5 @@ func (f *FabricInterface) ParseBlocksForTransactions(startNumber uint64, endNumb
 // Close the connection to the blockchain node
 func (f *FabricInterface) Close() {
 	f.Gateway.Close()
+	close(f.commitChannel)
 }
