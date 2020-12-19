@@ -1,7 +1,5 @@
 package types
 
-import "github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
-
 //FabricTX represents all the necessary information for an
 // Hyperledger Fabric transaction
 type FabricTX struct {
@@ -21,6 +19,6 @@ type FabricUser struct {
 }
 
 type FabricCommitEvent struct {
-	Channel <-chan *fab.TxStatusEvent // the commit event channel from Fabric
+	Valid bool
 	ID     uint64 // the ID used in client to keep track of the transaction and register throughput
 }
