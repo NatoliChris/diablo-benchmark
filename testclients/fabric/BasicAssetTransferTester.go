@@ -124,7 +124,7 @@ func main(){
 //
 //
 	//log.Println("submitted transaction")
-	
+
 
 	log.Println("--> Evaluate Transaction: GetAllAssets, function returns every asset")
 	result, err := client1.Contract.EvaluateTransaction("GetAllAssetsID")
