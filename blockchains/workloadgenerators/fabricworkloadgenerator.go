@@ -143,8 +143,8 @@ func (f FabricWorkloadGenerator) generateTestWorkload() (Workload, error) {
 
 					// transactions are of the form  (assetID, color, size, owner, price)
 					otherParams := functionToInvoke.Params
-					//to quickly make a unique transaction each time, i will only modifiy assetID
 
+					// modifying assetID to get a unique transaction
 					otherParams[0].Value = strconv.FormatUint(txID, 10)
 					params = append(params, otherParams...)
 
