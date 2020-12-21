@@ -1,0 +1,21 @@
+name: "assetTransfer test"
+description: "Do contracts even work?"
+secondaries: 2
+threads: 1
+
+bench:
+  type: "test"
+  txs:
+    0: 5
+    5: 5
+contract:
+  functions:
+    - name: "ReadAsset"
+      ftype: "read"
+      ratio: 100
+      params:
+        - type: "string"
+          value: "assetID"
+
+
+

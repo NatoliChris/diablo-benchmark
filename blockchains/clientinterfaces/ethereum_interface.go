@@ -82,7 +82,7 @@ func (e *EthereumInterface) Cleanup() results.Results {
 	// Calculate the throughput and latencies
 	var throughput float64
 	if len(txLatencies) > 0 {
-		throughput = float64(e.NumTxDone) / (endTime.Sub(e.StartTime).Seconds())
+		throughput = (float64(e.NumTxDone) - float64(e.Fail)) / (endTime.Sub(e.StartTime).Seconds())
 		avgLatency = avgLatency / float64(len(txLatencies))
 	} else {
 		avgLatency = 0
