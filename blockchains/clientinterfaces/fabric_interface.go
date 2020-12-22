@@ -33,8 +33,6 @@ type FabricInterface struct {
 	GenericInterface
 }
 
-// MaxCommits determines the buffer size of commitChannel
-const MaxCommits = 1000
 
 // Init initializes the wallet, gateway, network and map of contracts available in the network
 func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
@@ -48,7 +46,6 @@ func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
 	}
 	f.NumTxDone = 0
 	f.TransactionInfo = make(map[uint64][]time.Time, 0)
-	f.commitChannel = make(chan *types.FabricCommitEvent, MaxCommits)
 
 	err := os.Setenv("DISCOVERY_AS_LOCALHOST", mapConfig["localHost"].(string))
 	if err != nil {
@@ -171,7 +168,7 @@ func (f *FabricInterface) throughputSeconds() {
 // A current problem with this implementation is that mainChannel receives more quickly than
 // it consumes. Hence, it may falsify throughput calculation, as throughputSeconds() keeps ticking
 // while we are emptying the channel
-func (f *FabricInterface) listenForCommits(mainChannel chan *types.FabricCommitEvent) {
+func (f *FabricInterface) listenForCommits() {
 	for {
 		select {
 		case commit := <-f.commitChannel:
@@ -200,7 +197,7 @@ func (f *FabricInterface) listenForCommits(mainChannel chan *types.FabricCommitE
 func (f *FabricInterface) Start() {
 	f.StartTime = time.Now()
 	go f.throughputSeconds()
-	go f.listenForCommits(f.commitChannel)
+	go f.listenForCommits()
 }
 
 //ParseWorkload Handles the workload, converts the bytes to usable transactions.
@@ -226,6 +223,8 @@ func (f *FabricInterface) ParseWorkload(workload workloadgenerators.WorkerThread
 	}
 
 	f.TotalTx = len(parsedWorkload)
+	// the commitChannel buffer length should be the total number of transactions so that it's not a blocker
+	f.commitChannel = make(chan *types.FabricCommitEvent, f.TotalTx)
 
 	return parsedWorkload, nil
 }
@@ -259,13 +258,6 @@ func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
 	f.TransactionInfo[transaction.ID] = []time.Time{time.Now()}
 	atomic.AddUint64(&f.NumTxSent, 1)
 
-	// creating the transaction and creating the commitEvent that we will listen to
-	t, err := f.Contract.CreateTransaction(transaction.FunctionName)
-
-	if err != nil {
-		return err
-	}
-
 	if transaction.FunctionType == "write" {
 		//submitTransaction does everything under the hood for us.
 		// Rather than interacting with a single peer, the SDK will send the submitTransaction proposal
@@ -275,8 +267,8 @@ func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
 		//a single transaction, which it then submits to the orderer. The orderer collects and sequences transactions from various application clients into a block of transactions.
 		//These blocks are distributed to every peer in the network, where every transaction is validated and committed.
 		//Finally, the SDK is notified via an event, allowing it to return control to the application.
-		go func(tr *gateway.Transaction) {
-			_, err := tr.Submit(transaction.Args...)
+		go func() {
+			_, err := f.Contract.SubmitTransaction(transaction.FunctionName, transaction.Args...)
 			time := time.Now()
 
 			if err != nil {
@@ -289,16 +281,13 @@ func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
 				ID:         transaction.ID,
 				CommitTime: time,
 			}
-
 			f.commitChannel <- &commit
-
-		}(t)
+		}()
 
 	} else {
-
 		//EvaluteTransaction is much less expensive and only queries one peer for its world state
-		go func(tr *gateway.Transaction) {
-			_, err := tr.Evaluate(transaction.Args...)
+		go func() {
+			_, err := f.Contract.EvaluateTransaction(transaction.FunctionName, transaction.Args...)
 			time := time.Now()
 			valid := err == nil
 			commit := types.FabricCommitEvent{
@@ -307,7 +296,7 @@ func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
 				CommitTime: time,
 			}
 			f.commitChannel <- &commit
-		}(t)
+		}()
 	}
 
 	return nil
