@@ -19,11 +19,12 @@ import (
 //FabricInterface is the Hyperledger Fabric implementation of the clientinterface
 // Provides functionality to communicate with the Fabric blockchain
 type FabricInterface struct {
-	Gateway  *gateway.Gateway  // Gateway manages the network interaction on behalf of the application
-	Wallet   *gateway.Wallet   // Wallet containing user identity configured for the gateway
-	Network  *gateway.Network  // Network object originating from gateway
-	Contract *gateway.Contract // The smart contract we will be interacting with (only supporting one contract workload for now)
-	ccpPath  string            // connection-profile path to configure the gateway
+	Gateway       *gateway.Gateway              // Gateway manages the network interaction on behalf of the application
+	Wallet        *gateway.Wallet               // Wallet containing user identity configured for the gateway
+	Network       *gateway.Network              // Network object originating from gateway
+	Contract      *gateway.Contract             // The smart contract we will be interacting with (only supporting one contract workload for now)
+	ccpPath       string                        // connection-profile path to configure the gateway
+	commitChannel chan *types.FabricCommitEvent // channel where we continuously listen to commit events to register throughput
 
 	TransactionInfo  map[uint64][]time.Time // Transaction information (used for throughput calculation)
 	StartTime        time.Time              // Start time of the benchmark
@@ -31,6 +32,7 @@ type FabricInterface struct {
 	Throughputs      []float64              // Throughput over time with 1 second intervals
 	GenericInterface
 }
+
 
 // Init initializes the wallet, gateway, network and map of contracts available in the network
 func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
@@ -103,8 +105,6 @@ func (f *FabricInterface) Cleanup() results.Results {
 
 	var endTime time.Time
 
-
-
 	for _, v := range f.TransactionInfo {
 		if len(v) > 1 {
 			txLatency := v[1].Sub(v[0]).Milliseconds()
@@ -126,7 +126,7 @@ func (f *FabricInterface) Cleanup() results.Results {
 	var throughput float64
 
 	if len(txLatencies) > 0 {
-		throughput = float64(f.NumTxDone) - float64(f.Fail) / (endTime.Sub(f.StartTime).Seconds())
+		throughput = float64(f.NumTxDone) - float64(f.Fail)/(endTime.Sub(f.StartTime).Seconds())
 		avgLatency = avgLatency / float64(len(txLatencies))
 	} else {
 		avgLatency = 0
@@ -162,12 +162,42 @@ func (f *FabricInterface) throughputSeconds() {
 	}
 }
 
+//listenForCommits listens continuously for FabricCommitEvent and updates
+// relevant fields whether if the transaction was valid or not
+// This functions is important because it forces synchronous access to the transactionInfo map.
+// A current problem with this implementation is that mainChannel receives more quickly than
+// it consumes. Hence, it may falsify throughput calculation, as throughputSeconds() keeps ticking
+// while we are emptying the channel
+func (f *FabricInterface) listenForCommits() {
+	for {
+		select {
+		case commit := <-f.commitChannel:
+
+			ID := commit.ID
+			zap.L().Debug("CommitChannel",
+				zap.Uint64("ID", ID))
+			// transaction failed, incrementing number of done and failed transactions
+			if !commit.Valid {
+				atomic.AddUint64(&f.Fail, 1)
+			} else {
+				//transaction validated, making the note of the time of return
+				f.TransactionInfo[ID] = append(f.TransactionInfo[ID], commit.CommitTime)
+				atomic.AddUint64(&f.Success, 1)
+			}
+
+			atomic.AddUint64(&f.NumTxDone, 1)
+		}
+	}
+
+}
+
 // Start handles the starting aspects of the benchmark
 // Is primarily used for setting the start time and allocating resources for
 // metrics
 func (f *FabricInterface) Start() {
 	f.StartTime = time.Now()
 	go f.throughputSeconds()
+	go f.listenForCommits()
 }
 
 //ParseWorkload Handles the workload, converts the bytes to usable transactions.
@@ -193,6 +223,8 @@ func (f *FabricInterface) ParseWorkload(workload workloadgenerators.WorkerThread
 	}
 
 	f.TotalTx = len(parsedWorkload)
+	// the commitChannel buffer length should be the total number of transactions so that it's not a blocker
+	f.commitChannel = make(chan *types.FabricCommitEvent, f.TotalTx)
 
 	return parsedWorkload, nil
 }
@@ -220,22 +252,11 @@ func (f *FabricInterface) DeploySmartContract(tx interface{}) (interface{}, erro
 
 // SendRawTransaction sends the transaction by the gateway
 func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
-
-	f.submitTransaction(tx)
-
-	return nil
-}
-
-// submitTransaction utility function to submit a transaction, to be used in a different thread
-// as the main thread as it may hang
-func (f *FabricInterface) submitTransaction(tx interface{}) {
 	transaction := tx.(*types.FabricTX)
 
 	// making note of the time we send the transaction
 	f.TransactionInfo[transaction.ID] = []time.Time{time.Now()}
 	atomic.AddUint64(&f.NumTxSent, 1)
-
-	var err error
 
 	if transaction.FunctionType == "write" {
 		//submitTransaction does everything under the hood for us.
@@ -246,25 +267,39 @@ func (f *FabricInterface) submitTransaction(tx interface{}) {
 		//a single transaction, which it then submits to the orderer. The orderer collects and sequences transactions from various application clients into a block of transactions.
 		//These blocks are distributed to every peer in the network, where every transaction is validated and committed.
 		//Finally, the SDK is notified via an event, allowing it to return control to the application.
-		_, err = f.Contract.SubmitTransaction(transaction.FunctionName, transaction.Args...)
+		go func() {
+			_, err := f.Contract.SubmitTransaction(transaction.FunctionName, transaction.Args...)
+			time := time.Now()
+
+			if err != nil {
+				zap.L().Debug("TX got an error",
+					zap.Error(err))
+			}
+			valid := err == nil
+			commit := types.FabricCommitEvent{
+				Valid:      valid,
+				ID:         transaction.ID,
+				CommitTime: time,
+			}
+			f.commitChannel <- &commit
+		}()
 
 	} else {
-
 		//EvaluteTransaction is much less expensive and only queries one peer for its world state
-		_, err = f.Contract.EvaluateTransaction(transaction.FunctionName, transaction.Args...)
+		go func() {
+			_, err := f.Contract.EvaluateTransaction(transaction.FunctionName, transaction.Args...)
+			time := time.Now()
+			valid := err == nil
+			commit := types.FabricCommitEvent{
+				Valid:      valid,
+				ID:         transaction.ID,
+				CommitTime: time,
+			}
+			f.commitChannel <- &commit
+		}()
 	}
 
-	// transaction failed, incrementing number of done and failed transactions
-	if err != nil {
-		atomic.AddUint64(&f.Fail, 1)
-		atomic.AddUint64(&f.NumTxDone, 1)
-		return
-	}
-
-	//transaction validated, making the note of the time of return
-	f.TransactionInfo[transaction.ID] = append(f.TransactionInfo[transaction.ID], time.Now())
-	atomic.AddUint64(&f.Success, 1)
-	atomic.AddUint64(&f.NumTxDone, 1)
+	return nil
 
 }
 
@@ -301,4 +336,5 @@ func (f *FabricInterface) ParseBlocksForTransactions(startNumber uint64, endNumb
 // Close the connection to the blockchain node
 func (f *FabricInterface) Close() {
 	f.Gateway.Close()
+	close(f.commitChannel)
 }
