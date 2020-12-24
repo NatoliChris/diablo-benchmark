@@ -1,0 +1,1 @@
+docker exec peer1.org1.example.com peer channel getinfo -c mychannel
