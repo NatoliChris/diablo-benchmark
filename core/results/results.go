@@ -27,21 +27,28 @@ type Results struct {
 // AggregatedResults returns all the information from all secondaries, and
 // stores the calculated information (e.g. max, min, ...)
 type AggregatedResults struct {
-	RawResults                    [][]Results `json:"RawResults"`                           // Result of [secondary][thread]
-	ResultsPerSecondary           []Results   `json:"ResultsPerSecondary"`                  // Aggregation of results per secondary
-	MinLatency                    float64     `json:"MinLatency"`                           // Minimum latency across all workers and secondaries
-	AverageLatency                float64     `json:"AverageLatency"`                       // Average latency across all workers and secondaries
-	AverageLatencyPerSecondary    []float64   `json:"AverageLatencyPerSecond"`              // Average latency per secondary
-	MedianLatency                 float64     `json:"MedianAverageLatency"`                 // Median latency value
-	MaxLatency                    float64     `json:"MaxAverageLatency"`                    // Highest latency across all secondaries and workers
-	TotalThroughputTimes          []float64   `json:"TotalThroughputPerSecond"`             // Throughput over time
-	AverageThroughputPerSecondary []float64   `json:"OverallThroughputPerSecondary"`        // Throughput per secondary
-	TotalThroughputSecondaryTime  [][]float64 `json:"TotalThroughputPerSecondaryPerSecond"` // Throughput over time for each secondary
-	MaxThroughput                 float64     `json:"MaximumOverallThroughput"`             // Highest throughput
-	MinThroughput                 float64     `json:"MinimumOverallThroughput"`             // Highest throughput
-	OverallThroughput             float64     `json:"OverallAverageThroughput"`             // Overall throughput measured as success / time
-	TotalSuccess                  uint        `json:"TotalSuccess"`                         // Total successful transactions
-	TotalFails                    uint        `json:"TotalFails"`                           // Total failed transactions
+	// Results
+	RawResults       [][]Results `json:"RawResults"`       // Results of [secondary][thread]
+	SecondaryResults []Results   `json:"SecondaryResults"` // Aggregation of results per secondary
+
+	// Latency
+	MinLatency     float64   `json:"MinLatency"`     // Minimum latency across all workers and secondaries
+	AverageLatency float64   `json:"AverageLatency"` // Average latency across all workers and secondaries
+	MaxLatency     float64   `json:"MaxLatency"`     // Maximum Latency across all workers and secondaries
+	MedianLatency  float64   `json:"MedianLatency"`  // Median Latency across all workers and secondaries
+	AllTxLatencies []float64 `json:"AllTxLatencies"` // All Transaction Latencies
+
+	// Throughput
+	TotalThroughputTimes         []float64   `json:"TotalThroughputOverTime"`              // Total throughput over time per window
+	AverageThroughputSecondary   []float64   `json:"AverageThroughputSecondaries"`         // Average throughput per secondary
+	TotalThroughputSecondaryTime [][]float64 `json:"TotalThrouhgputPerSecondaryPerWindow"` // Total throughput per secondary
+	MaxThroughput                float64     `json:"MaximumThroughout"`                    // Maximum Throughput reached over time
+	MinThroughput                float64     `json:"MinimumThroughput"`                    // Miniumum Throughput reached overall
+	AverageThroughput            float64     `json:"AverageThroughput"`                    // Average throughput reached overall
+
+	// Success and Fail
+	TotalSuccess uint `json:"TotalSuccess"` // Total number of successes
+	TotalFails   uint `json:"TotalFails"`   // Total number of fails
 }
 
 // Return the median of a list
@@ -77,9 +84,10 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 	// Min/Max/Average Latency
 	maxTotalLatency := float64(0)
 	averageTotalLatency := float64(0)
-	minTotalLatency := float64(0)
+	minTotalLatency := secondaryResults[0][0].AverageLatency
 
 	var latencyPerSecondary []float64
+	var allTxLatencies []float64
 
 	// Throughput total
 	maxTotalThroughput := float64(0)
@@ -103,9 +111,9 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 			latencyEntries += float64(len(workerResult.TxLatencies))
 			numSuccess += workerResult.Success
 			numFails += workerResult.Fail
-			for latencyIdx, v := range workerResult.TxLatencies {
+			for _, v := range workerResult.TxLatencies {
 				averageLatencyPerSecondary += v
-				if v < minTotalLatency || minTotalLatency < 0 {
+				if minTotalLatency > v && v > 0 {
 					minTotalLatency = v
 				}
 
@@ -113,10 +121,8 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 					maxTotalLatency = v
 				}
 
-				if latencyIdx >= len(txLatencies) {
-					txLatencies = append(txLatencies, 0)
-				}
-				txLatencies[latencyIdx] += v
+				txLatencies = append(txLatencies, v)
+				allTxLatencies = append(allTxLatencies, v)
 			}
 
 			// 2. Obtain throughputs
@@ -142,7 +148,6 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 		// fix the average latencies
 		avgLatency := float64(0)
 		for idx := 0; idx < len(txLatencies); idx++ {
-			txLatencies[idx] = txLatencies[idx] / float64(len(secondaryResult))
 			avgLatency += txLatencies[idx]
 		}
 		if len(txLatencies) > 0 {
@@ -194,6 +199,7 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 			maxTotalThroughput = v
 		}
 
+		// NOTE - need to check out the minimum throughput, because of the 0 throughput if waiting for timeouts
 		if v < minTotalThroughput {
 			minTotalThroughput = v
 		}
@@ -216,20 +222,20 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 
 	// Return the absolute mass of results chunked together!
 	return AggregatedResults{
-		RawResults:                    secondaryResults,
-		ResultsPerSecondary:           ResultsPerSecondary,
-		MinLatency:                    minTotalLatency,
-		AverageLatency:                averageTotalLatency,
-		AverageLatencyPerSecondary:    latencyPerSecondary,
-		MedianLatency:                 medianLatencyTotal,
-		MaxLatency:                    maxTotalLatency,
-		TotalThroughputTimes:          totalThroughputOverTime,
-		AverageThroughputPerSecondary: throughputPerSecondary,
-		TotalThroughputSecondaryTime:  throughputOverTimeSecondary,
-		MaxThroughput:                 maxTotalThroughput,
-		MinThroughput:                 minTotalThroughput,
-		OverallThroughput:             averageTotalThroughput,
-		TotalSuccess:                  totalSuccess,
-		TotalFails:                    totalFails,
+		RawResults:                   secondaryResults,
+		SecondaryResults:             ResultsPerSecondary,
+		MinLatency:                   minTotalLatency,
+		AverageLatency:               averageTotalLatency,
+		MedianLatency:                medianLatencyTotal,
+		MaxLatency:                   maxTotalLatency,
+		TotalThroughputTimes:         totalThroughputOverTime,
+		AverageThroughputSecondary:   throughputPerSecondary,
+		TotalThroughputSecondaryTime: throughputOverTimeSecondary,
+		MaxThroughput:                maxTotalThroughput,
+		MinThroughput:                minTotalThroughput,
+		AverageThroughput:            averageTotalThroughput,
+		TotalSuccess:                 totalSuccess,
+		TotalFails:                   totalFails,
+		AllTxLatencies:               allTxLatencies,
 	}
 }

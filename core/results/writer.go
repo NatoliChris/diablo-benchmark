@@ -114,10 +114,10 @@ func Display(results AggregatedResults) {
 	fmt.Println("Benchmark Complete")
 	fmt.Println("--------------------------")
 	fmt.Println("[*] Aggregated Stats")
-	fmt.Println(fmt.Sprintf("\t [-] Throughput [tx/sec]: %.3f [Min: %.3f | Max: %.3f]", results.OverallThroughput, results.MinThroughput, results.MaxThroughput))
+	fmt.Println(fmt.Sprintf("\t [-] Throughput [tx/sec]: %.3f [Min: %.3f | Max: %.3f]", results.AverageThroughput, results.MinThroughput, results.MaxThroughput))
 	fmt.Println(fmt.Sprintf("\t [-] Latency        [ms]: %.3f [Min: %+v | Max: %+v]", results.AverageLatency, results.MinLatency, results.MaxLatency))
 
-	for i, v := range results.ResultsPerSecondary {
+	for i, v := range results.SecondaryResults {
 		fmt.Println(fmt.Sprintf("[*] Secondary %d Stats", i))
 		fmt.Println(fmt.Sprintf("\t [-] Throughput [tx/sec]: %.3f", v.Throughput))
 		fmt.Println(fmt.Sprintf("\t [-] Latency        [ms]: %.3f", v.AverageLatency))
