@@ -2,7 +2,7 @@
 CHANNEL_NAME="mychannel"
 CC_RUNTIME_LANGUAGE="golang"
 VERSION="1"
-CC_SRC_PATH="github.com/chaincode/basic"
+CC_SRC_PATH="github.com/hyperledger/fabric/peer/chaincode/basic"
 CC_NAME="basic"
 
 
