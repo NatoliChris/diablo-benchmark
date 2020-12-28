@@ -46,5 +46,5 @@ echo "===================== Chaincode is installed on peer1.org2 ===============
 
 }
 
-#packageChaincode
+packageChaincode
 installChaincode
