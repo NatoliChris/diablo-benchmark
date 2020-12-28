@@ -1,0 +1,62 @@
+
+# Copyright IBM Corp. All Rights Reserved.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+version: '2'
+
+volumes:
+  orderer3.example.com:  
+  peer0.org2.example.com:
+
+networks:
+  byfn:
+
+services:
+
+  orderer3.example.com:
+    extends:
+      file: base/peer-base.yaml
+      service: orderer-base
+    environment:
+      - ORDERER_GENERAL_LISTENPORT=9050
+    container_name: orderer3.example.com
+    networks:
+    - byfn
+    extra_hosts:
+      - "orderer.example.com:192.168.1.148"
+      - "orderer2.example.com:192.168.1.160"
+      - "orderer3.example.com:192.168.1.170"
+      - "orderer4.example.com:192.168.1.197"
+      - "orderer5.example.com:192.168.1.148"
+      - "peer0.org1.example.com:192.168.1.148"
+      - "peer1.org1.example.com:192.168.1.160"
+      - "peer0.org2.example.com:192.168.1.170"
+      - "peer2.org2.example.com:192.168.1.197"
+    volumes:
+        - ./channel-artifacts/genesis.block:/var/hyperledger/orderer/orderer.genesis.block
+        - ./crypto-config/ordererOrganizations/example.com/orderers/orderer3.example.com/msp:/var/hyperledger/orderer/msp
+        - ./crypto-config/ordererOrganizations/example.com/orderers/orderer3.example.com/tls/:/var/hyperledger/orderer/tls
+        - orderer3.example.com:/var/hyperledger/production/orderer
+    ports:
+    - 9050:9050
+
+  peer0.org2.example.com:
+    container_name: peer0.org2.example.com
+    extends:
+      file: base/docker-compose-base.yaml
+      service: peer0.org2.example.com
+    extra_hosts:
+      - "orderer.example.com:192.168.1.148"
+      - "orderer2.example.com:192.168.1.160"
+      - "orderer3.example.com:192.168.1.170"
+      - "orderer4.example.com:192.168.1.197"
+      - "orderer5.example.com:192.168.1.148"
+      - "peer0.org1.example.com:192.168.1.148"
+      - "peer1.org1.example.com:192.168.1.160"
+      - "peer0.org2.example.com:192.168.1.170"
+      - "peer2.org2.example.com:192.168.1.197"
+    networks:
+      - byfn
+

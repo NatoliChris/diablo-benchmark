@@ -24,12 +24,12 @@ func main(){
 	}
 	zap.ReplaceGlobals(logger)
 
-	cc, err := parsers.ParseChainConfig("configurations/blockchain-configs/fabric/fabric-test.yaml")
+	cc, err := parsers.ParseChainConfig("configurations/blockchain-configs/fabric/remote/fabric-basic.yaml")
 	if err != nil {
 		panic(err)
 	}
 
-	bc, err := parsers.ParseBenchConfig("configurations/workloads/fabric/testDiabloFabric.yaml")
+	bc, err := parsers.ParseBenchConfig("configurations/workloads/fabric/remote/DiabloFabricBasic.yaml")
 
 	if err != nil {
 		panic(err)
@@ -65,30 +65,25 @@ func main(){
 	}
 
 
-	//log.Println("sendRawTransaction via client1 FIRST TIME EXPECTING BUG")
-	//err = client1.SendRawTransaction(createAssetTransaction(0,generator))
+	log.Println("sendRawTransaction via client1 FIRST TIME EXPECTING BUG")
+	err = client1.SendRawTransaction(createAssetTransaction(0,generator))
 	////err = client2.SendRawTransaction(createAssetTransaction(0,generator))
 //
-	//workload,err := generator.GenerateWorkload()
-//
-	//if err != nil {
-	//	panic(err)
-	//}
-//
-	//parsedWorkload1,err := client1.ParseWorkload(workload[0][0])
-//
-	//if err != nil {
-	//	panic(err)
-	//}
-//
-//
-	//for _,intervals := range parsedWorkload1 {
-	//	for _, tx := range intervals {
-	//		client1.SendRawTransaction(tx)
-	//	}
-	//}
-//
-	//parsedWorkload2,err := client2.ParseWorkload(workload[0][1])
+	workload,err := generator.GenerateWorkload()
+	 if err != nil {
+		panic(err)
+	}
+	parsedWorkload1,err := client1.ParseWorkload(workload[0][0])
+
+	 if err != nil {
+		panic(err)
+	}
+ 	for _,intervals := range parsedWorkload1 {
+		for _, tx := range intervals {
+			client1.SendRawTransaction(tx)
+		}
+	}
+// //parsedWorkload2,err := client2.ParseWorkload(workload[0][1])
 	//	for _,intervals := range parsedWorkload2 {
 	//		for _, tx := range intervals{
 	//		client2.SendRawTransaction(tx)
