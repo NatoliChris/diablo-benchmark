@@ -2,9 +2,8 @@
 CHANNEL_NAME="mychannel"
 CC_RUNTIME_LANGUAGE="golang"
 VERSION="1"
+CC_SRC_PATH="github.com/hyperledger/fabric/peer/chaincode/basic"
 CC_NAME="basic"
-CC_SRC_PATH="github.com/hyperledger/fabric/peer/chaincode/${CC_NAME}"
-
 
 
 packageChaincode(){
@@ -17,6 +16,7 @@ packageChaincode(){
 
 installChaincode(){
   # copy packages directory to skip packaging chaincode
+  docker exec cli cp -r packages/. ./
 
  docker exec cli peer lifecycle chaincode install ${CC_NAME}.tar.gz
   echo "===================== Chaincode is installed on peer0.org1 ===================== "
@@ -46,5 +46,5 @@ echo "===================== Chaincode is installed on peer1.org2 ===============
 
 }
 
-packageChaincode
+#packageChaincode
 installChaincode
