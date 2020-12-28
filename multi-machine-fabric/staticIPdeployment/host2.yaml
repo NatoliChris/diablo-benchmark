@@ -30,7 +30,7 @@ services:
       - "peer0.org1.example.com:192.168.1.148"
       - "peer1.org1.example.com:192.168.1.160"
       - "peer0.org2.example.com:192.168.1.170"
-      - "peer2.org2.example.com:192.168.1.197"
+      - "peer1.org2.example.com:192.168.1.197"
     networks:
     - byfn
     volumes:
@@ -55,7 +55,7 @@ services:
       - "peer0.org1.example.com:192.168.1.148"
       - "peer1.org1.example.com:192.168.1.160"
       - "peer0.org2.example.com:192.168.1.170"
-      - "peer2.org2.example.com:192.168.1.197"
+      - "peer1.org2.example.com:192.168.1.197"
     networks:
       - byfn
 
