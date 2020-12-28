@@ -29,7 +29,7 @@ services:
       - "peer0.org1.example.com:192.168.1.148"
       - "peer1.org1.example.com:192.168.1.160"
       - "peer0.org2.example.com:192.168.1.170"
-      - "peer2.org2.example.com:192.168.1.197"
+      - "peer1.org2.example.com:192.168.1.197"
     networks:
       - byfn
 
@@ -64,7 +64,7 @@ services:
       - "peer0.org1.example.com:192.168.1.148"
       - "peer1.org1.example.com:192.168.1.160"
       - "peer0.org2.example.com:192.168.1.170"
-      - "peer2.org2.example.com:192.168.1.197"
+      - "peer1.org2.example.com:192.168.1.197"
     networks:
       - byfn
 
@@ -98,7 +98,7 @@ services:
       - "peer0.org1.example.com:192.168.1.148"
       - "peer1.org1.example.com:192.168.1.160"
       - "peer0.org2.example.com:192.168.1.170"
-      - "peer2.org2.example.com:192.168.1.197"
+      - "peer1.org2.example.com:192.168.1.197"
     volumes:
         - /var/run/:/host/var/run/
         - ./chaincode:/opt/gopath/src/github.com/hyperledger/fabric/peer/chaincode
