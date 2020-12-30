@@ -18,8 +18,9 @@ type BenchConfig struct {
 
 // BenchInfo provides specific information about transaction type and intervals
 type BenchInfo struct {
-	TxType    BenchTransactionType `yaml:"type"` // Type of the transactions (simple, contract).
-	Intervals TPSIntervals         `yaml:"txs"`  // Transactions.
+	TxType    BenchTransactionType `yaml:"type"`               // Type of the transactions (simple, contract).
+	DataPath  string               `yaml:"datapath,omitempty"` // Data path of the transactions
+	Intervals TPSIntervals         `yaml:"txs"`                // Transactions.
 }
 
 // ContractParam defines the contract function parameters
