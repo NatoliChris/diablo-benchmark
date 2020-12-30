@@ -1,9 +1,9 @@
 pragma solidity >=0.7.0;
 
 contract AviationParts {
-    /**
-     * Structs
-     */
+    ////////////////////
+    // Structs
+    ////////////////////
 
     // Struct for the aircraft part
     struct AircraftPart {
@@ -71,17 +71,17 @@ contract AviationParts {
     // Create the single aircraft part
     function CreatePart(string memory id, string memory desc, address owner, string memory cert, uint apprVal) public partNotExists(id) {
         parts[id] = AircraftPart({
-ID: id,
-Description: desc,
-Certification: cert,
-Owner: owner,
-AppraisedValue: apprVal,
-isSet: true
-});
+                        ID: id,
+                        Description: desc,
+                        Certification: cert,
+                        Owner: owner,
+                        AppraisedValue: apprVal,
+                        isSet: true
+                    });
 
-ownermapping[msg.sender].push(id);
+        ownermapping[msg.sender].push(id);
 
-emit PartCreated(id, apprVal, msg.sender);
+        emit PartCreated(id, apprVal, msg.sender);
 }
 
 function _fixarray(address owner, uint index) internal {
@@ -105,26 +105,26 @@ function _fixarray(address owner, uint index) internal {
 function TransferPart(string memory id, string memory purchaseId, address oldOwner, address newOwner) public partExists(id) onlyOwner(id, oldOwner) {
     // Make the order
     orders[purchaseId] = PurchaseOrder({
-ID: purchaseId,
-From: oldOwner,
-To: newOwner,
-SoldPart: parts[id],
-isSet: true
-});
+                            ID: purchaseId,
+                            From: oldOwner,
+                            To: newOwner,
+                            SoldPart: parts[id],
+                            isSet: true
+                        });
 
-// Transfer
-parts[id].Owner = newOwner;
+    // Transfer
+    parts[id].Owner = newOwner;
 
-for(uint i = 0; i < ownermapping[msg.sender].length; i++) {
-    // AircraftPart memory p = ownermapping[msg.sender][i];
-    if (keccak256(abi.encodePacked(ownermapping[msg.sender][i])) == keccak256(abi.encodePacked(id))) {
-        _fixarray(msg.sender, i);
-        ownermapping[newOwner].push(id);
-        break;
+    for(uint i = 0; i < ownermapping[msg.sender].length; i++) {
+        // AircraftPart memory p = ownermapping[msg.sender][i];
+        if (keccak256(abi.encodePacked(ownermapping[msg.sender][i])) == keccak256(abi.encodePacked(id))) {
+            _fixarray(msg.sender, i);
+            ownermapping[newOwner].push(id);
+            break;
+        }
     }
-}
 
-emit PartTransferred(id, msg.sender, newOwner);
+    emit PartTransferred(id, msg.sender, newOwner);
 }
 
 
