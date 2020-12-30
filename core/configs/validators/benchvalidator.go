@@ -66,6 +66,10 @@ func ValidateBenchConfig(c *configs.BenchConfig) (bool, error) {
 		if len(c.ContractInfo.Functions) == 0 {
 			return false, fmt.Errorf("[%s] no functions provided for contract", c.Name)
 		}
+	} else if c.TxInfo.TxType == configs.TxTypePremade {
+		if len(c.TxInfo.DataPath) == 0 {
+			return false, fmt.Errorf("[%s] data path not provided", c.Name)
+		}
 	}
 
 	// Intervals cannot be empty.
