@@ -6,6 +6,7 @@ package parsers
 import (
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/configs/validators"
+	"diablo-benchmark/core/workload"
 	"errors"
 	"io/ioutil"
 	"math"
@@ -50,6 +51,15 @@ func parseBenchYaml(content []byte, path string) (*configs.BenchConfig, error) {
 
 	if err != nil {
 		return nil, err
+	}
+
+	if benchConfig.TxInfo.TxType == configs.TxTypePremade {
+		premade, err := workload.ParsePremade(benchConfig.TxInfo.DataPath)
+		if err != nil {
+			return nil, err
+		}
+
+		benchConfig.TxInfo.PremadeInfo = premade
 	}
 
 	// Add the full intervals into the benchmark configurations
