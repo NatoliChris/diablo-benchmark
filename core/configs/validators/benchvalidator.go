@@ -68,7 +68,7 @@ func ValidateBenchConfig(c *configs.BenchConfig) (bool, error) {
 		}
 	} else if c.TxInfo.TxType == configs.TxTypePremade {
 		if len(c.TxInfo.DataPath) == 0 {
-			return false, fmt.Errorf("[%s] data path not provided", c.Name)
+			return false, fmt.Errorf("[%s] data path not provided for premade benchmark (missing \"datapath\")", c.Name)
 		}
 	}
 
