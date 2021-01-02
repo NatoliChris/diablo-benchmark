@@ -43,20 +43,22 @@ full_transactions = total_transactions * int(CONFIG["secondaries"]) * int(CONFIG
 
 premade_workload = []
 
+accID = 0
 if TXTYPE == 0:
     for secondaryID in range(0, int(CONFIG["secondaries"])):
         secondaryWorkload = []
         for threadID in range(0, int(CONFIG["threads"])):
             threadWorkload = []
             for i in range(0, total_transactions):
-                accID = (secondaryID * threadID * total_transactions) + i
                 threadWorkload.append({
+                    'ID' : accID,
                     'from': "account{}".format(accID),
                     'to': "account{}".format((accID + 1) % full_transactions),
                     'value': '1',
                     'function': '',
                     'params': DATA_PARAMS(i)
                 })
+                accID += 1
             secondaryWorkload.append(threadWorkload)
             threadWorkload = []
         premade_workload.append(secondaryWorkload)
