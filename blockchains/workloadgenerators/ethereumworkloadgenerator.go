@@ -678,6 +678,11 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 	return totalWorkload, nil
 }
 
+func (e *EthereumWorkloadGenerator) generatePremadeWorkload() (Workload, error) {
+
+	return nil, nil
+}
+
 // GenerateWorkload creates a workload of transactions to be used in the benchmark for all clients.
 func (e *EthereumWorkloadGenerator) GenerateWorkload() (Workload, error) {
 	// 1/ work out the total number of secondaries.
@@ -716,6 +721,8 @@ func (e *EthereumWorkloadGenerator) GenerateWorkload() (Workload, error) {
 		return e.generateSimpleWorkload()
 	case configs.TxTypeContract:
 		return e.generateContractWorkload()
+	case configs.TxTypePremade:
+		return e.generatePremadeWorkload()
 	default:
 		return nil, errors.New("unknown transaction type in config for workload generation")
 	}
