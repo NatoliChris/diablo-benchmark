@@ -678,8 +678,14 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 	return totalWorkload, nil
 }
 
+// generatePremadeWorkload generates the workload for the "premade" json file that
+// is associated with this workload.
 func (e *EthereumWorkloadGenerator) generatePremadeWorkload() (Workload, error) {
+	// 1 deploy the contract if it is a contract workload, get the address
 
+	// 2 loop through the premade dataset and create the relevant transactions
+
+	// 3 return the workload to be distributed
 	return nil, nil
 }
 
