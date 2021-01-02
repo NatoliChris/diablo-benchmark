@@ -133,9 +133,49 @@ func generateFullIntervals(intervals configs.TPSIntervals) (configs.TPSIntervals
 func GetTotalNumberOfTransactions(config *configs.BenchConfig) (int, error) {
 	totalNumberOfTransactions := 0
 
-	for _, v := range config.TxInfo.Intervals {
-		totalNumberOfTransactions += v
+	intervalKeys := make([]int, 0)
+	for k := range config.TxInfo.Intervals {
+		intervalKeys = append(intervalKeys, k)
 	}
 
-	return totalNumberOfTransactions, nil
+	// Sort
+	sort.Ints(intervalKeys)
+
+	intervals := config.TxInfo.Intervals
+
+	// Check that it starts at 0
+	// TODO: If the values don't start at 0, do we start at the next rate or 0?
+	// NOTE: I'm going to go with 0, since it seems logical for ramp-up. People can define
+	// Their own start with a 0 index if they want.
+	if _, ok := intervals[0]; !ok {
+		// if 0 doesn't exist, we need it to.
+		intervalKeys = append([]int{0}, intervalKeys...)
+		intervals[0] = 0
+	}
+
+	// Go through each interval
+	// Fill in the gaps by calculating a linear ramp-up.
+	// TODO: this needs improvement, big time! Currently doing linear, but maybe we can have a smoothing curve?
+	currentKey := intervalKeys[0]
+	for _, nextKey := range intervalKeys[1:] {
+		// Note: extremely naive linear ramp-up.
+		// Next value - current value / number of intervals between keys.
+		// e.g 10sec=30tps, 40sec=100tps; increment_val = (100-30) / (40-10) => 2.33333 increment per second.
+
+		numberOfIntervals := nextKey - currentKey
+		startTPS := intervals[currentKey]
+		endTPS := intervals[nextKey]
+
+		incrementValue := float64(endTPS-startTPS) / float64(numberOfIntervals)
+
+		currentTPS := float64(startTPS)
+		for i := currentKey; i < nextKey; i++ {
+			totalNumberOfTransactions += int(math.Floor(currentTPS))
+			currentTPS += incrementValue
+		}
+
+		currentKey = nextKey
+	}
+
+	return totalNumberOfTransactions * config.Secondaries * config.Threads, nil
 }
