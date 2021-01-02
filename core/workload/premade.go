@@ -9,10 +9,12 @@ import (
 // PremadeTransaction defines the premade transaction information that will be defined
 // in the JSON for the benchmark
 type PremadeTransaction struct {
-	From       string       `json:"from"`        // From which account
-	To         string       `json:"to"`          // To which account
-	Value      string       `json:"value"`       // Value of the transcation
-	DataParams []DataParams `json:"params,flow"` // Parameters to invoke a function call
+	From       string       `json:"from"`               // From which account
+	To         string       `json:"to"`                 // To which account
+	Value      string       `json:"value"`              // Value of the transcation
+	Function   string       `json:"function,omitempty"` // Function Name
+	DataParams []DataParams `json:"params,flow"`        // Parameters to invoke a function call
+	Rawdata    string       `json:"rawdata, omitempty"` // Raw data for an already-existing function
 }
 
 // DataParams are the parameters passed into a function
@@ -20,6 +22,7 @@ type DataParams struct {
 	Name  string `json:"name"`  // Parameter Name
 	Type  string `json:"type"`  // Type of the parameter
 	Value string `json:"value"` // Value of the parameter
+	Raw   string `json:"raw"`   // Raw value of the data params, will only be [{raw: ___}]
 }
 
 // PremadeBenchmarkWorkload is the entire workload produced for premade transaction
