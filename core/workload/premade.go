@@ -9,6 +9,7 @@ import (
 // PremadeTransaction defines the premade transaction information that will be defined
 // in the JSON for the benchmark
 type PremadeTransaction struct {
+	ID         string       `json:"ID"`                 // Unique transaction number
 	From       string       `json:"from"`               // From which account
 	To         string       `json:"to"`                 // To which account
 	Value      string       `json:"value"`              // Value of the transcation
