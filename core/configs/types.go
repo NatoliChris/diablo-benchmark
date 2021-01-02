@@ -145,6 +145,8 @@ func (bt *BenchTransactionType) UnmarshalYAML(unmarshal func(interface{}) error)
 		*bt = TxTypeSimple
 	case "contract":
 		*bt = TxTypeContract
+	case "premade":
+		*bt = TxTypePremade
 	case "test":
 		*bt = TxTypeTest
 	default:

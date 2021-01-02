@@ -23,8 +23,8 @@ type DataParams struct {
 }
 
 // PremadeBenchmarkWorkload is the entire workload produced for premade transaction
-// information
-type PremadeBenchmarkWorkload []PremadeTransaction
+// information already in the form of [secondary][thread]
+type PremadeBenchmarkWorkload [][][]PremadeTransaction
 
 // ParsePremade parses the json file associated with the premade workload.
 // This file must contain all the information for all transactions in the workload
