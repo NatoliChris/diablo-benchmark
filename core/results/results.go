@@ -42,7 +42,7 @@ type AggregatedResults struct {
 	TotalThroughputTimes         []float64   `json:"TotalThroughputOverTime"`              // Total throughput over time per window
 	AverageThroughputSecondary   []float64   `json:"AverageThroughputSecondaries"`         // Average throughput per secondary
 	TotalThroughputSecondaryTime [][]float64 `json:"TotalThrouhgputPerSecondaryPerWindow"` // Total throughput per secondary
-	MaxThroughput                float64     `json:"MaximumThroughout"`                    // Maximum Throughput reached over time
+	MaxThroughput                float64     `json:"MaximumThroughput"`                    // Maximum Throughput reached over time
 	MinThroughput                float64     `json:"MinimumThroughput"`                    // Miniumum Throughput reached overall
 	AverageThroughput            float64     `json:"AverageThroughput"`                    // Average throughput reached overall
 
@@ -233,7 +233,7 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 		TotalThroughputSecondaryTime: throughputOverTimeSecondary,
 		MaxThroughput:                maxTotalThroughput,
 		MinThroughput:                minTotalThroughput,
-		AverageThroughput:            averageTotalThroughput,
+		AverageThroughput:            avgThroughputAvg,
 		TotalSuccess:                 totalSuccess,
 		TotalFails:                   totalFails,
 		AllTxLatencies:               allTxLatencies,
