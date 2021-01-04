@@ -318,7 +318,6 @@ func (e *EthereumInterface) _sendTx(txSigned ethtypes.Transaction) {
 func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
 	// NOTE: type conversion might be slow, there might be a better way to send this.
 	txSigned := tx.(*ethtypes.Transaction)
-	zap.L().Debug(fmt.Sprintf("%s", txSigned.Nonce))
 	go e._sendTx(*txSigned)
 
 	return nil

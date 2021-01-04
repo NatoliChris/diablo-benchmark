@@ -6,6 +6,7 @@ import (
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/results"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -32,7 +33,6 @@ type FabricInterface struct {
 	Throughputs      []float64              // Throughput over time with 1 second intervals
 	GenericInterface
 }
-
 
 // Init initializes the wallet, gateway, network and map of contracts available in the network
 func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
@@ -137,6 +137,12 @@ func (f *FabricInterface) Cleanup() results.Results {
 	for i := 1; i < len(f.Throughputs); i++ {
 		calculatedThroughputSeconds = append(calculatedThroughputSeconds, float64(f.Throughputs[i]-f.Throughputs[i-1]))
 	}
+
+	zap.L().Debug("Results being returned",
+		zap.Float64("throughput", throughput),
+		zap.Float64("latency", avgLatency),
+		zap.String("ThroughputWindow", fmt.Sprintf("%v", f.Throughputs)),
+	)
 
 	return results.Results{
 		TxLatencies:       txLatencies,
@@ -253,6 +259,9 @@ func (f *FabricInterface) DeploySmartContract(tx interface{}) (interface{}, erro
 // SendRawTransaction sends the transaction by the gateway
 func (f *FabricInterface) SendRawTransaction(tx interface{}) error {
 	transaction := tx.(*types.FabricTX)
+
+	zap.L().Debug("Submitting TX",
+		zap.Uint64("ID", transaction.ID))
 
 	// making note of the time we send the transaction
 	f.TransactionInfo[transaction.ID] = []time.Time{time.Now()}
