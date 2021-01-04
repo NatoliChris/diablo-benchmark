@@ -37,6 +37,13 @@ type EthereumWorkloadGenerator struct {
 	CompiledContract  *compiler.Contract   // Compiled contract bytecode for the contract used in complex workloads
 }
 
+const (
+	// number of bits in a big.Word
+	wordBits = 32 << (uint64(^big.Word(0)) >> 63)
+	// number of bytes in a big.Word
+	wordBytes = wordBits / 8
+)
+
 // NewGenerator returns a new instance of the generator
 func (e *EthereumWorkloadGenerator) NewGenerator(chainConfig *configs.ChainConfig, benchConfig *configs.BenchConfig) WorkloadGenerator {
 	return &EthereumWorkloadGenerator{BenchConfig: benchConfig, ChainConfig: chainConfig}
@@ -257,6 +264,205 @@ func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, c
 	return []byte{}, errors.New("failed to create deploy tx")
 }
 
+// ReadBits encodes the absolute value of bigint as big-endian bytes. Callers must ensure
+// that buf has enough space. If buf is too short the result will be incomplete.
+// This function is taken from: https://github.com/ethereum/go-ethereum/blob/master/common/math/big.go
+func readBits(bigint *big.Int, buf []byte) {
+	i := len(buf)
+	for _, d := range bigint.Bits() {
+		for j := 0; j < wordBytes && i > 0; j++ {
+			i--
+			buf[i] = byte(d)
+			d >>= 8
+		}
+	}
+}
+
+// Converts the uint256 into padded bytes
+func convertU256(i *big.Int) []byte {
+	if i.BitLen()/8 >= 32 {
+		return i.Bytes()
+	}
+
+	ret := make([]byte, 32)
+	readBits(i, ret)
+	return ret
+}
+
+// getCallDataBytes will return the ABI encoded bytes for the variable, or an error
+// if it cannot be converted
+func (e *EthereumWorkloadGenerator) getCallDataBytes(paramType string, val string) ([]byte, error) {
+
+	payloadBytes := make([]byte, 0)
+
+	switch paramType {
+	// uints
+	case "uint8":
+		// uint 8 = 1 byte
+		// padding = 31 bytes
+		num, err := strconv.ParseUint(val, 10, 8)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert contract arg %s into %s", val, paramType)
+		}
+		padding := make([]byte, 31)
+		payloadBytes = append(payloadBytes, padding...)
+		payloadBytes = append(payloadBytes, uint8(num))
+		break
+	case "uint32":
+		// uint 32 = 4 bytes
+		// padding = 28 bytes
+		num, err := strconv.ParseUint(val, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert contract arg %s into %s", val, paramType)
+		}
+		padding := make([]byte, 28)
+		payloadBytes = append(payloadBytes, padding...)
+		numBytes := make([]byte, 4)
+		binary.BigEndian.PutUint32(numBytes, uint32(num))
+		payloadBytes = append(payloadBytes, numBytes...)
+		break
+	case "uint64":
+		// uint 64 = 8 bytes
+		// padding = 24 bytes
+		num, err := strconv.ParseUint(val, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert contract arg %s into %s", val, paramType)
+		}
+		padding := make([]byte, 24)
+		payloadBytes = append(payloadBytes, padding...)
+		numBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(numBytes, num)
+		payloadBytes = append(payloadBytes, numBytes...)
+		break
+	case "uint256", "uint":
+		// uint 256 = 64 bytes
+		//  padding = 0
+		num, ok := big.NewInt(0).SetString(val, 10)
+		if !ok {
+			return nil, fmt.Errorf("failed to convert contract arg %s into %s", val, paramType)
+		}
+		payloadBytes = append(payloadBytes, convertU256(num)...)
+		break
+	// ints
+	case "int8":
+		// int 8 = 1 byte
+		// padding = 31 bytes
+		num, err := strconv.ParseInt(val, 10, 8)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert contract arg %s into %s", val, paramType)
+		}
+		padding := make([]byte, 31)
+		payloadBytes = append(payloadBytes, padding...)
+		buf := new(bytes.Buffer)
+		err = binary.Write(buf, binary.BigEndian, int8(num))
+		if err != nil {
+			return nil, err
+		}
+		payloadBytes = append(payloadBytes, buf.Bytes()...)
+		break
+	case "int32":
+		// int 32 = 4 bytes
+		// padding = 28 bytes
+		num, err := strconv.ParseInt(val, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert contract arg %s into %s", val, paramType)
+		}
+		padding := make([]byte, 28)
+		payloadBytes = append(payloadBytes, padding...)
+		buf := new(bytes.Buffer)
+		err = binary.Write(buf, binary.BigEndian, int32(num))
+		if err != nil {
+			return nil, err
+		}
+		payloadBytes = append(payloadBytes, buf.Bytes()...)
+		break
+	case "int64":
+		// int 32 = 4 bytes
+		// padding = 28 bytes
+		num, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert contract arg %s into %s", val, paramType)
+		}
+		padding := make([]byte, 24)
+		payloadBytes = append(payloadBytes, padding...)
+		buf := new(bytes.Buffer)
+		err = binary.Write(buf, binary.BigEndian, num)
+		if err != nil {
+			return nil, err
+		}
+		payloadBytes = append(payloadBytes, buf.Bytes()...)
+		break
+	case "int256", "int":
+		num, ok := big.NewInt(0).SetString(val, 10)
+		if !ok {
+			return nil, fmt.Errorf("failed to convert contract arg %s into %s", val, paramType)
+		}
+		payloadBytes = append(payloadBytes, num.Bytes()...)
+		break
+	// bool
+	case "bool":
+		// Bool is just a padded uint8 of value 0 or 1
+		var bVal uint8
+		if val == "true" {
+			bVal = 1
+		} else if val == "false" {
+			bVal = 0
+		} else {
+			return nil, fmt.Errorf("failed to convert contract arg %s into %s", val, paramType)
+		}
+		padding := make([]byte, 31)
+		payloadBytes = append(payloadBytes, padding...)
+		payloadBytes = append(payloadBytes, bVal)
+		break
+	// address
+	case "address":
+		// uint160
+		// get the address
+		addr := common.HexToAddress(val)
+		// padding - address bytes should be 20bytes long.
+		padding := make([]byte, 12)
+		payloadBytes = append(payloadBytes, padding...)
+		payloadBytes = append(payloadBytes, addr.Bytes()...)
+		break
+	// bytes
+	case "bytes24":
+		// TODO this needs improvement!
+		s := []byte(val)
+		padding := make([]byte, 32-len(s))
+		payloadBytes = append(payloadBytes, s...)
+		payloadBytes = append(payloadBytes, padding...)
+		break
+	case "bytes32":
+		// TODO this needs improvement!
+		s := []byte(val)
+		payloadBytes = append(payloadBytes, s...)
+		break
+
+	// DYNAMIC TYPES ARE HARD :(
+	case "string", "bytes":
+		// todo this needs to be checked!
+		s := []byte(val)
+		// 2 get the length of the bytes
+		slen := uint32(len(s))
+		// make a uint and pad that bigendian
+		spadding := make([]byte, 28)
+		payloadBytes = append(payloadBytes, spadding...)
+		numBytes := make([]byte, 4)
+		binary.BigEndian.PutUint32(numBytes, uint32(slen))
+		payloadBytes = append(payloadBytes, numBytes...)
+		// 3 - add the padded string
+		padding := make([]byte, (32 - (len(s) % 32)))
+		payloadBytes = append(payloadBytes, s...)
+		payloadBytes = append(payloadBytes, padding...)
+		break
+	// Default
+	default:
+		return nil, fmt.Errorf("invalid arg type: %s", paramType)
+	}
+
+	return payloadBytes, nil
+}
+
 // CreateInteractionTX forms a transaction that invokes a smart contract
 func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []configs.ContractParam, value string) ([]byte, error) {
 	// Check that the contract has been compiled, if nto - then it's difficult to get the hashes from the ABI.
@@ -280,6 +486,9 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 	} else {
 		val, ok := e.CompiledContract.Hashes[functionName]
 		if !ok {
+			zap.L().Debug("Failed to find function",
+				zap.String("ABI", fmt.Sprintf("%v", e.CompiledContract.Hashes)),
+				zap.String("Function", fmt.Sprintf("%v", functionName)))
 			return nil, fmt.Errorf("contract does not contain function: %s", functionName)
 		}
 		funcHash = val
@@ -293,153 +502,95 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 	// Then go through and convert the params
 	// Types taken from: https://solidity.readthedocs.io/en/develop/abi-spec.html#types
 	// NOTE: need to pad to 32 bytes
+
+	// NOTE#2: Dynamic Types require points to show where each type begin and ends
+	// look at "abi.encode" for JS
+	isDynamic := false
 	for _, v := range contractParams {
-		switch v.Type {
-		// uints
-		case "uint8":
-			// uint 8 = 1 byte
-			// padding = 31 bytes
-			num, err := strconv.ParseUint(v.Value, 10, 8)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
-			}
-			padding := make([]byte, 31)
-			payloadBytes = append(payloadBytes, padding...)
-			payloadBytes = append(payloadBytes, uint8(num))
+		if v.Type == "string" || v.Type == "bytes" {
+			isDynamic = true
 			break
-		case "uint32":
-			// uint 32 = 4 bytes
-			// padding = 28 bytes
-			num, err := strconv.ParseUint(v.Value, 10, 32)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
-			}
-			padding := make([]byte, 28)
-			payloadBytes = append(payloadBytes, padding...)
-			numBytes := make([]byte, 4)
-			binary.BigEndian.PutUint32(numBytes, uint32(num))
-			payloadBytes = append(payloadBytes, numBytes...)
-			break
-		case "uint64":
-			// uint 64 = 8 bytes
-			// padding = 24 bytes
-			num, err := strconv.ParseUint(v.Value, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
-			}
-			padding := make([]byte, 24)
-			payloadBytes = append(payloadBytes, padding...)
-			numBytes := make([]byte, 8)
-			binary.BigEndian.PutUint64(numBytes, num)
-			payloadBytes = append(payloadBytes, numBytes...)
-			break
-		case "uint256", "uint":
-			// uint 256 = 64 bytes
-			//  padding = 0
-			num, ok := big.NewInt(0).SetString(v.Value, 10)
-			if !ok {
-				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
-			}
-			payloadBytes = append(payloadBytes, num.Bytes()...)
-			break
-		// ints
-		case "int8":
-			// int 8 = 1 byte
-			// padding = 31 bytes
-			num, err := strconv.ParseInt(v.Value, 10, 8)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
-			}
-			padding := make([]byte, 31)
-			payloadBytes = append(payloadBytes, padding...)
-			buf := new(bytes.Buffer)
-			err = binary.Write(buf, binary.BigEndian, int8(num))
-			if err != nil {
-				return nil, err
-			}
-			payloadBytes = append(payloadBytes, buf.Bytes()...)
-			break
-		case "int32":
-			// int 32 = 4 bytes
-			// padding = 28 bytes
-			num, err := strconv.ParseInt(v.Value, 10, 32)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
-			}
-			padding := make([]byte, 28)
-			payloadBytes = append(payloadBytes, padding...)
-			buf := new(bytes.Buffer)
-			err = binary.Write(buf, binary.BigEndian, int32(num))
-			if err != nil {
-				return nil, err
-			}
-			payloadBytes = append(payloadBytes, buf.Bytes()...)
-			break
-		case "int64":
-			// int 32 = 4 bytes
-			// padding = 28 bytes
-			num, err := strconv.ParseInt(v.Value, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
-			}
-			padding := make([]byte, 24)
-			payloadBytes = append(payloadBytes, padding...)
-			buf := new(bytes.Buffer)
-			err = binary.Write(buf, binary.BigEndian, num)
-			if err != nil {
-				return nil, err
-			}
-			payloadBytes = append(payloadBytes, buf.Bytes()...)
-			break
-		case "int256", "int":
-			num, ok := big.NewInt(0).SetString(v.Value, 10)
-			if !ok {
-				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
-			}
-			payloadBytes = append(payloadBytes, num.Bytes()...)
-			break
-		// bool
-		case "bool":
-			// Bool is just a padded uint8 of value 0 or 1
-			var bVal uint8
-			if v.Value == "true" {
-				bVal = 1
-			} else if v.Value == "false" {
-				bVal = 0
-			} else {
-				return nil, fmt.Errorf("failed to convert contract arg %s into %s", v.Value, v.Type)
-			}
-			padding := make([]byte, 31)
-			payloadBytes = append(payloadBytes, padding...)
-			payloadBytes = append(payloadBytes, bVal)
-			break
-		// address
-		case "address":
-			// uint160
-			// get the address
-			addr := common.HexToAddress(v.Value)
-			// padding - address bytes should be 20bytes long.
-			padding := make([]byte, 12)
-			payloadBytes = append(payloadBytes, padding...)
-			payloadBytes = append(payloadBytes, addr.Bytes()...)
-			break
-		// bytes
-		case "bytes24":
-			// TODO this needs improvement!
-			s := []byte(v.Value)
-			padding := make([]byte, 32-len(s))
-			payloadBytes = append(payloadBytes, s...)
-			payloadBytes = append(payloadBytes, padding...)
-			break
-		case "bytes32":
-			// TODO this needs improvement!
-			s := []byte(v.Value)
-			payloadBytes = append(payloadBytes, s...)
-			break
-			// Default
-		default:
-			return nil, fmt.Errorf("invalid arg type: %s", v.Type)
 		}
+	}
+
+	// If it's dynamic - then we need to have to space things out :\
+	// encoding = location in calldata
+	// e.g. func(string, uint)
+	//      = location_of_string, uint, stringlen, stringdata
+
+	// e.g. 2 func(string, uint, string)
+	//      = location_of_string1, uint, location_of_string2, stringlen, stringdata, stringlen, stringdata
+	//
+	// length (pad to 32 bytes)
+	// data (pad to nearest 32 bytes)
+
+	if !isDynamic {
+		for _, v := range contractParams {
+			encB, err := e.getCallDataBytes(v.Type, v.Value)
+			if err != nil {
+				return nil, err
+			}
+			payloadBytes = append(payloadBytes, encB...)
+		}
+	} else {
+		zap.L().Debug("Contract call contains dynamic values - wizard time")
+
+		// 1 get all the encoded values
+		var nonDynArr [][]byte
+		var dynArr [][]byte
+		totalNonDynLength := 0
+		for _, v := range contractParams {
+			encB, err := e.getCallDataBytes(v.Type, v.Value)
+			if err != nil {
+				return nil, err
+			}
+			zap.L().Debug("Bytes",
+				zap.String("Type", v.Type),
+				zap.String("Val", v.Value),
+				zap.String("Bytes", fmt.Sprintf("%x", encB)),
+			)
+			// if it's dynamic - add a 32byte placeholder
+			// and append to the dynamic data
+			if v.Type == "string" || v.Type == "bytes" {
+				nonDynArr = append(nonDynArr, []byte{})
+				dynArr = append(dynArr, encB)
+				totalNonDynLength += 32
+			} else {
+				nonDynArr = append(nonDynArr, encB)
+				totalNonDynLength += len(encB)
+			}
+		}
+
+		// 2 work out positioning
+		fullBytes := make([]byte, 0)
+		allDynBytes := make([]byte, 0)
+		currentOffset := totalNonDynLength
+		dynIndex := 0
+		for _, v := range nonDynArr {
+			// if it has 0 length, it is dynamic so we work out based
+			// on the offset
+			if len(v) == 0 {
+
+				// Set the offset
+				offsetBytes := make([]byte, 28)
+				numBytes := make([]byte, 4)
+				binary.BigEndian.PutUint32(numBytes, uint32(currentOffset))
+				fullBytes = append(fullBytes, offsetBytes...)
+				fullBytes = append(fullBytes, numBytes...)
+
+				// Update the offset
+				currentOffset += len(dynArr[dynIndex])
+
+				// Append all the bytes to the end
+				allDynBytes = append(allDynBytes, dynArr[dynIndex]...)
+			} else {
+				fullBytes = append(fullBytes, v...)
+			}
+		}
+
+		// 3 fill in the final parts
+		payloadBytes = append(payloadBytes, fullBytes...)
+		payloadBytes = append(payloadBytes, allDynBytes...)
 	}
 
 	// Assume that the payload bytes have been correctly formed at this point?
