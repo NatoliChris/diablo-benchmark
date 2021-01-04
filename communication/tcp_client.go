@@ -2,7 +2,6 @@ package communication
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 	"net"
 
@@ -37,6 +36,10 @@ func SetupSecondaryTCP(addr string) (*ConnClient, error) {
 		return nil, err
 	}
 
+	zap.L().Debug("Connection OK",
+		zap.String("ADDR", addr),
+	)
+
 	return &ConnClient{Conn: conn}, nil
 }
 
@@ -48,10 +51,14 @@ func SetupSecondaryTCP(addr string) (*ConnClient, error) {
 func (c *ConnClient) ReplyOK() {
 	_, err := c.Conn.Write(MsgOk)
 	if err != nil {
-		fmt.Println(err)
+		zap.L().Error("Error sending reply to master",
+			zap.Error(err),
+		)
 		_ = c.Conn.Close()
 		return
 	}
+
+	zap.L().Debug("OK sent to master")
 }
 
 // ReplyERR replies with an error: We tried the command, but something went wrong
@@ -59,10 +66,13 @@ func (c *ConnClient) ReplyERR(msg string) {
 	errmsg := append(MsgErr, []byte(msg)...)
 	_, err := c.Conn.Write(errmsg)
 	if err != nil {
-		fmt.Println(err)
+		zap.L().Error("Error sending reply to master",
+			zap.Error(err),
+		)
 		_ = c.Conn.Close()
 		return
 	}
+	zap.L().Debug("Error state sent to master")
 }
 
 // SendDataOK will send OK + DATA to the Primary
@@ -80,12 +90,12 @@ func (c *ConnClient) SendDataOK(data []byte) {
 	zap.L().Debug("Sending data to primary",
 		zap.Int("dataLen", len(data)))
 
-	fmt.Println(dataLen)
-
 	_, err := c.Conn.Write(payload)
 
 	if err != nil {
-		fmt.Println(err)
+		zap.L().Error("Error sending reply to master",
+			zap.Error(err),
+		)
 		_ = c.Conn.Close()
 		return
 	}
@@ -100,6 +110,7 @@ func (c *ConnClient) SendDataOK(data []byte) {
 func (c *ConnClient) InitialRead() ([]byte, error) {
 	buf := make([]byte, READLENGTH)
 
+	zap.L().Debug("Performing Initial Read")
 	n, err := c.Conn.Read(buf)
 	if err != nil {
 		return nil, err
@@ -149,6 +160,10 @@ func (c *ConnClient) ReadSize(size uint64) ([]byte, error) {
 	}
 	buf := make([]byte, size)
 
+	zap.L().Debug("Reading Size",
+		zap.Uint64("size", size),
+	)
+
 	n, err := c.Conn.Read(buf)
 	if err != nil {
 		return nil, err
@@ -162,5 +177,6 @@ func (c *ConnClient) ReadSize(size uint64) ([]byte, error) {
 
 // CloseConn closes the connection to the primary server
 func (c *ConnClient) CloseConn() {
+	zap.L().Debug("Closing Connection to primary")
 	_ = c.Conn.Close()
 }

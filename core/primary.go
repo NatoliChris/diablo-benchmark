@@ -6,7 +6,6 @@
 package core
 
 import (
-	"diablo-benchmark/blockchains"
 	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/communication"
 	"diablo-benchmark/core/configs"
@@ -41,6 +40,12 @@ func InitPrimary(listenAddr string, expectedSecondaries int, wg workloadgenerato
 		benchmarkConfig:   bConfig,
 		chainConfig:       cConfig,
 	}
+}
+
+// closeAllConns closes all connections and exits
+func (p *Primary) closeAllConns() {
+	p.Server.CloseSecondaries()
+	p.Server.Close()
 }
 
 // Run provides the main functionality to run
@@ -79,10 +84,10 @@ func (p *Primary) Run() {
 
 	if errs != nil {
 		// We have errors
-		p.Server.CloseSecondaries()
-		p.Server.Close()
+		p.closeAllConns()
 		zap.L().Error("Encountered errors in secondaries",
 			zap.Strings("errors", errs))
+		return
 	}
 
 	// Number of secondaries connected
@@ -93,22 +98,36 @@ func (p *Primary) Run() {
 
 	// Step 2: Blockchain type (tells which interface they should be using)
 	// get the blockchain byte
-	bcMessage, err := blockchains.MatchStringToMessage(p.chainConfig.Name)
 
-	if err != nil {
-		p.Server.CloseSecondaries()
-		p.Server.Close()
-	}
+	/////////////////////////////////////////////////////////////////////////
+	// Note; This feature has been DISABLED!
+	//       The primary function for this feature was to enable Diablo to
+	//       continue running on the machines and benchmark MULTIPLE
+	//       blockchains one after another to preserve the "same machines"
+	//       and same experimental setup.
+	//       This feature was disabled since we can easily re-run the binary
+	//       with separate configurations to achieve the same effect.
+	//
+	//       TODO: @Chris - Remove this feature entirely, since we decided
+	//                      against it.
+	/////////////////////////////////////////////////////////////////////////
 
-	errs = p.Server.SendBlockchainType(bcMessage)
+	// bcMessage, err := blockchains.MatchStringToMessage(p.chainConfig.Name)
 
-	if errs != nil {
-		zap.L().Error("failed to send blockchain type",
-			zap.Strings("errors", errs))
-		p.Server.CloseSecondaries()
-		p.Server.Close()
-		return
-	}
+	// if err != nil {
+	// 	p.Server.CloseSecondaries()
+	// 	p.Server.Close()
+	// }
+
+	// errs = p.Server.SendBlockchainType(bcMessage)
+
+	// if errs != nil {
+	// 	zap.L().Error("failed to send blockchain type",
+	// 		zap.Strings("errors", errs))
+	// 	p.Server.CloseSecondaries()
+	// 	p.Server.Close()
+	// 	return
+	// }
 
 	// Step 3: Prepare the workload for the benchmark
 	// TODO: generate workloads
@@ -117,21 +136,28 @@ func (p *Primary) Run() {
 	if err != nil {
 		zap.L().Error("failed to generate workload",
 			zap.String("error", err.Error()))
-		p.Server.CloseSecondaries()
-		p.Server.Close()
+		p.closeAllConns()
 		return
 	}
 
 	// Step 4: Distribute benchmark
 	errs = p.Server.SendWorkload(workload)
 	if errs != nil {
-		fmt.Println(errs)
+		zap.L().Error("Encountered Error sending workload",
+			zap.String("errs", fmt.Sprintf("%v", errs)),
+		)
+		p.closeAllConns()
+		return
 	}
 
 	// Step 5: run the bench
 	errs = p.Server.RunBenchmark()
 	if errs != nil {
-		fmt.Println(errs)
+		zap.L().Error("Encountered Error sending workload",
+			zap.String("errs", fmt.Sprintf("%v", errs)),
+		)
+		p.closeAllConns()
+		return
 	}
 
 	// Wait until everyone is done and give some room for final messages
@@ -143,6 +169,7 @@ func (p *Primary) Run() {
 	if errs != nil {
 		zap.L().Error("GetResults returned client errors",
 			zap.Strings("errors", errs))
+		p.closeAllConns()
 	}
 
 	// TODO: @CHRIS
