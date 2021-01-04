@@ -60,9 +60,9 @@ if TXTYPE == 0:
                 interval_tx = []
                 for i in range(0, intervalTPS):
                     interval_tx.append({
-                        'ID' : accID,
-                        'from': "account{}".format(accID),
-                        'to': "account{}".format((accID + 1) % full_transactions),
+                        'ID': "{}".format(accID),
+                        'from': "{}".format(accID),
+                        'to': "{}".format((accID + 1) % full_transactions),
                         'value': '1',
                         'function': '',
                         'params': DATA_PARAMS(i)
