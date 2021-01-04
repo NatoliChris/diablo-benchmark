@@ -682,11 +682,130 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 // is associated with this workload.
 func (e *EthereumWorkloadGenerator) generatePremadeWorkload() (Workload, error) {
 	// 1 deploy the contract if it is a contract workload, get the address
+	var contractAddr string
+	if len(e.BenchConfig.ContractInfo.Path) > 0 && len(e.BenchConfig.ContractInfo.Name) > 0 {
+		// Deploy the contract
+		var err error
+		contractAddr, err = e.DeployContract(e.KnownAccounts[0].PrivateKey, e.BenchConfig.ContractInfo.Path)
 
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var fullWorkload Workload
 	// 2 loop through the premade dataset and create the relevant transactions
+	for secondaryIndex, secondaryWorkload := range e.BenchConfig.TxInfo.PremadeInfo {
+
+		secondaryTransactions := make(SecondaryWorkload, 0)
+
+		for threadIndex, threadWorkload := range secondaryWorkload {
+
+			threadTransactions := make(WorkerThreadWorkload, 0)
+
+			for intervalIndex, intervalWorkload := range threadWorkload {
+
+				intervalTransactions := make([][]byte, 0)
+
+				for _, txInfo := range intervalWorkload {
+					// Make the transaction based on its
+					fromID, err := strconv.Atoi(txInfo.From)
+					fromAccount := e.KnownAccounts[fromID%len(e.KnownAccounts)]
+					if err != nil {
+						return nil, fmt.Errorf("[Premade tx: %v] Failed to convert %v to int", txInfo.ID, txInfo.From)
+					}
+
+					var toAccount string
+					if txInfo.To == "contract" {
+						toAccount = contractAddr
+					} else {
+						toID, err := strconv.Atoi(txInfo.To)
+						if err != nil {
+							return nil, fmt.Errorf("[Premade tx: %v] Failed to convert %v to int", txInfo.ID, txInfo.To)
+						}
+						toAccount = e.KnownAccounts[toID%len(e.KnownAccounts)].Address
+					}
+
+					zap.L().Debug("Premade Transaction",
+						zap.String("Tx Info", fmt.Sprintf("[S: %v, T: %v, I: %v]", secondaryIndex, threadIndex, intervalIndex)),
+						zap.String(fmt.Sprintf("From (%v): ", txInfo.From), fmt.Sprintf("%v", fromAccount.Address)),
+						zap.String(fmt.Sprintf("To (%v): ", txInfo.To), fmt.Sprintf("%v", toAccount)),
+						zap.String("ID", txInfo.ID),
+						zap.String("Function", txInfo.Function),
+					)
+
+					var finalTx []byte
+
+					txVal, ok := big.NewInt(0).SetString(txInfo.Value, 10)
+
+					if !ok {
+						return nil, fmt.Errorf("Failed to set value to big int: %s", txInfo.Value)
+					}
+
+					if txInfo.Function == "" && len(txInfo.DataParams) == 0 {
+						// This is a simple transaction
+						finalTx, err = e.CreateSignedTransaction(
+							fromAccount.PrivateKey,
+							toAccount,
+							txVal,
+							[]byte{},
+						)
+
+						if err != nil {
+							return nil, err
+						}
+
+					} else {
+						// This is a contract
+						if txInfo.Function == "constructor" {
+							// Constructor = make a deploy transaction
+							finalTx, err = e.CreateContractDeployTX(
+								fromAccount.PrivateKey,
+								e.BenchConfig.ContractInfo.Path,
+							)
+
+							if err != nil {
+								return nil, err
+							}
+
+						} else {
+							// It's an interaction transaction
+
+							// function name should be: function(type,type,type)
+							var txParams []configs.ContractParam
+							var functionParamSigs []string
+							for _, paramVal := range txInfo.DataParams {
+								functionParamSigs = append(functionParamSigs, paramVal.Type)
+								txParams = append(txParams, configs.ContractParam{Type: paramVal.Type, Value: paramVal.Value})
+							}
+
+							functionFinal := fmt.Sprintf("%s(%s)", txInfo.Function, strings.Join(functionParamSigs[:], ","))
+
+							finalTx, err = e.CreateInteractionTX(
+								fromAccount.PrivateKey,
+								toAccount,
+								functionFinal,
+								txParams,
+								txInfo.Value,
+							)
+						}
+
+					}
+
+					intervalTransactions = append(intervalTransactions, finalTx)
+				}
+
+				threadTransactions = append(threadTransactions, intervalTransactions)
+			}
+
+			secondaryTransactions = append(secondaryTransactions, threadTransactions)
+		}
+
+		fullWorkload = append(fullWorkload, secondaryTransactions)
+	}
 
 	// 3 return the workload to be distributed
-	return nil, nil
+	return fullWorkload, nil
 }
 
 // GenerateWorkload creates a workload of transactions to be used in the benchmark for all clients.

@@ -32,7 +32,7 @@ type PremadeBenchmarkWorkload [][][][]PremadeTransaction
 
 // ParsePremade parses the json file associated with the premade workload.
 // This file must contain all the information for all transactions in the workload
-func ParsePremade(filepath string) (*PremadeBenchmarkWorkload, error) {
+func ParsePremade(filepath string) (PremadeBenchmarkWorkload, error) {
 	// Attempt to open the file
 	fp, err := os.Open(filepath)
 
@@ -51,5 +51,5 @@ func ParsePremade(filepath string) (*PremadeBenchmarkWorkload, error) {
 		return nil, err
 	}
 
-	return &premade, nil
+	return premade, nil
 }
