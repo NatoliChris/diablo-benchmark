@@ -20,6 +20,7 @@ const TxTypeContract BenchTransactionType = "contract"
 // TxTypeTest indicates the we are running the test workload used in end-to-end testing
 const TxTypeTest BenchTransactionType = "test"
 
+
 // DefaultTimeout is the default timeout for the benchmark if not provided
 // or overwritten by the args
 const DefaultTimeout int = 20
