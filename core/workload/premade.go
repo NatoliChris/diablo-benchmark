@@ -14,6 +14,7 @@ type PremadeTransaction struct {
 	To         string       `json:"to"`                 // To which account
 	Value      string       `json:"value"`              // Value of the transcation
 	Function   string       `json:"function,omitempty"` // Function Name
+	TxType     string       `json:"txtype"`             // Function Type (Read or Write)
 	DataParams []DataParams `json:"params,flow"`        // Parameters to invoke a function call
 	Rawdata    string       `json:"rawdata, omitempty"` // Raw data for an already-existing function
 }
