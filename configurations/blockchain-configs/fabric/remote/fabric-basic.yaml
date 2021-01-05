@@ -34,7 +34,7 @@ extra:
       VJYO94s/RqOi5Wiz4m0ow9IIxNChRANCAAR7vXsodLJ0+wzS+O6lFr7lJMBHzqwS
       w/8oY9xuqJ6EWrC66bn2pVF1uQ1h+AJMI+XJyxmPId/y2SQ6k3/yN7K7
       -----END PRIVATE KEY-----
-    ccpPath: "multi-machine-fabric/staticIPdeployment/crypto-config/peerOrganizations/org1.example.com/connection-org1.yaml"
+    ccpPath: "multi-machine-fabric/staticIPdeployment/crypto-config/peerOrganizations/org1.example.com/connection-org1-template.yaml"
     localHost: "false"
     channelName: "mychannel"
     contractName: "basic"

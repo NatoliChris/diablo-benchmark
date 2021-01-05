@@ -38,7 +38,7 @@ func main() {
 		}
 	}
 
-	//gateaway needs config which is a connection-org.yaml => create with test-network/organizations/ccp-generate.sh and using ccp-template-yaml
+	//gateaway needs config which is a connection-org.yaml => create with test-network/organizations/compose-generate.sh and using ccp-template-yaml
 
 
 	ccpPath := filepath.Join(
@@ -48,7 +48,7 @@ func main() {
 		"crypto-config",
 		"peerOrganizations",
 		"org1.example.com",
-		"connection-org1.yaml",
+		"connection-org1-template.yaml",
 	)
 
 	gw, err := gateway.Connect(
