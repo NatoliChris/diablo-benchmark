@@ -504,6 +504,8 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 		accountCount++
 	}
 
+	fullIntervals := GetIntervalPerThread(e.BenchConfig.TxInfo.Intervals, e.BenchConfig.Secondaries, e.BenchConfig.Threads)
+
 	// 2. Generate the transactions
 	txID := 0
 	accountBatch := 0
@@ -521,7 +523,7 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 				zap.Int("thread", thread),
 				zap.Int("len", len(accountDistribution)))
 			accountsChoices := accountDistribution[accountBatch]
-			for interval, txnum := range e.BenchConfig.TxInfo.Intervals {
+			for interval, txnum := range fullIntervals {
 				// Debug print for each interval to monitor correctness.
 				zap.L().Debug("Making workload ",
 					zap.Int("secondary", secondaryID),
@@ -681,7 +683,7 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 // GenerateWorkload creates a workload of transactions to be used in the benchmark for all clients.
 func (e *EthereumWorkloadGenerator) GenerateWorkload() (Workload, error) {
 	// 1/ work out the total number of secondaries.
-	numberOfWorkingSecondaries := e.BenchConfig.Secondaries * e.BenchConfig.Threads
+	numberOfWorkers := e.BenchConfig.Secondaries * e.BenchConfig.Threads
 
 	// Get the number of transactions to be created
 	numberOfTransactions, err := parsers.GetTotalNumberOfTransactions(e.BenchConfig)
@@ -691,14 +693,13 @@ func (e *EthereumWorkloadGenerator) GenerateWorkload() (Workload, error) {
 	}
 
 	// Total transactions
-	totalTx := numberOfTransactions * numberOfWorkingSecondaries
+	totalTxPerWorker := numberOfTransactions / numberOfWorkers
 
 	zap.L().Info(
 		"Generating workload",
 		zap.String("workloadType", string(e.BenchConfig.TxInfo.TxType)),
-		zap.Int("secondaries", numberOfWorkingSecondaries),
-		zap.Int("transactionsPerSecondary", numberOfTransactions),
-		zap.Int("totalTransactions", totalTx),
+		zap.Int("threadsTotal", numberOfWorkers),
+		zap.Int("totalTransactions per worker", totalTxPerWorker),
 	)
 
 	// Print a warning about the accounts
