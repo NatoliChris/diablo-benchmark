@@ -35,6 +35,7 @@ type EthereumWorkloadGenerator struct {
 	ChainID           *big.Int             // ChainID for transactions, provided through the ethereum API
 	KnownAccounts     []configs.ChainKey   // Known accounds, public:private key pair
 	CompiledContract  *compiler.Contract   // Compiled contract bytecode for the contract used in complex workloads
+	GenericWorkloadGenerator
 }
 
 // NewGenerator returns a new instance of the generator
@@ -504,8 +505,6 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 		accountCount++
 	}
 
-	fullIntervals := GetIntervalPerThread(e.BenchConfig.TxInfo.Intervals, e.BenchConfig.Secondaries, e.BenchConfig.Threads)
-
 	// 2. Generate the transactions
 	txID := 0
 	accountBatch := 0
@@ -523,7 +522,7 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 				zap.Int("thread", thread),
 				zap.Int("len", len(accountDistribution)))
 			accountsChoices := accountDistribution[accountBatch]
-			for interval, txnum := range fullIntervals {
+			for interval, txnum := range e.TPSIntervals {
 				// Debug print for each interval to monitor correctness.
 				zap.L().Debug("Making workload ",
 					zap.Int("secondary", secondaryID),
@@ -627,7 +626,7 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 
 	// Shuffle the function interactions
 	// TODO check this carefully - we may have workloads with dependent transactions in future - maybe add this as a flag in config?
-	ShuffleFunctionCalls(functionsToCreatePerThread)
+	// ShuffleFunctionCalls(functionsToCreatePerThread)
 
 	// Now generate the workload as usual
 	var totalWorkload Workload
@@ -641,7 +640,8 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 
 			accountsChoices := accountDistribution[accountBatch]
 
-			for _, numTx := range e.BenchConfig.TxInfo.Intervals {
+			// 			for _, numTx := range e.BenchConfig.TxInfo.Intervals {
+			for _, numTx := range e.TPSIntervals {
 				intervalWorkload := make([][]byte, 0)
 
 				for i := 0; i < numTx; i++ {

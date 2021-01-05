@@ -94,6 +94,8 @@ func (p *Primary) Run() {
 	zap.L().Info("Benchmark secondaries all connected.",
 		zap.Int("secondaries", len(p.Server.Secondaries)))
 
+	p.workloadGenerator.SetThreadIntervals(workloadgenerators.GetIntervalPerThread(p.benchmarkConfig.TxInfo.Intervals, p.benchmarkConfig.Secondaries, p.benchmarkConfig.Threads))
+
 	// Step 3: Prepare the workload for the benchmark
 	// TODO: generate workloads
 	workload, err := p.workloadGenerator.GenerateWorkload()
