@@ -6,15 +6,17 @@ import (
 	"diablo-benchmark/core/configs/parsers"
 	"encoding/json"
 	"errors"
-	"go.uber.org/zap"
 	"math/big"
 	"strconv"
+
+	"go.uber.org/zap"
 )
 
 // FabricWorkloadGenerator is the workload generator implementation for the Hyperledger Fabric blockchain
 type FabricWorkloadGenerator struct {
 	BenchConfig *configs.BenchConfig // Benchmark configuration for workload intervals / type
 	ChainConfig *configs.ChainConfig // Chain configuration to get number of transactions to make
+	GenericWorkloadGenerator
 }
 
 //NewGenerator returns a new instance of the generator
@@ -116,7 +118,7 @@ func (f FabricWorkloadGenerator) generateTestWorkload() (Workload, error) {
 			zap.L().Debug("Info",
 				zap.Int("secondary", secondaryID),
 				zap.Int("thread", thread))
-			for interval, txnum := range f.BenchConfig.TxInfo.Intervals {
+			for interval, txnum := range f.TPSIntervals {
 				// Debug print for each interval to monitor correctness.
 				zap.L().Debug("Making workload ",
 					zap.Int("secondary", secondaryID),
