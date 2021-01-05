@@ -1,7 +1,6 @@
 package core
 
 import (
-	"diablo-benchmark/blockchains"
 	"diablo-benchmark/blockchains/clientinterfaces"
 	"diablo-benchmark/communication"
 	"diablo-benchmark/core/configs"
@@ -100,17 +99,6 @@ func (s *Secondary) Run() {
 			zap.L().Debug("Connect and Init of workload handler and client interface OK",
 				zap.Int("ID", s.ID),
 			)
-		case communication.MsgBc[0]:
-			// What type of blockchain are we running?
-			// NOTE: see blockchains/bctypemessage.go for details about why feature
-			// is not used (for now).
-			zap.L().Info("Got command from primary",
-				zap.String("CMD", "BLOCKCHAIN"))
-			_, err = blockchains.MatchMessageToInterface(cmd[1])
-			if err != nil {
-				s.PrimaryComms.ReplyERR(err.Error())
-				continue
-			}
 		case communication.MsgWorkload[0]:
 			zap.L().Info("Got command from primary",
 				zap.String("CMD", "WORKLOAD"))
