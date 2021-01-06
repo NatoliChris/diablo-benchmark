@@ -12,7 +12,7 @@ type PremadeTransaction struct {
 	ID         string       `json:"ID"`                 // Unique transaction number
 	From       string       `json:"from"`               // From which account
 	To         string       `json:"to"`                 // To which account
-	Value      string       `json:"value"`              // Value of the transcation
+	Value      string       `json:"value"`              // Value of the transaction
 	Function   string       `json:"function,omitempty"` // Function Name
 	TxType     string       `json:"txtype"`             // Function Type (Read or Write)
 	DataParams []DataParams `json:"params,flow"`        // Parameters to invoke a function call
