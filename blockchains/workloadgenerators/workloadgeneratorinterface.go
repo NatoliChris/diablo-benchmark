@@ -21,6 +21,18 @@ type SecondaryWorkload [][][][]byte
 // WorkerThreadWorkload is the workload executed per thread on the secondary: [time][txlist][txbytes]
 type WorkerThreadWorkload [][][]byte
 
+// GenericWorkloadGenerator provides generic aspects for the workload generator that will be
+// standard across all generators
+type GenericWorkloadGenerator struct {
+	TPSIntervals []int
+}
+
+// SetThreadIntervals sets the TPS intervals to be made for each thread
+// This is the number of transactions per second for each thread to be made
+func (g *GenericWorkloadGenerator) SetThreadIntervals(intervals []int) {
+	g.TPSIntervals = intervals
+}
+
 // WorkloadGenerator provides the interface and basic functionality to generate a workload given the configurations.
 // The workload generator handles the creation of the transactions and additionally sets
 // up the blockchain and starts the blockchain nodes.
@@ -56,4 +68,7 @@ type WorkloadGenerator interface {
 
 	// GenerateWorkload generates the workload specified in the chain configurations.
 	GenerateWorkload() (Workload, error)
+
+	// SetThreadIntervals sets the number of transactions per thread to create for each interval
+	SetThreadIntervals(interval []int)
 }
