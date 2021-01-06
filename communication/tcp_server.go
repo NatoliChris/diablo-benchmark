@@ -2,7 +2,6 @@ package communication
 
 import (
 	"bytes"
-	"diablo-benchmark/blockchains"
 	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/core/results"
 	"encoding/binary"
@@ -186,7 +185,7 @@ func (s *PrimaryServer) sendAndWaitData(data []byte, secondary net.Conn) ([]resu
 			AverageLatency: 0,
 			Throughput:     0,
 			TxLatencies:    []float64{},
-				}}, nil
+		}}, nil
 	}
 
 	fullReply := initialReply[9:n]
@@ -248,31 +247,6 @@ func (s *PrimaryServer) PrepareBenchmarkSecondaries(numThreads uint32) Secondary
 		err := s.SendAndWaitOKSync(payload, c)
 		if err != nil {
 			zap.L().Warn("Got an error from secondary",
-				zap.String("secondary", c.RemoteAddr().String()))
-			errorList = append(errorList, err.Error())
-		}
-	}
-
-	if len(errorList) == 0 {
-		return nil
-	}
-
-	return errorList
-}
-
-// SendBlockchainType [UNUSED/TODO] sends the blockchain type to the secondaries
-// Note: this function was intended to let the same servers be used for multiple
-// benchmarks of different chains without having to restart and spawn new secondaries.
-// Moved to future work.
-func (s *PrimaryServer) SendBlockchainType(bcType blockchains.BlockchainTypeMessage) SecondaryReplyErrors {
-	// Send the blockchain type message
-	var errorList []string
-
-	fullMessage := append(MsgBc, byte(bcType))
-	for _, c := range s.Secondaries {
-		err := s.SendAndWaitOKSync(fullMessage, c)
-		if err != nil {
-			zap.L().Warn("error from secondary",
 				zap.String("secondary", c.RemoteAddr().String()))
 			errorList = append(errorList, err.Error())
 		}
