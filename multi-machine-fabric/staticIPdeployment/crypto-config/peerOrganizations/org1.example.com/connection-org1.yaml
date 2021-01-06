@@ -37,6 +37,7 @@ peers:
     grpcOptions:
       ssl-target-name-override: peer0.org1.example.com
       hostnameOverride: peer0.org1.example.com
+      request-timeout: 120001
 
   peer1.org1.example.com:
     url: grpcs://192.168.1.122:8051
@@ -60,3 +61,4 @@ peers:
     grpcOptions:
       ssl-target-name-override: peer1.org1.example.com
       hostnameOverride: peer1.org1.example.com
+      request-timeout: 120001
