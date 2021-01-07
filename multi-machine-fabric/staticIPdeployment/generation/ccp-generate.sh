@@ -11,5 +11,5 @@ HOST1_IP=$1
 HOST2_IP=$2
 
 
-echo "$(yaml_generate $HOST1_IP $HOST2_IP)" > peerOrganizations/org1.example.com/connection-org1.yaml
+echo "$(yaml_generate $HOST1_IP $HOST2_IP)" > ../crypto-config/peerOrganizations/org1.example.com/connection-org1.yaml
 

@@ -16,7 +16,7 @@ organizations:
     - peer1.org1.example.com
 peers:
   peer0.org1.example.com:
-    url: grpcs://192.168.1.171:7051
+    url: grpcs://${HOST1_IP}:7051
     tlsCACerts:
       pem: |
         -----BEGIN CERTIFICATE-----
@@ -40,7 +40,7 @@ peers:
       request-timeout: 120001
 
   peer1.org1.example.com:
-    url: grpcs://192.168.1.191:8051
+    url: grpcs://${HOST2_IP}:8051
     tlsCACerts:
       pem: |
         -----BEGIN CERTIFICATE-----
@@ -62,3 +62,4 @@ peers:
       ssl-target-name-override: peer1.org1.example.com
       hostnameOverride: peer1.org1.example.com
       request-timeout: 120001
+
