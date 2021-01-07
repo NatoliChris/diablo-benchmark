@@ -16,7 +16,7 @@ organizations:
     - peer1.org1.example.com
 peers:
   peer0.org1.example.com:
-    url: grpcs://192.168.1.237:7051
+    url: grpcs://192.168.1.171:7051
     tlsCACerts:
       pem: |
         -----BEGIN CERTIFICATE-----
@@ -40,7 +40,7 @@ peers:
       request-timeout: 120001
 
   peer1.org1.example.com:
-    url: grpcs://192.168.1.122:8051
+    url: grpcs://192.168.1.191:8051
     tlsCACerts:
       pem: |
         -----BEGIN CERTIFICATE-----
