@@ -25,15 +25,15 @@ services:
     networks:
     - byfn
     extra_hosts:
-      - "orderer.example.com:192.168.1.148"
-      - "orderer2.example.com:192.168.1.201"
-      - "orderer3.example.com:192.168.1.173"
-      - "orderer4.example.com:192.168.1.161"
-      - "orderer5.example.com:192.168.1.148"
-      - "peer0.org1.example.com:192.168.1.148"
-      - "peer1.org1.example.com:192.168.1.201"
-      - "peer0.org2.example.com:192.168.1.173"
-      - "peer1.org2.example.com:192.168.1.161"
+      - "orderer.example.com:192.168.1.192"
+      - "orderer2.example.com:192.168.1.209"
+      - "orderer3.example.com:192.168.1.234"
+      - "orderer4.example.com:192.168.1.144"
+      - "orderer5.example.com:192.168.1.192"
+      - "peer0.org1.example.com:192.168.1.192"
+      - "peer1.org1.example.com:192.168.1.209"
+      - "peer0.org2.example.com:192.168.1.234"
+      - "peer1.org2.example.com:192.168.1.144"
     volumes:
         - ./channel-artifacts/genesis.block:/var/hyperledger/orderer/orderer.genesis.block
         - ./crypto-config/ordererOrganizations/example.com/orderers/orderer3.example.com/msp:/var/hyperledger/orderer/msp
@@ -48,14 +48,14 @@ services:
       file: base/docker-compose-base.yaml
       service: peer0.org2.example.com
     extra_hosts:
-      - "orderer.example.com:192.168.1.148"
-      - "orderer2.example.com:192.168.1.201"
-      - "orderer3.example.com:192.168.1.173"
-      - "orderer4.example.com:192.168.1.161"
-      - "orderer5.example.com:192.168.1.148"
-      - "peer0.org1.example.com:192.168.1.148"
-      - "peer1.org1.example.com:192.168.1.201"
-      - "peer0.org2.example.com:192.168.1.173"
-      - "peer1.org2.example.com:192.168.1.161"
+      - "orderer.example.com:192.168.1.192"
+      - "orderer2.example.com:192.168.1.209"
+      - "orderer3.example.com:192.168.1.234"
+      - "orderer4.example.com:192.168.1.144"
+      - "orderer5.example.com:192.168.1.192"
+      - "peer0.org1.example.com:192.168.1.192"
+      - "peer1.org1.example.com:192.168.1.209"
+      - "peer0.org2.example.com:192.168.1.234"
+      - "peer1.org2.example.com:192.168.1.144"
     networks:
       - byfn
