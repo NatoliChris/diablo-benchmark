@@ -24,12 +24,12 @@ func main(){
 	}
 	zap.ReplaceGlobals(logger)
 
-	cc, err := parsers.ParseChainConfig("configurations/blockchain-configs/fabric/remote/fabric-basic.yaml")
+	cc, err := parsers.ParseChainConfig("../../configurations/blockchain-configs/fabric/remote/fabric-basic.yaml")
 	if err != nil {
 		panic(err)
 	}
 
-	bc, err := parsers.ParseBenchConfig("configurations/workloads/fabric/remote/DiabloFabricBasic.yaml")
+	bc, err := parsers.ParseBenchConfig("../../configurations/workloads/fabric/remote/DiabloFabricBasic.yaml")
 
 	if err != nil {
 		panic(err)
