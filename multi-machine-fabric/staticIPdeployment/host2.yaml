@@ -22,15 +22,15 @@ services:
       - ORDERER_GENERAL_LISTENPORT=8050
     container_name: orderer2.example.com
     extra_hosts:
-      - "orderer.example.com:192.168.1.192"
-      - "orderer2.example.com:192.168.1.209"
-      - "orderer3.example.com:192.168.1.234"
-      - "orderer4.example.com:192.168.1.144"
-      - "orderer5.example.com:192.168.1.192"
-      - "peer0.org1.example.com:192.168.1.192"
-      - "peer1.org1.example.com:192.168.1.209"
-      - "peer0.org2.example.com:192.168.1.234"
-      - "peer1.org2.example.com:192.168.1.144"
+      - "orderer.example.com:192.168.1.146"
+      - "orderer2.example.com:192.168.1.158"
+      - "orderer3.example.com:192.168.1.149"
+      - "orderer4.example.com:192.168.1.155"
+      - "orderer5.example.com:192.168.1.146"
+      - "peer0.org1.example.com:192.168.1.146"
+      - "peer1.org1.example.com:192.168.1.158"
+      - "peer0.org2.example.com:192.168.1.149"
+      - "peer1.org2.example.com:192.168.1.155"
     networks:
     - byfn
     volumes:
@@ -47,14 +47,14 @@ services:
       file: base/docker-compose-base.yaml
       service: peer1.org1.example.com
     extra_hosts:
-      - "orderer.example.com:192.168.1.192"
-      - "orderer2.example.com:192.168.1.209"
-      - "orderer3.example.com:192.168.1.234"
-      - "orderer4.example.com:192.168.1.144"
-      - "orderer5.example.com:192.168.1.192"
-      - "peer0.org1.example.com:192.168.1.192"
-      - "peer1.org1.example.com:192.168.1.209"
-      - "peer0.org2.example.com:192.168.1.234"
-      - "peer1.org2.example.com:192.168.1.144"
+      - "orderer.example.com:192.168.1.146"
+      - "orderer2.example.com:192.168.1.158"
+      - "orderer3.example.com:192.168.1.149"
+      - "orderer4.example.com:192.168.1.155"
+      - "orderer5.example.com:192.168.1.146"
+      - "peer0.org1.example.com:192.168.1.146"
+      - "peer1.org1.example.com:192.168.1.158"
+      - "peer0.org2.example.com:192.168.1.149"
+      - "peer1.org2.example.com:192.168.1.155"
     networks:
       - byfn
