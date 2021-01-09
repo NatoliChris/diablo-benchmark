@@ -8,6 +8,6 @@ do
     --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt \
      --peerAddresses peer0.org2.example.com:9051 \
      --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt \
-     -c '{"function":"CreateAsset","Args":["$i","red","5","YUNGBULL","58"]}'
+     -c '{"function":"CreateAsset","Args":["'$i'","red","5","YUNGBULL","58"]}'
 
 done
