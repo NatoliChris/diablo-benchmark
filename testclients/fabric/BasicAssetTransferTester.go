@@ -69,20 +69,20 @@ func main(){
 	err = client1.SendRawTransaction(createAssetTransaction(0,generator))
 	////err = client2.SendRawTransaction(createAssetTransaction(0,generator))
 //
-	workload,err := generator.GenerateWorkload()
-	 if err != nil {
-		panic(err)
-	}
-	parsedWorkload1,err := client1.ParseWorkload(workload[0][0])
-
-	 if err != nil {
-		panic(err)
-	}
- 	for _,intervals := range parsedWorkload1 {
-		for _, tx := range intervals {
-			client1.SendRawTransaction(tx)
-		}
-	}
+	//workload,err := generator.GenerateWorkload()
+	// if err != nil {
+	//	panic(err)
+	//}
+	//parsedWorkload1,err := client1.ParseWorkload(workload[0][0])
+//
+	// if err != nil {
+	//	panic(err)
+	//}
+ 	//for _,intervals := range parsedWorkload1 {
+	//	for _, tx := range intervals {
+	//		client1.SendRawTransaction(tx)
+	//	}
+	//}
 // //parsedWorkload2,err := client2.ParseWorkload(workload[0][1])
 	//	for _,intervals := range parsedWorkload2 {
 	//		for _, tx := range intervals{
