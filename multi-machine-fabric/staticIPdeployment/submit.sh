@@ -1,5 +1,5 @@
 #!/bin/bash
-for i in {4 ... 105}
+for ((i = 0; i <= 100; i++ ))
 do
    sudo docker exec cli peer chaincode invoke -o orderer3.example.com:9050 \
    --tls true \
