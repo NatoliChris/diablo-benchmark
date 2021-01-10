@@ -94,40 +94,7 @@ func (p *Primary) Run() {
 	zap.L().Info("Benchmark secondaries all connected.",
 		zap.Int("secondaries", len(p.Server.Secondaries)))
 
-	// Set up the blockchain information
-
-	// Step 2: Blockchain type (tells which interface they should be using)
-	// get the blockchain byte
-
-	/////////////////////////////////////////////////////////////////////////
-	// Note; This feature has been DISABLED!
-	//       The primary function for this feature was to enable Diablo to
-	//       continue running on the machines and benchmark MULTIPLE
-	//       blockchains one after another to preserve the "same machines"
-	//       and same experimental setup.
-	//       This feature was disabled since we can easily re-run the binary
-	//       with separate configurations to achieve the same effect.
-	//
-	//       TODO: @Chris - Remove this feature entirely, since we decided
-	//                      against it.
-	/////////////////////////////////////////////////////////////////////////
-
-	// bcMessage, err := blockchains.MatchStringToMessage(p.chainConfig.Name)
-
-	// if err != nil {
-	// 	p.Server.CloseSecondaries()
-	// 	p.Server.Close()
-	// }
-
-	// errs = p.Server.SendBlockchainType(bcMessage)
-
-	// if errs != nil {
-	// 	zap.L().Error("failed to send blockchain type",
-	// 		zap.Strings("errors", errs))
-	// 	p.Server.CloseSecondaries()
-	// 	p.Server.Close()
-	// 	return
-	// }
+	p.workloadGenerator.SetThreadIntervals(workloadgenerators.GetIntervalPerThread(p.benchmarkConfig.TxInfo.Intervals, p.benchmarkConfig.Secondaries, p.benchmarkConfig.Threads))
 
 	// Step 3: Prepare the workload for the benchmark
 	// TODO: generate workloads
