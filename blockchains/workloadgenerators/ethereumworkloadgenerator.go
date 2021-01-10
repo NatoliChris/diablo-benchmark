@@ -35,6 +35,7 @@ type EthereumWorkloadGenerator struct {
 	ChainID           *big.Int             // ChainID for transactions, provided through the ethereum API
 	KnownAccounts     []configs.ChainKey   // Known accounds, public:private key pair
 	CompiledContract  *compiler.Contract   // Compiled contract bytecode for the contract used in complex workloads
+	GenericWorkloadGenerator
 }
 
 // NewGenerator returns a new instance of the generator
@@ -521,7 +522,7 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 				zap.Int("thread", thread),
 				zap.Int("len", len(accountDistribution)))
 			accountsChoices := accountDistribution[accountBatch]
-			for interval, txnum := range e.BenchConfig.TxInfo.Intervals {
+			for interval, txnum := range e.TPSIntervals {
 				// Debug print for each interval to monitor correctness.
 				zap.L().Debug("Making workload ",
 					zap.Int("secondary", secondaryID),
@@ -625,7 +626,7 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 
 	// Shuffle the function interactions
 	// TODO check this carefully - we may have workloads with dependent transactions in future - maybe add this as a flag in config?
-	ShuffleFunctionCalls(functionsToCreatePerThread)
+	// ShuffleFunctionCalls(functionsToCreatePerThread)
 
 	// Now generate the workload as usual
 	var totalWorkload Workload
@@ -639,7 +640,8 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 
 			accountsChoices := accountDistribution[accountBatch]
 
-			for _, numTx := range e.BenchConfig.TxInfo.Intervals {
+			// 			for _, numTx := range e.BenchConfig.TxInfo.Intervals {
+			for _, numTx := range e.TPSIntervals {
 				intervalWorkload := make([][]byte, 0)
 
 				for i := 0; i < numTx; i++ {
@@ -678,10 +680,140 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 	return totalWorkload, nil
 }
 
+// generatePremadeWorkload generates the workload for the "premade" json file that
+// is associated with this workload.
+func (e *EthereumWorkloadGenerator) generatePremadeWorkload() (Workload, error) {
+	// 1 deploy the contract if it is a contract workload, get the address
+	var contractAddr string
+	if len(e.BenchConfig.ContractInfo.Path) > 0 && len(e.BenchConfig.ContractInfo.Name) > 0 {
+		// Deploy the contract
+		var err error
+		contractAddr, err = e.DeployContract(e.KnownAccounts[0].PrivateKey, e.BenchConfig.ContractInfo.Path)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var fullWorkload Workload
+	// 2 loop through the premade dataset and create the relevant transactions
+	for secondaryIndex, secondaryWorkload := range e.BenchConfig.TxInfo.PremadeInfo {
+
+		secondaryTransactions := make(SecondaryWorkload, 0)
+
+		for threadIndex, threadWorkload := range secondaryWorkload {
+
+			threadTransactions := make(WorkerThreadWorkload, 0)
+
+			for intervalIndex, intervalWorkload := range threadWorkload {
+
+				intervalTransactions := make([][]byte, 0)
+
+				for _, txInfo := range intervalWorkload {
+					// Make the transaction based on its
+					fromID, err := strconv.Atoi(txInfo.From)
+					fromAccount := e.KnownAccounts[fromID%len(e.KnownAccounts)]
+					if err != nil {
+						return nil, fmt.Errorf("[Premade tx: %v] Failed to convert %v to int", txInfo.ID, txInfo.From)
+					}
+
+					var toAccount string
+					if txInfo.To == "contract" {
+						toAccount = contractAddr
+					} else {
+						toID, err := strconv.Atoi(txInfo.To)
+						if err != nil {
+							return nil, fmt.Errorf("[Premade tx: %v] Failed to convert %v to int", txInfo.ID, txInfo.To)
+						}
+						toAccount = e.KnownAccounts[toID%len(e.KnownAccounts)].Address
+					}
+
+					zap.L().Debug("Premade Transaction",
+						zap.String("Tx Info", fmt.Sprintf("[S: %v, T: %v, I: %v]", secondaryIndex, threadIndex, intervalIndex)),
+						zap.String(fmt.Sprintf("From (%v): ", txInfo.From), fmt.Sprintf("%v", fromAccount.Address)),
+						zap.String(fmt.Sprintf("To (%v): ", txInfo.To), fmt.Sprintf("%v", toAccount)),
+						zap.String("ID", txInfo.ID),
+						zap.String("Function", txInfo.Function),
+					)
+
+					var finalTx []byte
+
+					txVal, ok := big.NewInt(0).SetString(txInfo.Value, 10)
+
+					if !ok {
+						return nil, fmt.Errorf("Failed to set value to big int: %s", txInfo.Value)
+					}
+
+					if txInfo.Function == "" && len(txInfo.DataParams) == 0 {
+						// This is a simple transaction
+						finalTx, err = e.CreateSignedTransaction(
+							fromAccount.PrivateKey,
+							toAccount,
+							txVal,
+							[]byte{},
+						)
+
+						if err != nil {
+							return nil, err
+						}
+
+					} else {
+						// This is a contract
+						if txInfo.Function == "constructor" {
+							// Constructor = make a deploy transaction
+							finalTx, err = e.CreateContractDeployTX(
+								fromAccount.PrivateKey,
+								e.BenchConfig.ContractInfo.Path,
+							)
+
+							if err != nil {
+								return nil, err
+							}
+
+						} else {
+							// It's an interaction transaction
+
+							// function name should be: function(type,type,type)
+							var txParams []configs.ContractParam
+							var functionParamSigs []string
+							for _, paramVal := range txInfo.DataParams {
+								functionParamSigs = append(functionParamSigs, paramVal.Type)
+								txParams = append(txParams, configs.ContractParam{Type: paramVal.Type, Value: paramVal.Value})
+							}
+
+							functionFinal := fmt.Sprintf("%s(%s)", txInfo.Function, strings.Join(functionParamSigs[:], ","))
+
+							finalTx, err = e.CreateInteractionTX(
+								fromAccount.PrivateKey,
+								toAccount,
+								functionFinal,
+								txParams,
+								txInfo.Value,
+							)
+						}
+
+					}
+
+					intervalTransactions = append(intervalTransactions, finalTx)
+				}
+
+				threadTransactions = append(threadTransactions, intervalTransactions)
+			}
+
+			secondaryTransactions = append(secondaryTransactions, threadTransactions)
+		}
+
+		fullWorkload = append(fullWorkload, secondaryTransactions)
+	}
+
+	// 3 return the workload to be distributed
+	return fullWorkload, nil
+}
+
 // GenerateWorkload creates a workload of transactions to be used in the benchmark for all clients.
 func (e *EthereumWorkloadGenerator) GenerateWorkload() (Workload, error) {
 	// 1/ work out the total number of secondaries.
-	numberOfWorkingSecondaries := e.BenchConfig.Secondaries * e.BenchConfig.Threads
+	numberOfWorkers := e.BenchConfig.Secondaries * e.BenchConfig.Threads
 
 	// Get the number of transactions to be created
 	numberOfTransactions, err := parsers.GetTotalNumberOfTransactions(e.BenchConfig)
@@ -691,14 +823,13 @@ func (e *EthereumWorkloadGenerator) GenerateWorkload() (Workload, error) {
 	}
 
 	// Total transactions
-	totalTx := numberOfTransactions * numberOfWorkingSecondaries
+	totalTxPerWorker := numberOfTransactions / numberOfWorkers
 
 	zap.L().Info(
 		"Generating workload",
 		zap.String("workloadType", string(e.BenchConfig.TxInfo.TxType)),
-		zap.Int("secondaries", numberOfWorkingSecondaries),
-		zap.Int("transactionsPerSecondary", numberOfTransactions),
-		zap.Int("totalTransactions", totalTx),
+		zap.Int("threadsTotal", numberOfWorkers),
+		zap.Int("totalTransactions per worker", totalTxPerWorker),
 	)
 
 	// Print a warning about the accounts
@@ -716,6 +847,8 @@ func (e *EthereumWorkloadGenerator) GenerateWorkload() (Workload, error) {
 		return e.generateSimpleWorkload()
 	case configs.TxTypeContract:
 		return e.generateContractWorkload()
+	case configs.TxTypePremade:
+		return e.generatePremadeWorkload()
 	default:
 		return nil, errors.New("unknown transaction type in config for workload generation")
 	}
