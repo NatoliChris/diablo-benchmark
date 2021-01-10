@@ -54,12 +54,6 @@ createChannel(){
     --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA
 }
 
-removeOldCrypto(){
-    rm -rf ./api-1.4/crypto/*
-    rm -rf ./api-1.4/fabric-client-kv-org1/*
-    rm -rf ./api-2.0/org1-wallet/*
-    rm -rf ./api-2.0/org2-wallet/*
-}
 
 
 joinChannel(){
@@ -85,8 +79,6 @@ updateAnchorPeers(){
     peer channel update -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com -c $CHANNEL_NAME -f ./artifacts/channel/${CORE_PEER_LOCALMSPID}anchors.tx --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA
     
 }
-
-removeOldCrypto
 
 createChannel
 joinChannel
