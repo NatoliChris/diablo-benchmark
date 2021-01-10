@@ -133,21 +133,26 @@ func (f *FabricInterface) Cleanup() results.Results {
 		throughput = 0
 	}
 
+	averageThroughput := float64(0)
 	var calculatedThroughputSeconds = []float64{f.Throughputs[0]}
 	for i := 1; i < len(f.Throughputs); i++ {
 		calculatedThroughputSeconds = append(calculatedThroughputSeconds, float64(f.Throughputs[i]-f.Throughputs[i-1]))
+		averageThroughput += float64(f.Throughputs[i] - f.Throughputs[i-1])
 	}
 
+	averageThroughput = averageThroughput / float64(len(f.Throughputs))
+
 	zap.L().Debug("Results being returned",
-		zap.Float64("throughput", throughput),
+		zap.Float64("avg throughput", averageThroughput),
+		zap.Float64("throughput (as is)", throughput),
 		zap.Float64("latency", avgLatency),
-		zap.String("ThroughputWindow", fmt.Sprintf("%v", f.Throughputs)),
+		zap.String("ThroughputWindow", fmt.Sprintf("%v", calculatedThroughputSeconds)),
 	)
 
 	return results.Results{
 		TxLatencies:       txLatencies,
 		AverageLatency:    avgLatency,
-		Throughput:        throughput,
+		Throughput:        averageThroughput,
 		ThroughputSeconds: calculatedThroughputSeconds,
 		Success:           success,
 		Fail:              fails,
