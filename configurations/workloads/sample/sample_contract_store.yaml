@@ -10,7 +10,7 @@ bench:
 contract:
   path: "./contracts/testing_contracts/ethereum/Store.sol"
   functions:
-    - name: "storeVal(uint32)"
+    - name: "storeVal"
       ftype: "write"
       ratio: 100
       params:
