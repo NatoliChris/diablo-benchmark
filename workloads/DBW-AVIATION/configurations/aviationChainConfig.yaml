@@ -1,4 +1,4 @@
-name: "Aviation Parts Online Market Place"
+name: "fabric"
 nodes:
   #peer0.org1.example.com
   - 0.0.0.0:7051
