@@ -20,6 +20,8 @@ const (
 	TxTypeTest = "test"
 	// TxTypePremade indicates that the transaction information is in a JSON file
 	TxTypePremade = "premade"
+	// TxTypeAviation indicates we are running the aviation workload
+	TxTypeAviation = "aviation"
 )
 
 // DefaultTimeout is the default timeout for the benchmark if not provided
@@ -149,6 +151,8 @@ func (bt *BenchTransactionType) UnmarshalYAML(unmarshal func(interface{}) error)
 		*bt = TxTypePremade
 	case "test":
 		*bt = TxTypeTest
+	case "aviation":
+		*bt = TxTypeAviation
 	default:
 		return errors.New("TX Type is incorrectly defined")
 	}

@@ -16,7 +16,7 @@ organizations:
     - ca.org2.example.com
 peers:
   peer0.org2.example.com:
-    url: grpcs://localhost:9051
+    url: grpcs://192.168.1.189:9051
     tlsCACerts:
       pem: |
           -----BEGIN CERTIFICATE-----
@@ -38,28 +38,3 @@ peers:
     grpcOptions:
       ssl-target-name-override: peer0.org2.example.com
       hostnameOverride: peer0.org2.example.com
-certificateAuthorities:
-  ca.org2.example.com:
-    url: https://localhost:8054
-    caName: ca-org2
-    tlsCACerts:
-      pem: 
-        - |
-          -----BEGIN CERTIFICATE-----
-          MIICUjCCAfigAwIBAgIRAMG1Xx3iFnCqTr/PoEv27FEwCgYIKoZIzj0EAwIwczEL
-          MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
-          cmFuY2lzY28xGTAXBgNVBAoTEG9yZzIuZXhhbXBsZS5jb20xHDAaBgNVBAMTE2Nh
-          Lm9yZzIuZXhhbXBsZS5jb20wHhcNMjAxMDMxMjAxNzAwWhcNMzAxMDI5MjAxNzAw
-          WjBzMQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMN
-          U2FuIEZyYW5jaXNjbzEZMBcGA1UEChMQb3JnMi5leGFtcGxlLmNvbTEcMBoGA1UE
-          AxMTY2Eub3JnMi5leGFtcGxlLmNvbTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IA
-          BKtehwkczNRvSU8hIGr1LWoU3cdYRGrneXSka24lHpMmZhUSYXilt7h9qim0iybl
-          4xsMEareAGyg/UWwCelil7ajbTBrMA4GA1UdDwEB/wQEAwIBpjAdBgNVHSUEFjAU
-          BggrBgEFBQcDAgYIKwYBBQUHAwEwDwYDVR0TAQH/BAUwAwEB/zApBgNVHQ4EIgQg
-          8OW9VsdapCc9x96Qoh626QPePwBgSRmdoVZYOzL94LcwCgYIKoZIzj0EAwIDSAAw
-          RQIgVFETzx1GqhfuAw+JGwt0J/TzcxVmdqWISkI9rqpdgXYCIQCDEsuvOHD9jMiW
-          CceHCQrnaxUhLBRJiDk8iCBHzJbocA==
-          -----END CERTIFICATE-----
-          
-    httpOptions:
-      verify: false
