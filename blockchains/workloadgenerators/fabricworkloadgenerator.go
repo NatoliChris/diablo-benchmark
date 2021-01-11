@@ -6,6 +6,8 @@ import (
 	"diablo-benchmark/core/configs/parsers"
 	"encoding/json"
 	"errors"
+	"fmt"
+
 	"math/big"
 	"strconv"
 
@@ -175,6 +177,71 @@ func (f FabricWorkloadGenerator) generateTestWorkload() (Workload, error) {
 
 }
 
+// generatePremadeWorkload generates the workload for the "premade" json file that
+// is associated with this workload.
+func (f *FabricWorkloadGenerator) generatePremadeWorkload() (Workload, error) {
+
+	var fullWorkload Workload
+	// 2 loop through the premade dataset and create the relevant transactions
+	for secondaryIndex, secondaryWorkload := range f.BenchConfig.TxInfo.PremadeInfo {
+
+		secondaryTransactions := make(SecondaryWorkload, 0)
+
+		for threadIndex, threadWorkload := range secondaryWorkload {
+
+			threadTransactions := make(WorkerThreadWorkload, 0)
+
+			for intervalIndex, intervalWorkload := range threadWorkload {
+
+				intervalTransactions := make([][]byte, 0)
+
+				for _, txInfo := range intervalWorkload {
+
+					zap.L().Debug("Premade Transaction",
+						zap.String("Tx Info", fmt.Sprintf("[S: %v, T: %v, I: %v]", secondaryIndex, threadIndex, intervalIndex)),
+						zap.String("ID", txInfo.ID),
+						zap.String("Function", txInfo.Function),
+					)
+
+					params := make([]configs.ContractParam, 0)
+
+					//First parameter is UID
+					params = append(params, configs.ContractParam{
+						Type:  "uint64",
+						Value: txInfo.ID,
+					})
+
+					//Then the chaincode invoke parameters
+					for _, dataParam := range txInfo.DataParams {
+						param := configs.ContractParam{
+							Type:  dataParam.Name,
+							Value: dataParam.Value,
+						}
+						params = append(params, param)
+					}
+
+					finalTx, err := f.CreateInteractionTX(nil, txInfo.TxType, txInfo.Function, params, "")
+
+					if err != nil {
+						return nil, err
+					}
+
+					intervalTransactions = append(intervalTransactions, finalTx)
+				}
+
+				threadTransactions = append(threadTransactions, intervalTransactions)
+			}
+
+			secondaryTransactions = append(secondaryTransactions, threadTransactions)
+		}
+
+		fullWorkload = append(fullWorkload, secondaryTransactions)
+	}
+
+	// 3 return the workload to be distributed
+	return fullWorkload, nil
+}
+
 //GenerateWorkload generates a workload given the benchmark config and the blockchain config files
 // returns: Workload ([secondary][threads][time][tx]) -> [][][][]byte
 func (f FabricWorkloadGenerator) GenerateWorkload() (Workload, error) {
@@ -204,7 +271,8 @@ func (f FabricWorkloadGenerator) GenerateWorkload() (Workload, error) {
 	//asset transfer/creation/deletion based workload
 	case configs.TxTypeTest:
 		return f.generateTestWorkload()
-
+	case configs.TxTypePremade:
+		return f.generatePremadeWorkload()
 	default:
 		return nil, errors.New("unknown transaction type in config for workload generation")
 	}

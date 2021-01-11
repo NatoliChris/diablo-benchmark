@@ -89,15 +89,26 @@ func (e *EthereumInterface) Cleanup() results.Results {
 		throughput = 0
 	}
 
+	averageThroughput := float64(0)
 	var calculatedThroughputSeconds = []float64{e.Throughputs[0]}
 	for i := 1; i < len(e.Throughputs); i++ {
 		calculatedThroughputSeconds = append(calculatedThroughputSeconds, float64(e.Throughputs[i]-e.Throughputs[i-1]))
+		averageThroughput += float64(e.Throughputs[i] - e.Throughputs[i-1])
 	}
+
+	averageThroughput = averageThroughput / float64(len(e.Throughputs))
+
+	zap.L().Debug("Results being returned",
+		zap.Float64("avg throughput", averageThroughput),
+		zap.Float64("throughput (as is)", throughput),
+		zap.Float64("latency", avgLatency),
+		zap.String("ThroughputWindow", fmt.Sprintf("%v", calculatedThroughputSeconds)),
+	)
 
 	return results.Results{
 		TxLatencies:       txLatencies,
 		AverageLatency:    avgLatency,
-		Throughput:        throughput,
+		Throughput:        averageThroughput,
 		ThroughputSeconds: calculatedThroughputSeconds,
 		Success:           success,
 		Fail:              fails,
