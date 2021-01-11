@@ -4,6 +4,8 @@
 // to the generation of the workload.
 package configs
 
+import "diablo-benchmark/core/workload"
+
 // BenchConfig provides the main benchmark configuration structure, all information about the specified workload
 type BenchConfig struct {
 	Name         string       `yaml:"name"` // Name of the benchmark.
@@ -18,8 +20,10 @@ type BenchConfig struct {
 
 // BenchInfo provides specific information about transaction type and intervals
 type BenchInfo struct {
-	TxType    BenchTransactionType `yaml:"type"` // Type of the transactions (simple, contract).
-	Intervals TPSIntervals         `yaml:"txs"`  // Transactions.
+	TxType      BenchTransactionType              `yaml:"type"`               // Type of the transactions (simple, contract).
+	DataPath    string                            `yaml:"datapath,omitempty"` // Data path of the transactions
+	Intervals   TPSIntervals                      `yaml:"txs"`                // Transactions.
+	PremadeInfo workload.PremadeBenchmarkWorkload // Premade workload (if exists)
 }
 
 // ContractParam defines the contract function parameters

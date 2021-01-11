@@ -105,6 +105,10 @@ func (p *Primary) Run() {
 			zap.String("error", err.Error()))
 		p.closeAllConns()
 		return
+	} else if workload == nil || len(workload) == 0 {
+		zap.L().Error("failed to produce workload")
+		p.closeAllConns()
+		return
 	}
 
 	// Step 4: Distribute benchmark
