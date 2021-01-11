@@ -1,13 +1,17 @@
 name: "Aviation Parts Online Market Place"
 description: "Honeywell inspired Online Market Place"
-secondaries: 1
+secondaries: 2
 threads: 1
 
 bench:
   type: "aviation"
   txs:
     0: 5
-    5: 5
+    1: 10
+    2: 15
+    3: 50
+    4: 60
+    5: 30
 contract:
   functions:
     # standard asset creation

@@ -12,8 +12,7 @@ organizations:
     mspid: Org${ORG}MSP
     peers:
     - peer0.org${ORG}.example.com
-    certificateAuthorities:
-    - ca.org${ORG}.example.com
+
 peers:
   peer0.org${ORG}.example.com:
     url: grpcs://${HOST_IP}:${P0PORT}

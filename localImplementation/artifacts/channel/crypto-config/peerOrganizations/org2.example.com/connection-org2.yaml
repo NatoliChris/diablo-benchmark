@@ -12,11 +12,9 @@ organizations:
     mspid: Org2MSP
     peers:
     - peer0.org2.example.com
-    certificateAuthorities:
-    - ca.org2.example.com
 peers:
   peer0.org2.example.com:
-    url: grpcs://192.168.1.189:9051
+    url: grpcs://localhost:9051
     tlsCACerts:
       pem: |
           -----BEGIN CERTIFICATE-----

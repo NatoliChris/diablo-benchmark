@@ -59,7 +59,7 @@ presetup() {
 CHANNEL_NAME="mychannel"
 CC_RUNTIME_LANGUAGE="golang"
 VERSION="1"
-CC_SRC_PATH="../workloads/aviationParts/chaincode-go"
+CC_SRC_PATH="../workloads/DBW-AVIATION/chaincode-go"
 CC_NAME="aviation"
 
 packageChaincode() {
