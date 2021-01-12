@@ -155,7 +155,7 @@ func (bt *BenchTransactionType) UnmarshalYAML(unmarshal func(interface{}) error)
 		*bt = TxTypeTest
 	case "aviation":
 		*bt = TxTypeAviation
-	case "contention"
+	case "contention":
 		*bt = TxTypeContention
 	default:
 		return errors.New("TX Type is incorrectly defined")

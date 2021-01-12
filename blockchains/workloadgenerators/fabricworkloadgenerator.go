@@ -519,7 +519,7 @@ func (f FabricWorkloadGenerator) GenerateWorkload() (Workload, error) {
 		return f.generatePremadeWorkload()
 	case configs.TxTypeAviation:
 		return f.generateAviationWorkload()
-	case configs.TxTypeContention
+	case configs.TxTypeContention:
 		return f.generateContentionWorkload()
 	default:
 		return nil, errors.New("unknown transaction type in config for workload generation")
