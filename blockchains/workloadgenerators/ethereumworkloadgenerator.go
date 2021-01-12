@@ -651,10 +651,23 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 					zap.L().Debug(fmt.Sprintf("tx %d for func %s", txCount, funcToCreate.Name),
 						zap.Int("secondary", secondaryID),
 						zap.Int("thread", threadID))
+					var functionParamSigs []string
+					var functionFinal string
+					if len(funcToCreate.Params) > 0 {
+
+						for _, paramVal := range funcToCreate.Params {
+							functionParamSigs = append(functionParamSigs, paramVal.Type)
+						}
+
+						functionFinal = fmt.Sprintf("%s(%s)", funcToCreate.Name, strings.Join(functionParamSigs[:], ","))
+					} else {
+						functionFinal = funcToCreate.Name
+					}
+
 					tx, txerr := e.CreateInteractionTX(
 						accFrom.PrivateKey,
 						contractAddr,
-						funcToCreate.Name,
+						functionFinal,
 						funcToCreate.Params,
 						funcToCreate.PayValue,
 					)
