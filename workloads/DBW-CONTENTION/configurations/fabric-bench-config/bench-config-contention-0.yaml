@@ -1,0 +1,28 @@
+name: "Contention"
+description: "Contention-focused workload to showcase design choice of Hyperledger Fabric"
+secondaries: 1
+threads: 1
+
+bench:
+  type: "contention"
+  txs:
+    0: 5
+    5: 5
+contract:
+  functions:
+    - name: "CreateAsset"
+      ftype: "write"
+      ratio: 100
+      params:
+        - type: "string"
+          value: "assetID"
+        - type: "color"
+          value: ""
+        - type: "size"
+          value: ""
+        - type: "owner"
+          value: ""
+        - type: "price"
+          value: ""
+
+
