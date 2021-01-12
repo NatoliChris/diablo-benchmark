@@ -1,0 +1,93 @@
+Diablo Benchmark Workload                                               Dec 2020
+
+================================================================================
+
+                           Initial Coin Offering
+                             (TENX WORKLOAD)
+
+================================================================================
+
+
+Description of the workload
+
+    This workload is representative of the request rates observed during the
+    Initial Coin Offering (ICO) of the TENX token. This token was launched
+    on 24th June 2017 and lasted 7 minutes. The token sale was able to raise
+    a collective of 100 million tokens, through a collection of both Bitcoin
+    and Ethereum. The workload representation will be based off the Ethereum
+    transaction request rate observed during that time.
+
+Curve Definition:
+
+   3500 |                                xxxxxxxxxxxxx
+   3000 |                    xxxxxxxxxxxx            x
+   2500 |   xxxxxxxxxxxxxxxxx                         x
+   2000 |   x                                         x
+   1500 |   x                                         x
+   1000 |   x                                         xxxxx
+    500 |xxxx                                              xxxxxxxx
+      0 |______________________________________________________________________
+        0   60  120         240         360         480         620         720
+            |                                        |
+          ICO START                               ICO END
+
+    ICO duration: 7 minutes
+    Contract Function: () "fallback function" or "receive()" - send ether and
+    it will convert to the tokens for the token sale.
+
+
+Experimental Setup:
+
+    Number of Nodes (blockchain): Optimal
+    Number of Secondaries: Optimal (Effective Scaling until degradation)
+    Number of Threads: Optimal (Effective Scaling until degradation)
+
+    Justification:
+
+        Initially, ICOs were released to the public on public blockchains,
+        often through Ethereum or Bitcoin.
+        As new blockchains are released, we should aim to find the "optimal"
+        environment for handling throughput to the point of degradation for
+        the blockchain available.
+        The blockchains MUST support smart-contract like functionality and
+        are classified to partake in environments where IPO/ICOs may occur.
+        It must be noted, that certain closed/permissioned blockchains operate
+        under an assumed environment (e.g. already set up consortium of fixed
+        numbers), and should be honoured during the testing setup and provided
+        in the workload configurations.
+
+    Blockchain Classifications:
+
+        Ethereum-based VM supporting contracts.
+            Ethereum POA
+            Quorum
+            Burrow
+            Ether/Tendermint
+            Mulga Chain
+
+Contract:
+
+    The deployed contract will be taken directly from the TenX token sale
+    contract as listed on the Etherscan website [2] and modified for simplicity
+    in the benchmark. The contract will be a modified version that contains
+    the same core functions, with minimal changes.
+    The highlighted changes can be found in the ".diff" file in the
+    "eth-solidity" folder.
+
+
+Justification:
+    In resource [1], the request rate is measured through passive measurement.
+    This highlighted the number of requests per minute observed in the P2P
+    network messages distribtued in the system. The rate of sending peaks
+    when the ICO time is reached, with maximal sends, and slowly tapers off
+    in the 7 minutes to finally settle at the base transaction request rate.
+
+Resources:
+
+    [1] Spain, Michael, Sean Foley, and Vincent Gramoli. "The Impact of
+    Ethereum Throughput and Fees on Transaction Latency During ICOs."
+    International Conference on Blockchain Economics, Security and Protocols
+    (Tokenomics 2019). Schloss Dagstuhl-Leibniz-Zentrum für Informatik, 2020.
+
+    [2] TenX Token Contract:
+    https://etherscan.io/address/0xd43d09ec1bc5e57c8f3d0c64020d403b04c7f783
