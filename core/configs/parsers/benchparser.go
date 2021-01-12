@@ -177,5 +177,5 @@ func GetTotalNumberOfTransactions(config *configs.BenchConfig) (int, error) {
 		currentKey = nextKey
 	}
 
-	return totalNumberOfTransactions * config.Secondaries * config.Threads, nil
+	return totalNumberOfTransactions, nil
 }
