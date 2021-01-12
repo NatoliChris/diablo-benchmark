@@ -52,7 +52,7 @@ for next_key in interval_keys[1:]:
         print("[*] DEBUG: Total: {}".format(total_transactions))
 
 total_updates = int((int(sys.argv[1]) / 100) * total_transactions)
-total_creates = int(total_transactions - total_updates)
+total_creates = int(total_transactions - total_updates) + 1
 
 print("Updates: {}; Create: {}".format(total_updates, total_creates))
 
