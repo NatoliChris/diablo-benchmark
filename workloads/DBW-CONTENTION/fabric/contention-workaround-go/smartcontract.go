@@ -13,7 +13,7 @@ type SmartContract struct {
 }
 const compositeName = "id~op~value"
 
-func (s *SmartContract) Update(ctx contractapi.TransactionContextInterface, id string, delta int64, operation string) error{
+func (s *SmartContract) UpdateAsset(ctx contractapi.TransactionContextInterface, id string, delta int64, operation string) error{
 
 	if operation != "+" && operation != "-"{
 		return fmt.Errorf("operation %s is not supported", operation)
@@ -80,7 +80,7 @@ func (s *SmartContract) Get(ctx contractapi.TransactionContextInterface, id stri
 	}
 
 	//updating the ledger with the final value
-	return s.Update(ctx, id, finalValue, "+")
+	return s.UpdateAsset(ctx, id, finalValue, "+")
 }
 
 func main() {
