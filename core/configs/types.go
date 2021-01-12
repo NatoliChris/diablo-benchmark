@@ -22,6 +22,8 @@ const (
 	TxTypePremade = "premade"
 	// TxTypeAviation indicates we are running the aviation workload
 	TxTypeAviation = "aviation"
+	// TxTypeContention indicates we are running the contention workload
+	TxTypeContention = "contention"
 )
 
 // DefaultTimeout is the default timeout for the benchmark if not provided

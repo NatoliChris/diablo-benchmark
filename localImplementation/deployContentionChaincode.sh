@@ -60,7 +60,7 @@ CHANNEL_NAME="mychannel"
 CC_RUNTIME_LANGUAGE="golang"
 VERSION="1"
 CC_SRC_PATH="../workloads/DBW-CONTENTION/fabric/chaincode-go"
-CC_NAME="basic"
+CC_NAME="contention"
 
 packageChaincode() {
     rm -rf ${CC_NAME}.tar.gz

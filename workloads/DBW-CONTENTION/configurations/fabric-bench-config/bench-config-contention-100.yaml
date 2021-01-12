@@ -40,7 +40,7 @@ contract:
   functions:
     - name: "CreateAsset"
       ftype: "write"
-      ratio: 0
+      ratio: 1
       params:
         - type: "assetID"
           value: ""
@@ -54,7 +54,7 @@ contract:
           value: "1"
     - name : "UpdateAsset"
       ftype: "write"
-      ratio: 100
+      ratio: 99
       params:
         - type: "string"
           value: "assetID"

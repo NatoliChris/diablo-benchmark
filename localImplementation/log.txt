@@ -1,2 +1,0 @@
-Installed chaincodes on peer:
-Package ID: aviation_1:56a77c54c7626fe489861dc2933ad0dfa47d8f802eda52afbfdb03b1b7498ac9, Label: aviation_1

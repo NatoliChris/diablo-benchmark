@@ -37,6 +37,6 @@ extra:
     ccpPath: "localImplementation/artifacts/channel/crypto-config/peerOrganizations/org2.example.com/connection-org2.yaml"
     localHost: "true"
     channelName: "mychannel"
-    contractName: "basic"
+    contractName: "contention"
 
 
