@@ -42,15 +42,17 @@ contract:
       ftype: "write"
       ratio: 100
       params:
-        - type: "string"
-          value: "assetID"
-        - type: "color"
+        - type: "id"
           value: ""
-        - type: "size"
+        - type: "value"
+          value: "1"
+    - name : "UpdateAsset"
+      ftype: "write"
+      ratio: 0
+      params:
+        - type: "id"
           value: ""
-        - type: "owner"
-          value: ""
-        - type: "price"
-          value: ""
+        - type: "value"
+          value: "1"
 
 

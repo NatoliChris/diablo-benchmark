@@ -454,8 +454,8 @@ func (f FabricWorkloadGenerator) generateContentionWorkload() (Workload, error) 
 						// transactions are of the form  (id,value)
 						otherParams := functionToInvoke.Params
 
-						//id
-						otherParams[0].Value = strconv.FormatInt(txID%numberOfCreate,10)
+						//id = 0, to simulate contention on asset 0
+						otherParams[0].Value = strconv.FormatInt(0,10)
 						// value
 						otherParams[1].Value = strconv.FormatInt(txID, 10)
 						params = append(params, otherParams...)
