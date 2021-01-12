@@ -1,0 +1,71 @@
+Diablo Benchmark Workload                                          <<YEAR HERE>>
+
+================================================================================
+
+                        Twitter Castle In The Sky
+
+================================================================================
+
+
+Description of the workload
+
+    This workload mimics the request rate observed with Twitter in August 2013,
+    when the airing of "Castle In The Sky" [1] was broadcast in Japan. This
+    workload highlights the potential for a system to cope with such high
+    amounts of traffic.
+
+
+Curve Definition:
+
+    150 |                                              x
+        |                                             x x
+    100 |                                             x x
+        |                                             x x
+     50 |                                             x x
+        |                                             x x
+      5 |xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx xxxxxxxxxxxxxxxxxxxxxxx
+      0 |______________________________________________________________________
+        0      10      20      30      40      50      60      70      80    90
+
+
+Experimental Setup:
+
+    Number of Nodes (blockchain):
+    Number of Secondaries:
+    Number of Threads
+
+    Justification:
+
+        As this workload is presented as a stress test, this workload should
+        be observed with ordinary conditions of that blockchain. For a
+        permissionless blockchain that is designed for several nodes running
+        a BFT consensus, it should be the number stated in that design, or,
+        optimal conditions if this is an exploratory benchmark to find
+        optimality.
+
+    Blockchain Classifications:
+
+        <<List supported blockchains for this workload>>
+
+Contract:
+
+    <<Describe the contract and the required code.>>
+
+Justification:
+
+    The twitter workload was provided from the data observed during the
+    event, at which twitter reached the highest "tweet per second" request
+    rate of 143,199 for one second. The average tweet per second observed
+    in twitter is approximately 5,700 - making this anomaly an event that
+    stress tested the system. [2]
+
+    A blockchain platform that may have traffic similar to that of twitter
+    must cope with such anomalous events, whereby this benchmark provides
+    a perfect stress test and observation of latency.
+
+
+Resources
+
+    [1] https://en.wikipedia.org/wiki/Castle_in_the_Sky
+
+    [2] https://blog.twitter.com/engineering/en_us/a/2013/new-tweets-per-second-record-and-how.html
