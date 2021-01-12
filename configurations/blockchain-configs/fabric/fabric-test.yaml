@@ -34,7 +34,7 @@ extra:
       qtsJm6lRLVsU+Y/GLFgOma9rv76hRANCAASbIq/YUCOeApLQA3uL6ca/FvcrIIwe
       6soO8TcS0kqbhU4bK2scS2UX8QiyTSL6AaIUxOx/GhVPyIfkoVdCbbA5
       -----END PRIVATE KEY-----
-    ccpPath: "localImplementation/artifacts/channel/crypto-config/peerOrganizations/org2.example.com/connection-org2.yaml"
+    ccpPath: "docker-deployments/fabric-docker-local/artifacts/channel/crypto-config/peerOrganizations/org2.example.com/connection-org2.yaml"
     localHost: "true"
     channelName: "mychannel"
     contractName: "basic"
