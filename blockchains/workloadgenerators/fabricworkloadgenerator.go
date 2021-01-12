@@ -385,8 +385,6 @@ func (f FabricWorkloadGenerator) generateContentionWorkload() (Workload, error) 
 	numberOfTransactions, _ := parsers.GetTotalNumberOfTransactions(f.BenchConfig)
 
 	numberOfCreate := int64(float64(numberOfTransactions) * (float64(f.BenchConfig.ContractInfo.Functions[0].Ratio) / 100.0))
-	numberOfUpdate := int64(float64(numberOfTransactions) * (float64(f.BenchConfig.ContractInfo.Functions[1].Ratio) / 100.0))
-
 	// 1. Generate the transactions
 	txID := int64(0)
 	accountBatch := 0
@@ -521,6 +519,8 @@ func (f FabricWorkloadGenerator) GenerateWorkload() (Workload, error) {
 		return f.generatePremadeWorkload()
 	case configs.TxTypeAviation:
 		return f.generateAviationWorkload()
+	case configs.TxTypeContention
+		return f.generateContentionWorkload()
 	default:
 		return nil, errors.New("unknown transaction type in config for workload generation")
 	}
