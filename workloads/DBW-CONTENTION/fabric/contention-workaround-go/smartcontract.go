@@ -13,13 +13,13 @@ type SmartContract struct {
 }
 const compositeName = "id~op~value"
 
-func (s *SmartContract) Update(ctx contractapi.TransactionContextInterface, id string, delta float64, operation string) error{
+func (s *SmartContract) Update(ctx contractapi.TransactionContextInterface, id string, delta int64, operation string) error{
 
 	if operation != "+" && operation != "-"{
 		return fmt.Errorf("operation %s is not supported", operation)
 	}
 
-	deltaString := fmt.Sprintf("%f", delta)
+	deltaString := strconv.FormatInt(delta,10)
 	compositeKey, err := ctx.GetStub().CreateCompositeKey(compositeName,[]string{id,operation,deltaString})
 
 	if err != nil {
@@ -41,7 +41,7 @@ func (s *SmartContract) Get(ctx contractapi.TransactionContextInterface, id stri
 		return fmt.Errorf("No asset with id %s exists", id)
 	}
 
-	var finalValue float64
+	var finalValue int64
 
 	for compositeKeyIterator.HasNext() {
 		compositeKey, err := compositeKeyIterator.Next()
@@ -58,7 +58,7 @@ func (s *SmartContract) Get(ctx contractapi.TransactionContextInterface, id stri
 		op := compositeKeyParts[1]
 		deltaString := compositeKeyParts[2]
 
-		delta,err := strconv.ParseFloat(deltaString,64)
+		delta,err := strconv.ParseInt(deltaString,10,64)
 		if err != nil {
 			return err
 		}
