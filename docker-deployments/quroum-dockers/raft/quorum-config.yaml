@@ -4,5 +4,5 @@ nodes:
   - 127.0.0.1:22011
   - 127.0.0.1:22012
   - 127.0.0.1:22013
-key_file: "docker-deployments/quroum-dockers/raft/keys.json"
+key_file: "docker-deployments/quroum-dockers/raft/100000_accounts/keys.json"
 window: 2

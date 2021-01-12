@@ -11,9 +11,9 @@ bench:
     51: 1140
     90: 1140
 contract:
-  path: "workloads/DBW-Twitter/contracts/______"
+  path: "workloads/DBW-TWITTER/contracts/eth-solidity/twitter.sol"
   name: "DecentralizedTwitter"
-  function:
+  functions:
     - name: "tweet(bytes32)"
       ftype: "write"
       ratio: 100
