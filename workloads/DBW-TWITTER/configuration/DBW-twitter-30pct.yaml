@@ -1,0 +1,23 @@
+name: "Diablo Twitter Castle In The Sky Workload"
+description: "Twitter requests observed during the 'castle in the sky' airing in japan"
+secondaries: 1
+threads: 1
+bench:
+  type: "contract"
+  txs:
+    0: 1710
+    49: 1710
+    50: 42960
+    51: 1710
+    90: 1710
+contract:
+  path: "workloads/DBW-Twitter/contracts/______"
+  name: "DecentralizedTwitter"
+  function:
+    - name: "tweet(bytes32)"
+      ftype: "write"
+      ratio: 100
+      value: 0
+      params:
+        - type: "bytes32"
+          value: "08ef39e921af704544d4c915c7a48627b8e0e415e78e1eb7fc4f6c6c9aa7b905"
