@@ -8,6 +8,7 @@ nodes:
   - 0.0.0.0:9051
   #peer1.org2.example.com
   - 0.0.0.0:10051
+window: 5
 extra:
   - label: "appUser"
     mspID: "Org2MSP"
