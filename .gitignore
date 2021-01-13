@@ -5,5 +5,5 @@ localImplementation/application-go/wallet/
 localImplementation/log.txt
 localImplementation/*.tar.gz
 diablo
-results/
+
 wallet/
