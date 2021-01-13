@@ -64,6 +64,7 @@ func (f *FabricInterface) Init(chainConfig *configs.ChainConfig) {
 		}
 	}
 
+
 	ccpPath := mapConfig["ccpPath"].(string)
 
 	f.Gateway, err = gateway.Connect(
