@@ -1,6 +1,6 @@
 name: "Contention"
 description: "Contention-focused workload to showcase design choice of Hyperledger Fabric"
-secondaries: 1
+secondaries: 2
 threads: 1
 
 bench:
