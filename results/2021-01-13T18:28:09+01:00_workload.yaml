@@ -71,7 +71,6 @@ bench:
     62: 1
     63: 1
 
-
 contract:
   functions:
     # standard asset creation
