@@ -82,6 +82,18 @@ func (s *SmartContract) Buy(ctx contractapi.TransactionContextInterface, stock s
 	return nil
 }
 
+func (s *SmartContract) Init(ctx contractapi.TransactionContextInterface) error {
+	for _, v := range availableStocks {
+		b := big.NewInt(1000000).Bytes()
+		err := ctx.GetStub().PutState(v, b)
+		if err != nil {
+			return fmt.Errorf("Failed to initialise stock: %v", err)
+		}
+	}
+
+	return nil
+}
+
 func main() {
 	exchangeChaincode, err := contractapi.NewChaincode(new(SmartContract))
 	if err != nil {
@@ -91,12 +103,4 @@ func main() {
 	if err := exchangeChaincode.Start(); err != nil {
 		log.Panicf("Error starting exchange chaincode: %v", err)
 	}
-
-	// TODO: initialise the stocks to 1m
-	// for _, val := range availableStocks {
-	// 	err := shim.GetStub().PutState(val, big.NewInt(10000000).Bytes())
-	// 	if err != nil {
-	// 		log.Panicf("Error starting exchange chaincode: %v", err)
-	// 	}
-	// }
 }
