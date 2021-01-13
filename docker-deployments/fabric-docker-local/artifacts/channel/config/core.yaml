@@ -426,6 +426,11 @@ peer:
       # This option is only supported for qscc at this time.
       concurrency:
         qscc: 5000
+        # endorserService limits concurrent requests to endorser service that handles chaincode deployment, query and invocation,
+        # including both user chaincodes and system chaincodes.
+        endorserService: 0
+        # deliverService limits concurrent event listeners registered to deliver service for blocks and transaction events.
+        deliverService: 0
 
 ###############################################################################
 #
