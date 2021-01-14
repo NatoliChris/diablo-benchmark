@@ -20,7 +20,6 @@ experiments = [
     "60",
     "80",
     "100",
-    "workaround",
 ]
 
 experiment_data = {x: [] for x in experiments}
@@ -28,12 +27,14 @@ barwidth = 0.25
 
 for ex in experiments:
     # list the things in the directory
-    files = os.listdir("contention/count20/{}/results".format(ex))
+    files = os.listdir("contention/count3/{}/results".format(ex))
     for f in files:
         if "results" in f:
             # if it's a result, read it to the file
-            with open("contention/count20/{}/results/{}".format(ex, f), "r") as fp:
+            with open("contention/count3/{}/results/{}".format(ex, f), "r") as fp:
                 experiment_data[ex].append(json.load(fp))
+
+    files = os.listdir("contention/count20/{}/results".format(ex))
 
 
 def plot_contention_bars():
@@ -81,6 +82,7 @@ def plot_throughput_windows():
     plt.legend(bbox_to_anchor=(0,1.02,1,0.2), loc="lower left", mode="expand", borderaxespad=1, ncol=3)
     plt.show()
 
+
 def print_average():
     r1 = np.arange(len(experiment_data))
     averages = []
@@ -95,8 +97,6 @@ def print_average():
         averages.append(avg / len(experiment_data[ex]))
     print(averages)
 
-
-# plot_contention_bars()
-# plot_throughput_windows()
+#plot_contention_bars()
+#plot_throughput_windows()
 print_average()
-
