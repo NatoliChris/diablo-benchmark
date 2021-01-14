@@ -13,18 +13,19 @@ type SmartContract struct {
 	contractapi.Contract
 }
 
-var availableStocks [10]string = [10]string{
-	"AMD",
-	"TSLA",
-	"AMZN",
-	"AAPL",
-	"ZNGA",
-	"NVDA",
-	"MSFT",
-	"JD",
-	"CSCO",
-	"FB",
+var availableStocks = map[string]bool{
+	"AMD":true,
+	"TSLA":true,
+	"AMZN":true,
+	"AAPL":true,
+	"ZNGA":true,
+	"NVDA":true,
+	"MSFT":true,
+	"JD":true,
+	"CSCO":true,
+	"FB":true,
 }
+
 
 func (s *SmartContract) checkStock(ctx contractapi.TransactionContextInterface, stock string, amount uint) error {
 	data, err := ctx.GetStub().GetState(stock)
@@ -43,15 +44,9 @@ func (s *SmartContract) checkStock(ctx contractapi.TransactionContextInterface, 
 }
 
 func (s *SmartContract) Buy(ctx contractapi.TransactionContextInterface, stock string, value uint) error {
-	isValid := false
-	for _, val := range availableStocks {
-		if val == stock {
-			isValid = true
-			break
-		}
-	}
 
-	if !isValid {
+
+	if _,ok := availableStocks[stock]; !ok{
 		return fmt.Errorf("%v is not a stock", stock)
 	}
 
@@ -83,9 +78,9 @@ func (s *SmartContract) Buy(ctx contractapi.TransactionContextInterface, stock s
 }
 
 func (s *SmartContract) Init(ctx contractapi.TransactionContextInterface) error {
-	for _, v := range availableStocks {
+	for k := range availableStocks {
 		b := big.NewInt(1000000).Bytes()
-		err := ctx.GetStub().PutState(v, b)
+		err := ctx.GetStub().PutState(k, b)
 		if err != nil {
 			return fmt.Errorf("Failed to initialise stock: %v", err)
 		}
