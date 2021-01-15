@@ -283,11 +283,11 @@ def plot_throughput_time_all_onesystem(systemname, duration):
     plt.close()
 
 
-#plot_average_throughput_bars()
-#plot_max_throughput_bars()
-#plot_throughput_time_experiment("100-3m")
-#plot_throughput_time_all_onesystem('quorum', "2m")
-for i in ['hyperledger', 'quorum']:
-    for j in ['1m', '2m', '3m']:
-        plot_throughput_time_all_onesystem(i, j)
+# plot_average_throughput_bars()
+# plot_max_throughput_bars()
+# plot_throughput_time_experiment("100-3m")
+# plot_throughput_time_all_onesystem('quorum', "2m")
+# for i in ['hyperledger', 'quorum']:
+#     for j in ['1m', '2m', '3m']:
+#         plot_throughput_time_all_onesystem(i, j)
 plot_latency_bars()
