@@ -80,13 +80,15 @@ def plot_average_throughput_bars():
 
     plt.xticks([r + BARWIDTH for r in range(len(hyperledgerthroughputs))],
                [ex for ex in experiments])
-    plt.ylabel("Transactions per second")
+    plt.ylabel("Throughput (Tx/s)")
+    plt.xlabel("Contention percentage")
 
     plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left",
-               mode="expand", borderaxespad=1, ncol=3)
-    plt.tight_layout()
+               mode="expand", borderaxespad=1, ncol=3, fontsize = 15)
 
-    plt.savefig('figures/contention/contention-comparison-average-throughput.png', dpi = 100)
+    plt.savefig('figures/contention/contention-comparison-average-throughput.png', dpi = 100, bbox_inches='tight')
+
+    plt.close()
 
 
 def plot_max_throughput_bars():
@@ -130,7 +132,7 @@ def plot_max_throughput_bars():
 
 
 def plot_latency_bars():
-    BARWIDTH = 0.25
+    BARWIDTH = 0.5
 
     quorum_x = [x for x in range(0, len(experiments) * 2, 2)]
     hl_x = [x+0.5 for x in range(0, len(experiments) * 2, 2)]
@@ -158,22 +160,20 @@ def plot_latency_bars():
         quorum_avg.append(qavg)
 
 
-
-
-
     plt.bar(quorum_x, quorum_avg, width=BARWIDTH,
             edgecolor='white', label='Quorum (Avg)')
     plt.bar(hl_x, hl_avg, width=BARWIDTH,
             edgecolor='white', label='Hyperledger (Avg)')
 
     plt.xticks([r + BARWIDTH for r in quorum_x], [ex for ex in experiments])
-    plt.ylabel("Milliseconds")
+    plt.xlabel("Contention percentage", fontsize = 15)
+    plt.ylabel("Latency (ms)", fontsize = 15)
     #plt.yscale('log')
     plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left",
-               mode="expand", borderaxespad=1, ncol=2)
+               mode="expand", borderaxespad=1, ncol=2, fontsize = 12)
 
 
-    plt.savefig('figures/contention/contention-comparison-average-latency.png', dpi=100)
+    plt.savefig('figures/contention/contention-comparison-average-latency.png', dpi=100, bbox_inches='tight')
     plt.close()
 
 
