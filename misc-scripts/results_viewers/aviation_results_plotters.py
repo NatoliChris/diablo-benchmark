@@ -4,6 +4,7 @@
 
 import json
 import os
+from statistics import stdev
 
 import matplotlib
 from matplotlib import pyplot as plt
@@ -12,8 +13,8 @@ import numpy as np
 font = {"size": 20}
 matplotlib.rc("font", **font)
 
-HYPERLEDGERPATH="aviation-hyperledger"
-QUORUMPATH="quorum_experiments/aviation/"
+HYPERLEDGERPATH = "aviation-hyperledger"
+QUORUMPATH = "quorum_experiments/aviation/"
 
 experiments = [
     "100-1m",
@@ -75,13 +76,17 @@ def plot_average_throughput_bars():
     r1 = np.arange(len(hyperledgerthroughputs))
     r2 = [x + BARWIDTH for x in r1]
 
-    plt.bar(r1, hyperledgerthroughputs, width=BARWIDTH, edgecolor='white', label='hyperledger')
-    plt.bar(r2, quorumthroughputs, width=BARWIDTH, edgecolor='white', label='quorum')
+    plt.bar(r1, hyperledgerthroughputs, width=BARWIDTH,
+            edgecolor='white', label='hyperledger')
+    plt.bar(r2, quorumthroughputs, width=BARWIDTH,
+            edgecolor='white', label='quorum')
 
-    plt.xticks([r + BARWIDTH for r in range(len(hyperledgerthroughputs))], [ex for ex in experiments])
+    plt.xticks([r + BARWIDTH for r in range(len(hyperledgerthroughputs))],
+               [ex for ex in experiments])
     plt.ylabel("Transactions per second")
 
-    plt.legend(bbox_to_anchor=(0,1.02,1,0.2), loc="lower left", mode="expand", borderaxespad=1, ncol=3)
+    plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left",
+               mode="expand", borderaxespad=1, ncol=3)
 
     plt.show()
 
@@ -111,15 +116,20 @@ def plot_max_throughput_bars():
     r1 = np.arange(len(hyperledgerthroughputs))
     r2 = [x + BARWIDTH for x in r1]
 
-    plt.bar(r1, hyperledgerthroughputs, width=BARWIDTH, edgecolor='white', label='hyperledger')
-    plt.bar(r2, quorumthroughputs, width=BARWIDTH, edgecolor='white', label='quorum')
+    plt.bar(r1, hyperledgerthroughputs, width=BARWIDTH,
+            edgecolor='white', label='hyperledger')
+    plt.bar(r2, quorumthroughputs, width=BARWIDTH,
+            edgecolor='white', label='quorum')
 
-    plt.xticks([r + BARWIDTH for r in range(len(hyperledgerthroughputs))], [ex for ex in experiments])
+    plt.xticks([r + BARWIDTH for r in range(len(hyperledgerthroughputs))],
+               [ex for ex in experiments])
     plt.ylabel("Transactions per second")
 
-    plt.legend(bbox_to_anchor=(0,1.02,1,0.2), loc="lower left", mode="expand", borderaxespad=1, ncol=3)
+    plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left",
+               mode="expand", borderaxespad=1, ncol=3)
 
     plt.show()
+
 
 def plot_latency_bars():
     BARWIDTH = 0.25
@@ -158,18 +168,24 @@ def plot_latency_bars():
     q2_x = [x + BARWIDTH for x in quorum_x]
     hl2_x = [x + BARWIDTH for x in hl_x]
 
-    plt.bar(quorum_x, quorum_maxs, width=BARWIDTH, edgecolor='white', label='Quorum (Max)')
-    plt.bar(hl_x, hl_maxs, width=BARWIDTH, edgecolor='white', label='Hyperledger (Max)')
+    plt.bar(quorum_x, quorum_maxs, width=BARWIDTH,
+            edgecolor='white', label='Quorum (Max)')
+    plt.bar(hl_x, hl_maxs, width=BARWIDTH,
+            edgecolor='white', label='Hyperledger (Max)')
 
-    plt.bar(q2_x, quorum_avg, width=BARWIDTH, edgecolor='white', label='Quorum (Avg)')
-    plt.bar(hl2_x, hl_avg, width=BARWIDTH, edgecolor='white', label='Hyperledger (Avg)')
+    plt.bar(q2_x, quorum_avg, width=BARWIDTH,
+            edgecolor='white', label='Quorum (Avg)')
+    plt.bar(hl2_x, hl_avg, width=BARWIDTH,
+            edgecolor='white', label='Hyperledger (Avg)')
 
     plt.xticks([r + BARWIDTH for r in quorum_x], [ex for ex in experiments])
     plt.ylabel("Milliseconds")
     # plt.yscale('log')
-    plt.legend(bbox_to_anchor=(0,1.02,1,0.2), loc="lower left", mode="expand", borderaxespad=1, ncol=2)
+    plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left",
+               mode="expand", borderaxespad=1, ncol=2)
 
     plt.show()
+
 
 def plot_throughput_time_experiment(ex):
     hyperledger_windows = []
@@ -177,8 +193,8 @@ def plot_throughput_time_experiment(ex):
         for idx in range(0, len(data['TotalThroughputOverTime'])):
             if idx >= len(hyperledger_windows):
                 hyperledger_windows.append([])
-            hyperledger_windows[idx].append(data['TotalThroughputOverTime'][idx])
-
+            hyperledger_windows[idx].append(
+                data['TotalThroughputOverTime'][idx])
 
     hyperledger_averages = [sum(x) / len(x) for x in hyperledger_windows]
 
@@ -213,8 +229,65 @@ def plot_throughput_time_experiment(ex):
     plt.legend()
     plt.show()
 
+def plot_throughput_time_all_onesystem(systemname, duration):
+
+    markers=['s', '^', '*', 'x']
+    filtered_exp = ["{}-{}".format(x, duration) for x in ["100", "200", "250"]]
+
+    fig = plt.figure(figsize=(10, 5))
+    ax = plt.subplot(111)
+
+    # Shrink current axis's height by 10% on the bottom
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0 + box.height * 0.3,
+        box.width, box.height * 0.8])
+
+    for exp in filtered_exp:
+        avg_times = []
+        for data in all_experiments_info[systemname][exp]:
+            for idx in range(0, len(data['TotalThroughputOverTime'])):
+                if idx >= len(avg_times):
+                    avg_times.append([])
+                avg_times[idx].append(
+                    data['TotalThroughputOverTime'][idx]
+                )
+
+        avgs = [sum(x) / len(x) for x in avg_times]
+        lower_errs = [min(x) for x in avg_times]
+        upper_errs = [max(x) for x in avg_times]
+        plt.errorbar(
+            [x * 5 for x in range(0, len(avgs))],
+            avgs,
+            # yerr=[lower_errs, upper_errs],
+            label=exp,
+            linewidth=2,
+            capsize=10,
+            marker=markers.pop()
+        )
+
+    #plt.title("{} Throughput".format(systemname))
+    plt.xlabel("Time (seconds)")
+    plt.ylabel("Transactions")
+    plt.legend(
+        loc="upper center",
+        ncol=3,
+        borderaxespad=1,
+        # mode="expand",
+        bbox_to_anchor=(0.5, -0.2),
+    )
+
+    # Shrink current axis's height by 10% on the bottom
+    # plt.legend(bbox_to_anchor=(), loc="",
+    #            mode="expand", borderaxespad=1, ncol=3)
+    plt.savefig('figures/aviation/{}-{}-throughput.png'.format(systemname, duration), dpi=100)
+    plt.close()
+
 
 # plot_average_throughput_bars()
 # plot_max_throughput_bars()
-plot_throughput_time_experiment("100-3m")
+# plot_throughput_time_experiment("100-3m")
+# plot_throughput_time_all_onesystem('quorum', "2m")
+for i in ['hyperledger', 'quorum']:
+    for j in ['1m', '2m', '3m']:
+        plot_throughput_time_all_onesystem(i, j)
 # plot_latency_bars()
