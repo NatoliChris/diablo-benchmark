@@ -14,7 +14,7 @@ font = {"size": 20}
 matplotlib.rc("font", **font)
 
 HYPERLEDGERPATH = "contention/count20"
-QUORUMPATH = "quorum_experiments/contention/no_window"
+QUORUMPATH = "quorum_experiments/new-contention"
 
 experiments = [
     "0",
@@ -84,8 +84,9 @@ def plot_average_throughput_bars():
 
     plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left",
                mode="expand", borderaxespad=1, ncol=3)
+    plt.tight_layout()
 
-    plt.show()
+    plt.savefig('figures/contention/contention-comparison-average-throughput.png', dpi = 100)
 
 
 def plot_max_throughput_bars():
@@ -124,8 +125,8 @@ def plot_max_throughput_bars():
 
     plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left",
                mode="expand", borderaxespad=1, ncol=3)
-
     plt.show()
+    plt.close()
 
 
 def plot_latency_bars():
@@ -181,7 +182,8 @@ def plot_latency_bars():
     plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left",
                mode="expand", borderaxespad=1, ncol=2)
 
-    plt.show()
+    plt.savefig('figures/contention/contention-comparison-average-latency.png', dpi=100)
+    plt.close()
 
 
 def plot_throughput_time_experiment(ex):
@@ -281,7 +283,7 @@ def plot_throughput_time_all_onesystem(systemname, contention):
 
 
 plot_average_throughput_bars()
-plot_max_throughput_bars()
+#plot_max_throughput_bars()
 #plot_throughput_time_experiment("100-3m")
 #for i in ['hyperledger', 'quorum']:
 #    for j in ['0', '20', '40', '60', '80','100']:
