@@ -282,6 +282,49 @@ def plot_throughput_time_all_onesystem(systemname, duration):
     plt.savefig('figures/aviation/{}-{}-throughput.png'.format(systemname, duration), dpi=100)
     plt.close()
 
+def plot_latency_cdfs_experiment(experiment):
+
+    latencies = {'quorum': {}, 'hyperledger': {}}
+    total_counts = {'quorum': 0, 'hyperledger': 0}
+    for system in ['hyperledger', 'quorum']:
+        for data in all_experiments_info[system][experiment]:
+            total_counts[system] += len(data['AllTxLatencies'])
+            for l in data['AllTxLatencies']:
+                if l not in latencies[system]:
+                    latencies[system][l] = 0
+                latencies[system][l] += 1
+
+    all_quorum_things = {x: (latencies['quorum'][x] / total_counts['quorum']) for x in latencies['quorum']}
+    quorum_keys = list(all_quorum_things.keys())
+    quorum_keys.sort()
+
+    all_hyperledger_things = {x: (latencies['hyperledger'][x] / total_counts['hyperledger']) for x in latencies['hyperledger']}
+
+    hyperledger_keys = list(all_hyperledger_things.keys())
+    hyperledger_keys.sort()
+
+    quorum_cdfs = [all_quorum_things[quorum_keys[0]]]
+    current_count = all_quorum_things[quorum_keys[0]]
+    for i in quorum_keys[1:]:
+        current_count += all_quorum_things[i]
+        quorum_cdfs.append(current_count)
+
+    hyperledger_cdfs = [all_hyperledger_things[hyperledger_keys[0]]]
+    current_count = all_hyperledger_things[hyperledger_keys[0]]
+    for i in hyperledger_keys[1:]:
+        current_count += all_hyperledger_things[i]
+        hyperledger_cdfs.append(current_count)
+
+    plt.plot(hyperledger_keys, hyperledger_cdfs, label='hyperledger')
+    plt.plot(quorum_keys, quorum_cdfs, label='quorum')
+    plt.xlabel("Latency (ms)")
+    plt.tight_layout()
+    plt.legend(loc='lower right')
+    plt.savefig('figures/aviation/{}-cdf.png'.format(experiment))
+    plt.close()
+
+
+
 
 # plot_average_throughput_bars()
 # plot_max_throughput_bars()
@@ -290,4 +333,8 @@ def plot_throughput_time_all_onesystem(systemname, duration):
 # for i in ['hyperledger', 'quorum']:
 #     for j in ['1m', '2m', '3m']:
 #         plot_throughput_time_all_onesystem(i, j)
-plot_latency_bars()
+# plot_latency_bars()
+
+for i in ["100", "200", "250"]:
+    for j in ["1m", "2m", "3m"]:
+        plot_latency_cdfs_experiment("{}-{}".format(i, j))
