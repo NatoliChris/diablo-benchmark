@@ -135,52 +135,43 @@ def plot_latency_bars():
     quorum_x = [x for x in range(0, len(experiments) * 2, 2)]
     hl_x = [x+0.5 for x in range(0, len(experiments) * 2, 2)]
 
-    quorum_maxs = []
-    hl_maxs = []
-
     quorum_avg = []
     hl_avg = []
 
     for ex in experiments:
         # hyperledger
         havg = 0
-        maxs = 0
         for i in all_experiments_info['hyperledger'][ex]:
             havg += i['AverageLatency']
-            maxs += i['MaxLatency']
+
 
         havg = havg / len(all_experiments_info['hyperledger'][ex])
         hl_avg.append(havg)
-        hl_maxs.append(maxs)
 
         qavg = 0
-        maxs = 0
+
         for i in all_experiments_info['quorum'][ex]:
             qavg += i['AverageLatency']
-            maxs += i['MaxLatency']
+
 
         qavg = qavg / len(all_experiments_info['quorum'][ex])
         quorum_avg.append(qavg)
-        quorum_maxs.append(maxs)
 
-    q2_x = [x + BARWIDTH for x in quorum_x]
-    hl2_x = [x + BARWIDTH for x in hl_x]
 
-    plt.bar(quorum_x, quorum_maxs, width=BARWIDTH,
-            edgecolor='white', label='Quorum (Max)')
-    plt.bar(hl_x, hl_maxs, width=BARWIDTH,
-            edgecolor='white', label='Hyperledger (Max)')
 
-    plt.bar(q2_x, quorum_avg, width=BARWIDTH,
+
+
+    plt.bar(quorum_x, quorum_avg, width=BARWIDTH,
             edgecolor='white', label='Quorum (Avg)')
-    plt.bar(hl2_x, hl_avg, width=BARWIDTH,
+    plt.bar(hl_x, hl_avg, width=BARWIDTH,
             edgecolor='white', label='Hyperledger (Avg)')
 
     plt.xticks([r + BARWIDTH for r in quorum_x], [ex for ex in experiments])
     plt.ylabel("Milliseconds")
-    plt.yscale('log')
+    #plt.yscale('log')
     plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left",
                mode="expand", borderaxespad=1, ncol=2)
+
 
     plt.savefig('figures/contention/contention-comparison-average-latency.png', dpi=100)
     plt.close()
