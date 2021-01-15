@@ -67,7 +67,7 @@ def plot_average_throughput_bars():
         for i in all_experiments_info['quorum'][ex]:
             qavg += i['AverageThroughput']
 
-        qavg = (qavg / len(all_experiments_info['quorum'][ex])) / 2
+        qavg = (qavg / len(all_experiments_info['quorum'][ex]))
         quorumthroughputs.append(qavg)
 
     r1 = np.arange(len(hyperledgerthroughputs))
@@ -107,7 +107,7 @@ def plot_max_throughput_bars():
         for i in all_experiments_info['quorum'][ex]:
             qavg += i['MaximumThroughput']
 
-        qavg = (qavg / len(all_experiments_info['quorum'][ex]))/2
+        qavg = (qavg / len(all_experiments_info['quorum'][ex]))
         quorumthroughputs.append(qavg)
 
     r1 = np.arange(len(hyperledgerthroughputs))
@@ -226,10 +226,10 @@ def plot_throughput_time_experiment(ex):
     plt.legend()
     plt.show()
 
-def plot_throughput_time_all_onesystem(systemname, duration):
+def plot_throughput_time_all_onesystem(systemname, contention):
 
     markers=['s', '^', '*', 'x']
-    filtered_exp = ["{}-{}".format(x, duration) for x in ["100", "200", "250"]]
+    filtered_exp = ["{}-{}%".format(x, contention) for x in ["100", "200", "250"]]
 
     fig = plt.figure(figsize=(10, 5))
     ax = plt.subplot(111)
@@ -276,7 +276,7 @@ def plot_throughput_time_all_onesystem(systemname, duration):
     # Shrink current axis's height by 10% on the bottom
     # plt.legend(bbox_to_anchor=(), loc="",
     #            mode="expand", borderaxespad=1, ncol=3)
-    plt.savefig('figures/aviation/{}-{}-throughput.png'.format(systemname, duration), dpi=100)
+    plt.savefig('figures/contention/{}-{}-throughput.png'.format(systemname, contention), dpi=100)
     plt.close()
 
 
