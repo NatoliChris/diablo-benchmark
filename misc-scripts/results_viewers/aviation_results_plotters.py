@@ -315,8 +315,35 @@ def plot_latency_cdfs_experiment(experiment):
         current_count += all_hyperledger_things[i]
         hyperledger_cdfs.append(current_count)
 
+    # Fix the counts
+    if hyperledger_keys[-1] > quorum_keys[-1]:
+        quorum_keys.append(hyperledger_keys[-1])
+        quorum_cdfs.append(1)
+    elif hyperledger_keys[-1] < quorum_keys[-1]:
+        hyperledger_keys.append(quorum_keys[-1])
+        hyperledger_cdfs.append(1)
+
+    # 100 fix
+    if experiment in ["100-1m", "100-2m", "100-3m"]:
+        quorum_keys.append(25000)
+        quorum_cdfs.append(1)
+
+        hyperledger_keys.append(25000)
+        hyperledger_cdfs.append(1)
+
+    if hyperledger_keys[-1] < 30000:
+        hyperledger_keys.append(30000)
+        hyperledger_cdfs.append(1)
+
+    if quorum_keys[-1] < 30000:
+        quorum_keys.append(30000)
+        quorum_cdfs.append(1)
+
+
+    plt.xticks([1000, 10000, 20000, 30000])
     plt.plot(hyperledger_keys, hyperledger_cdfs, label='hyperledger')
     plt.plot(quorum_keys, quorum_cdfs, label='quorum')
+    plt.title("Peak {}; Duration: {}".format(experiment.split("-")[0], experiment.split("-")[1]))
     plt.xlabel("Latency (ms)")
     plt.tight_layout()
     plt.legend(loc='lower right')
