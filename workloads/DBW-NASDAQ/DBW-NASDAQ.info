@@ -1,0 +1,61 @@
+Diablo Benchmark Workload                                                   2021
+
+================================================================================
+
+                            NASDAQ TOP10 STOCKS
+
+================================================================================
+
+
+Description of the workload
+
+    This workload mimics the number of sales of the worlds top 10 most traded
+    stocks as seen on the NASDAQ stock exchange. NASDAQ is an american stock
+    exchange that provides trading for numerous stocks and is ranked second,
+    lead only by the New York Stock Exchange. This workload provides
+    data obtained during 2021/01 where the highest throughput was selected as
+    input to this dataset.
+
+Curve Definition:
+
+        (Small visual represntation of the curve of the benchmark)
+
+        |                                                                      
+        |                                                                      
+        |                                                                      
+        |                                                                      
+        |                                                                      
+        |                                                                      
+        |                                                                      
+      0 |______________________________________________________________________
+        0
+
+
+Experimental Setup:
+
+    Number of Nodes (blockchain):
+    Number of Secondaries:
+    Number of Threads
+
+    Justification:
+
+        <<The justification MUST describe information about why the number of
+        nodes/secondaries/threads exist. In some cases, these are tailored
+        specifically for a specific workload that requires exact number of
+        nodes and clients.>>
+
+
+    Blockchain Classicitaions:
+
+        <<List supported blockchains for this workload>>
+
+Contract:
+
+    <<Describe the contract and the required code.>>
+
+Justification:
+
+    <<Justification of the workload with reference to any related resources>>
+
+Resoruces
+
