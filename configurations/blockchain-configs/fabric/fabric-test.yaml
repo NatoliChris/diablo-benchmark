@@ -11,6 +11,7 @@ nodes:
 extra:
   - label: "appUser"
     mspID: "Org2MSP"
+    #msp/signcerts
     cert: |
       -----BEGIN CERTIFICATE-----
       MIICKTCCAdCgAwIBAgIQKQFz4ksKPeII9yCTVJlAVjAKBggqhkjOPQQDAjBzMQsw
@@ -26,13 +27,14 @@ extra:
       PQQDAgNHADBEAiB/V1dL62bdd2xOSDT0S5nShu8QiF5oqQXTp92z649AdQIgCFw1
       FU5B1xtVXNmuf74VO1ZdLZP7wt+YH8I3zxInqk8=
       -----END CERTIFICATE-----
+    #msp/keystore
     key: |
       -----BEGIN PRIVATE KEY-----
       MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg35z/sLNihPfvKq27
       qtsJm6lRLVsU+Y/GLFgOma9rv76hRANCAASbIq/YUCOeApLQA3uL6ca/FvcrIIwe
       6soO8TcS0kqbhU4bK2scS2UX8QiyTSL6AaIUxOx/GhVPyIfkoVdCbbA5
       -----END PRIVATE KEY-----
-    ccpPath: "localImplementation/artifacts/channel/crypto-config/peerOrganizations/org2.example.com/connection-org2.yaml"
+    ccpPath: "docker-deployments/fabric-docker-local/artifacts/channel/crypto-config/peerOrganizations/org2.example.com/connection-org2.yaml"
     localHost: "true"
     channelName: "mychannel"
     contractName: "basic"
