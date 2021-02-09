@@ -1,0 +1,46 @@
+{
+    "name": "DiabloPOA",
+    "engine": {
+        "authorityRound": {
+            "params": {
+                "stepDuration": "1",
+                "validators" : {
+                    "list": [
+                        "0xd2ffab60f7ed4b53f10155b21cee106c429ab506",
+                        "0x0ec2aa16564d3ca9df603721815c8c521e858f48",
+                        "0x333d24a961070e7002323e1373c77190e1016bb5",
+                        "0x2f45bf71dde5d6a1132b737006b14a1573448f16"
+                    ]
+                }
+            }
+        }
+    },
+    "params": {
+        "gasLimitBoundDivisor": "0x400",
+        "maximumExtraDataSize": "0x20",
+        "minGasLimit": "0x1388",
+        "networkID" : "0x2323",
+        "eip155Transition": 0,
+        "validateChainIdTransition": 0,
+        "eip140Transition": 0,
+        "eip211Transition": 0,
+        "eip214Transition": 0,
+        "eip658Transition": 0
+    },
+    "genesis": {
+        "seal": {
+            "authorityRound": {
+                "step": "0x0",
+                "signature": "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            }
+        },
+        "difficulty": "0x20000",
+        "gasLimit": "0x5B8D80"
+    },
+    "accounts": {
+        "0x0000000000000000000000000000000000000001": { "balance": "1", "builtin": { "name": "ecrecover", "pricing": { "linear": { "base": 3000, "word": 0 } } } },
+        "0x0000000000000000000000000000000000000002": { "balance": "1", "builtin": { "name": "sha256", "pricing": { "linear": { "base": 60, "word": 12 } } } },
+        "0x0000000000000000000000000000000000000003": { "balance": "1", "builtin": { "name": "ripemd160", "pricing": { "linear": { "base": 600, "word": 120 } } } },
+        "0x0000000000000000000000000000000000000004": { "balance": "1", "builtin": { "name": "identity", "pricing": { "linear": { "base": 15, "word": 3 } } } }
+    }
+}

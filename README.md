@@ -52,6 +52,8 @@ The secondary clients are acting as clients interacting with the blockchain. Eac
 ### Requirements
 
 * Go `go version 1.14` or greater.
+* Ethereum/EVM Blockchain: [solc](https://docs.soliditylang.org/en/v0.8.0/installing-solidity.html) **v0.7.5**
+    * Note: it's important to install v0.7.5 for ethereum, as there are breaking changes (01/2021) that prevent the go from reading compiler information critical to the benchmark workloads.
 
 
 ### Installation
