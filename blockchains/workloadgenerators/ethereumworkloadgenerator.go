@@ -134,7 +134,9 @@ func (e *EthereumWorkloadGenerator) CreateAccount() (interface{}, error) {
 // DeployContract deploys the contract and returns the address
 func (e *EthereumWorkloadGenerator) DeployContract(fromPivKey []byte, contractPath string) (string, error) {
 	tx, err := e.CreateContractDeployTX(fromPivKey, contractPath)
+
 	if err != nil {
+		zap.L().Error("Failed to create deploy tx")
 		return "", err
 	}
 
@@ -170,24 +172,17 @@ func (e *EthereumWorkloadGenerator) DeployContract(fromPivKey []byte, contractPa
 	}
 }
 
-// CreateContractDeployTX creates a transaction to deploy the smart contract
-func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, contractPath string) ([]byte, error) {
-
-	// Generate the relevant account information from the private key
-	priv, err := crypto.HexToECDSA(hex.EncodeToString(fromPrivKey))
-	if err != nil {
-		return []byte{}, err
-	}
-
-	addrFrom := crypto.PubkeyToAddress(priv.PublicKey)
-
-	// Check for the existence of the contract
+// CompileContract runs the solidity compiler and returns the compiled contract instance
+func (e *EthereumWorkloadGenerator) CompileContract(contractPath string) (*compiler.Contract, error) {
 	if _, err := os.Stat(contractPath); err == nil {
 		// Path exists, compile the contract and prepare the transaction
 		// TODO: check the 'solc' string
 		contracts, err := compiler.CompileSolidity("", contractPath)
+
 		if err != nil {
-			return []byte{}, err
+			zap.L().Error("Failed to compile contract",
+				zap.Error(err))
+			return nil, err
 		}
 		if len(contracts) == 0 {
 			return nil, fmt.Errorf("no contracts to compile")
@@ -218,6 +213,33 @@ func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, c
 				break
 			}
 		}
+
+		zap.L().Debug("Contract found",
+			zap.Bool("isNil?", contract == nil))
+
+		return contract, nil
+	} else if os.IsNotExist(err) {
+		// Path doesn't exist - return an error
+		return nil, fmt.Errorf("contract does not exist: %s", contractPath)
+	} else {
+		// Corner case, it's another error - so we should handle it
+		// like an error state
+		return nil, err
+	}
+}
+
+// CreateContractDeployTX creates a transaction to deploy the smart contract
+func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, contractPath string) ([]byte, error) {
+
+	// Generate the relevant account information from the private key
+	priv, err := crypto.HexToECDSA(hex.EncodeToString(fromPrivKey))
+	if err != nil {
+		return []byte{}, err
+	}
+
+	addrFrom := crypto.PubkeyToAddress(priv.PublicKey)
+
+	if contract, err := e.CompileContract(contractPath); err == nil {
 
 		zap.L().Info("Deploying Contract",
 			zap.String("contract", e.BenchConfig.ContractInfo.Name),
@@ -253,16 +275,10 @@ func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, c
 
 		return signedTx.MarshalJSON()
 
-	} else if os.IsNotExist(err) {
-		// Path doesn't exist - return an error
-		return []byte{}, fmt.Errorf("contract does not exist: %s", contractPath)
 	} else {
-		// Corner case, it's another error - so we should handle it
-		// like an error state
 		return []byte{}, err
 	}
 
-	return []byte{}, errors.New("failed to create deploy tx")
 }
 
 // ReadBits encodes the absolute value of bigint as big-endian bytes. Callers must ensure
@@ -760,7 +776,22 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 	}
 
 	// Deploy the contract
-	contractAddr, err := e.DeployContract(e.KnownAccounts[0].PrivateKey, e.BenchConfig.ContractInfo.Path)
+	var contractAddr string
+	if e.BenchConfig.ContractInfo.Deployed == "" {
+		contractAddr, err = e.DeployContract(e.KnownAccounts[0].PrivateKey, e.BenchConfig.ContractInfo.Path)
+	} else {
+		contract, err := e.CompileContract(e.BenchConfig.ContractInfo.Path)
+		if err != nil {
+			return nil, err
+		}
+
+		e.CompiledContract = contract
+
+		contractAddr = e.BenchConfig.ContractInfo.Deployed
+	}
+
+	zap.L().Debug("Contract Deployed",
+		zap.String("address", contractAddr))
 
 	if err != nil {
 		return nil, err
@@ -875,14 +906,26 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 func (e *EthereumWorkloadGenerator) generatePremadeWorkload() (Workload, error) {
 	// 1 deploy the contract if it is a contract workload, get the address
 	var contractAddr string
+	var err error
 	if len(e.BenchConfig.ContractInfo.Path) > 0 && len(e.BenchConfig.ContractInfo.Name) > 0 {
 		// Deploy the contract
-		var err error
-		contractAddr, err = e.DeployContract(e.KnownAccounts[0].PrivateKey, e.BenchConfig.ContractInfo.Path)
-
-		if err != nil {
-			return nil, err
+		if e.BenchConfig.ContractInfo.Deployed == "" {
+			contractAddr, err = e.DeployContract(e.KnownAccounts[0].PrivateKey, e.BenchConfig.ContractInfo.Path)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// Compile the contract
+			contract, err := e.CompileContract(e.BenchConfig.ContractInfo.Path)
+			if err != nil {
+				return nil, err
+			}
+			// Set the global compiled contract
+			e.CompiledContract = contract
+			// set the address
+			contractAddr = e.BenchConfig.ContractInfo.Deployed
 		}
+
 	}
 
 	var fullWorkload Workload

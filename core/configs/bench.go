@@ -43,7 +43,8 @@ type ContractFunction struct {
 
 // ContractInfo defining the path and functions that would be called.
 type ContractInfo struct {
-	Path      string             `yaml:"path"`           // Path of the contract file to be deployed (e.g. Solidity File).
-	Name      string             `yaml:"name"`           // The contract name (required for multiple deployed contracts)
-	Functions []ContractFunction `yaml:"functions,flow"` // Functions that should be called.
+	Path      string             `yaml:"path"`                // Path of the contract file to be deployed (e.g. Solidity File).
+	Name      string             `yaml:"name"`                // The contract name (required for multiple deployed contracts)
+	Deployed  string             `yaml:"deployed",omitempty"` // Contract deployed address for a pre-deployed contract
+	Functions []ContractFunction `yaml:"functions,flow"`      // Functions that should be called.
 }
