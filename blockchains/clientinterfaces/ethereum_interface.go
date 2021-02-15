@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -30,6 +31,7 @@ type EthereumInterface struct {
 	StartTime        time.Time              // Start time of the benchmark
 	ThroughputTicker *time.Ticker           // Ticker for throughput (1s)
 	Throughputs      []float64              // Throughput over time with 1 second intervals
+	infolock         sync.Mutex
 	GenericInterface
 }
 
@@ -172,10 +174,12 @@ func (e *EthereumInterface) parseBlocksForTransactions(blockNumber *big.Int) {
 	var tAdd uint64
 	for _, v := range block.Transactions() {
 		tHash := v.Hash().String()
+		e.infolock.Lock()
 		if _, ok := e.TransactionInfo[tHash]; ok {
 			e.TransactionInfo[tHash] = append(e.TransactionInfo[tHash], tNow)
 			tAdd++
 		}
+		e.infolock.Unlock()
 	}
 
 	atomic.AddUint64(&e.NumTxDone, tAdd)
@@ -216,12 +220,14 @@ func (e *EthereumInterface) ParseBlocksForTransactions(startNumber uint64, endNu
 		if err != nil {
 			return err
 		}
-
+		e.infolock.Lock()
 		for _, v := range b.TransactionHashes {
+
 			if _, ok := e.TransactionInfo[v]; ok {
 				e.TransactionInfo[v] = append(e.TransactionInfo[v], time.Unix(int64(b.Timestamp), 0))
 			}
 		}
+		e.infolock.Unlock()
 	}
 
 	return nil
@@ -308,7 +314,7 @@ func (e *EthereumInterface) _sendTx(txSigned ethtypes.Transaction) {
 	// timoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
 
 	err := e.PrimaryNode.SendTransaction(context.Background(), &txSigned)
-
+	ct := time.Now()
 	// The transaction failed - this could be if it was reproposed, or, just failed.
 	// We need to make sure that if it was re-proposed it doesn't count as a "success" on this node.
 	if err != nil {
@@ -319,8 +325,12 @@ func (e *EthereumInterface) _sendTx(txSigned ethtypes.Transaction) {
 		atomic.AddUint64(&e.NumTxDone, 1)
 	}
 
-	e.TransactionInfo[txSigned.Hash().String()] = []time.Time{time.Now()}
 	atomic.AddUint64(&e.NumTxSent, 1)
+
+	e.infolock.Lock()
+	e.TransactionInfo[txSigned.Hash().String()] = []time.Time{ct}
+	e.infolock.Unlock()
+
 }
 
 // SendRawTransaction sends a raw transaction to the blockchain node.

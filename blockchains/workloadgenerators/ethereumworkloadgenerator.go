@@ -275,9 +275,9 @@ func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, c
 
 		return signedTx.MarshalJSON()
 
-	} else {
-		return []byte{}, err
 	}
+
+	return []byte{}, err
 
 }
 
