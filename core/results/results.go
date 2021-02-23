@@ -9,19 +9,21 @@ package results
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	"go.uber.org/zap"
 )
 
 // Results is the generic result structure that will be encoded and sent back to the primary and combined
 type Results struct {
-	TxLatencies       []float64 `json:"TxLatencies"`       // Latency of each transaction, can be used in CDF
-	AverageLatency    float64   `json:"AverageLatency"`    // Averaged latency of the transactions
-	MedianLatency     float64   `json:"MedianLatency"`     // Median Latency of the transaction
-	Throughput        float64   `json:"Throughput"`        // Number of transactions per second "committed"
-	ThroughputSeconds []float64 `json:"ThroughputSeconds"` // Number of transactions "committed" over second periods to measure dynamic throughput
-	Success           uint      // Number of successful transactions
-	Fail              uint      // Number of failed transactions
+	TxLatencies       []float64              `json:"TxLatencies"`       // Latency of each transaction, can be used in CDF
+	AverageLatency    float64                `json:"AverageLatency"`    // Averaged latency of the transactions
+	LatencySeconds    map[string][]time.Time `json:"TxTimes"`           // All the transaction sent times.
+	MedianLatency     float64                `json:"MedianLatency"`     // Median Latency of the transaction
+	Throughput        float64                `json:"Throughput"`        // Number of transactions per second "committed"
+	ThroughputSeconds []float64              `json:"ThroughputSeconds"` // Number of transactions "committed" over second periods to measure dynamic throughput
+	Success           uint                   // Number of successful transactions
+	Fail              uint                   // Number of failed transactions
 }
 
 // AggregatedResults returns all the information from all secondaries, and
@@ -32,11 +34,12 @@ type AggregatedResults struct {
 	SecondaryResults []Results   `json:"SecondaryResults"` // Aggregation of results per secondary
 
 	// Latency
-	MinLatency     float64   `json:"MinLatency"`     // Minimum latency across all workers and secondaries
-	AverageLatency float64   `json:"AverageLatency"` // Average latency across all workers and secondaries
-	MaxLatency     float64   `json:"MaxLatency"`     // Maximum Latency across all workers and secondaries
-	MedianLatency  float64   `json:"MedianLatency"`  // Median Latency across all workers and secondaries
-	AllTxLatencies []float64 `json:"AllTxLatencies"` // All Transaction Latencies
+	MinLatency     float64                `json:"MinLatency"`     // Minimum latency across all workers and secondaries
+	AverageLatency float64                `json:"AverageLatency"` // Average latency across all workers and secondaries
+	MaxLatency     float64                `json:"MaxLatency"`     // Maximum Latency across all workers and secondaries
+	MedianLatency  float64                `json:"MedianLatency"`  // Median Latency across all workers and secondaries
+	AllTxLatencies []float64              `json:"AllTxLatencies"` // All Transaction Latencies
+	AllTxTimes     map[string][]time.Time `json:"AllTxTimes"`     // All transaction times
 
 	// Throughput
 	TotalThroughputTimes         []float64   `json:"TotalThroughputOverTime"`              // Total throughput over time per window

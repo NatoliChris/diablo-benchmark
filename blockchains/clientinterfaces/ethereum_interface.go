@@ -110,6 +110,7 @@ func (e *EthereumInterface) Cleanup() results.Results {
 	return results.Results{
 		TxLatencies:       txLatencies,
 		AverageLatency:    avgLatency,
+		LatencySeconds:    e.TransactionInfo,
 		Throughput:        averageThroughput,
 		ThroughputSeconds: calculatedThroughputSeconds,
 		Success:           success,
