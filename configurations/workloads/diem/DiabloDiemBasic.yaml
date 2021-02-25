@@ -1,0 +1,25 @@
+name: "assetTransfer test"
+description: "Do contracts even work?"
+secondaries: 1
+threads: 1
+
+bench:
+  type: "test"
+  txs:
+    0: 5
+    5: 5
+contract:
+  path: "./contracts/testing_contracts/diem/transfer.mv"
+  functions:
+    - name: "transfer"
+      ftype: "write"
+      ratio: 100
+      params:
+        - type: "string" #sender account address
+          value: "0"
+        - type: "string"
+          value: "receiver_account_address"
+        - type: "string" # amount to send
+          value: "100"
+
+

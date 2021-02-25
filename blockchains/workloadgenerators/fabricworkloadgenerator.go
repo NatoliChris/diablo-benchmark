@@ -58,7 +58,7 @@ func (f FabricWorkloadGenerator) DeployContract(fromPrivKey []byte, contractPath
 //(NOT NEEDED IN FABRIC) contract deployment is not something useful to
 // be benchmarked in a Hyperledger Fabric implementation as it is a permissioned
 // blockchain and contract deployment is something agreed upon by organisations and
-//not done regularly enough to hinder throughput (usually done during while low traffic)
+//not done regularly enough to hinder throughput (usually done3 during while low traffic)
 func (f FabricWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, contractPath string) ([]byte, error) {
 	return nil, nil
 }
