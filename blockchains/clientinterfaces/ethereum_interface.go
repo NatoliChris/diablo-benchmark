@@ -49,6 +49,7 @@ func (e *EthereumInterface) Cleanup() results.Results {
 	// Stop the ticker
 	e.ThroughputTicker.Stop()
 
+	e.infolock.Lock()
 	// clean up connections and format results
 	if e.HandlersStarted {
 		e.SubscribeDone <- true
@@ -107,6 +108,7 @@ func (e *EthereumInterface) Cleanup() results.Results {
 		zap.String("ThroughputWindow", fmt.Sprintf("%v", calculatedThroughputSeconds)),
 	)
 
+	e.infolock.Unlock()
 	return results.Results{
 		TxLatencies:       txLatencies,
 		AverageLatency:    avgLatency,
@@ -279,7 +281,7 @@ func (e *EthereumInterface) ConnectAll(primaryID int) error {
 		if idx != primaryID {
 			c, err := ethclient.Dial(fmt.Sprintf("ws://%s", node))
 			if err != nil {
-				return err
+				continue
 			}
 
 			e.SecondaryNodes = append(e.SecondaryNodes, c)

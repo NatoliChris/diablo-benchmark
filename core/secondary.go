@@ -70,6 +70,8 @@ func (s *Secondary) Run() {
 			// It should also give us a secondary ID as aux value
 			s.ID = int(cmd[1])
 			s.ID = int(binary.BigEndian.Uint32(cmd[1:5]))
+			zap.L().Debug("Assigned ID",
+				zap.Int("id", s.ID))
 			numThreads := binary.BigEndian.Uint32(cmd[5:9])
 			// Connect le blockchains
 			var bcis []clientinterfaces.BlockchainInterface
@@ -98,6 +100,7 @@ func (s *Secondary) Run() {
 
 			zap.L().Debug("Connect and Init of workload handler and client interface OK",
 				zap.Int("ID", s.ID),
+				zap.String("url", fmt.Sprintf("%s", s.ChainConfig.Nodes[s.ID])),
 			)
 		case communication.MsgWorkload[0]:
 			zap.L().Info("Got command from primary",
