@@ -22,8 +22,9 @@ type Results struct {
 	MedianLatency     float64                `json:"MedianLatency"`     // Median Latency of the transaction
 	Throughput        float64                `json:"Throughput"`        // Number of transactions per second "committed"
 	ThroughputSeconds []float64              `json:"ThroughputSeconds"` // Number of transactions "committed" over second periods to measure dynamic throughput
-	Success           uint                   // Number of successful transactions
-	Fail              uint                   // Number of failed transactions
+	Success           uint                   `json:"success"`           // Number of successful transactions
+	Fail              uint                   `json:"fail"`              // Number of failed transactions
+	Timeout           uint                   `json:"timeout"`           // Number of timeouts that occurred (subset of fails)
 }
 
 // AggregatedResults returns all the information from all secondaries, and
@@ -52,6 +53,7 @@ type AggregatedResults struct {
 	// Success and Fail
 	TotalSuccess uint `json:"TotalSuccess"` // Total number of successes
 	TotalFails   uint `json:"TotalFails"`   // Total number of fails
+	TotalTimeout uint `json:"TotalTimeout"` // Total number of timeouts (subset of fails)
 }
 
 // Return the median of a list
@@ -98,6 +100,7 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 
 	totalSuccess := uint(0)
 	totalFails := uint(0)
+	totalTimeouts := uint(0)
 
 	// Iterate through the results
 	for secondaryID, secondaryResult := range secondaryResults {
@@ -109,11 +112,13 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 		// For each worker
 		numSuccess := uint(0)
 		numFails := uint(0)
+		numTimeout := uint(0)
 		for workerID, workerResult := range secondaryResult {
 			// 1. get the latency average per secondary
 			latencyEntries += float64(len(workerResult.TxLatencies))
 			numSuccess += workerResult.Success
 			numFails += workerResult.Fail
+			numTimeout += workerResult.Timeout
 			for _, v := range workerResult.TxLatencies {
 				averageLatencyPerSecondary += v
 				if minTotalLatency > v && v > 0 {
@@ -184,11 +189,13 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 			MedianLatency:     medianLatency,
 			Success:           numSuccess,
 			Fail:              numFails,
+			Timeout:           numTimeout,
 		})
 
 		// Update the number of total success and failures
 		totalSuccess += numSuccess
 		totalFails += numFails
+		totalTimeouts += numTimeout
 	}
 
 	// Fix up the average and median latency
@@ -239,6 +246,7 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 		AverageThroughput:            avgThroughputAvg,
 		TotalSuccess:                 totalSuccess,
 		TotalFails:                   totalFails,
+		TotalTimeout:                 totalTimeouts,
 		AllTxLatencies:               allTxLatencies,
 	}
 }

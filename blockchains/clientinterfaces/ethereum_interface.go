@@ -62,6 +62,7 @@ func (e *EthereumInterface) Cleanup() results.Results {
 
 	success := uint(0)
 	fails := uint(e.Fail)
+	timeout := uint(0)
 
 	for _, v := range e.TransactionInfo {
 		if len(v) > 1 {
@@ -75,6 +76,7 @@ func (e *EthereumInterface) Cleanup() results.Results {
 			success++
 		} else {
 			fails++
+			timeout++
 		}
 	}
 
@@ -117,6 +119,7 @@ func (e *EthereumInterface) Cleanup() results.Results {
 		ThroughputSeconds: calculatedThroughputSeconds,
 		Success:           success,
 		Fail:              fails,
+		Timeout:           timeout,
 	}
 }
 
