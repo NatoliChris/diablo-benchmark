@@ -164,7 +164,6 @@ func (f *FabricInterface) Cleanup() results.Results {
 func (f *FabricInterface) throughputSeconds() {
 	f.ThroughputTicker = time.NewTicker(time.Duration(f.Window) * time.Second)
 	seconds := float64(0)
-
 	for {
 		select {
 		case <-f.ThroughputTicker.C:

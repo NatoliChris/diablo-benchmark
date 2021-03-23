@@ -32,7 +32,6 @@ func InitPrimary(listenAddr string, expectedSecondaries int, wg workloadgenerato
 		// TODO remove panic
 		panic(err)
 	}
-
 	// Return a new primary instance with the active communication set up
 	return &Primary{
 		Server:            s,

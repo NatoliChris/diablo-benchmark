@@ -57,11 +57,16 @@ func (f DiemWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, contra
 // TODO implement basic interactive transaction
 func (f DiemWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, functionType string, functionName string, contractParams []configs.ContractParam, value string) ([]byte, error){
 	var tx types.DiemTX
+	txId, err := strconv.ParseUint(contractParams[0].Value, 10, 64)
+	senderRefId, err := strconv.ParseUint(contractParams[1].Value, 10, 64)
+
+	tx.ID = txId
+	tx.SenderRefId = senderRefId
+	tx.ScriptPath = contractParams[2].Value
 	tx.FunctionType = functionType
 	tx.Name = functionName
-	tx.Path = f.BenchConfig.Path
 	args := make([]string, 0)
-	for _, v := range contractParams[1:] {
+	for _, v := range contractParams[3:] {
 		args = append(args, v.Value)
 	}
 	tx.Args = args
@@ -110,7 +115,7 @@ func (f DiemWorkloadGenerator) GenerateSimpleWorkload() (Workload, error) {
 					// transactions are of the form  (assetID, color, size, owner, price)
 					otherParams := functionToInvoke.Params
 					// modifying assetID to get a unique transaction
-					otherParams[0].Value = strconv.FormatUint(txID, 10)
+					//otherParams[0].Value = strconv.FormatUint(txID, 10)
 					params = append(params, otherParams...)
 					functionType := f.BenchConfig.ContractInfo.Functions[0].Type //function type gives us whether it a submit or read type transaction
 					name := functionToInvoke.Name

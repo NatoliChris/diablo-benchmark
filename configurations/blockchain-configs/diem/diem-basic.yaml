@@ -1,0 +1,14 @@
+name: "diem"
+nodes:
+  #peer 1
+  - 54.152.155.160:9898
+extra:
+  # server to receive result from rust client
+  - tcpServerAddress: 0.0.0.0:9999
+  # server address of the rust client to execute actual commands
+    tcpClientAddress: 54.152.155.160:9898
+  # address of local libra accounts
+    accountAddress:
+      - bf9e02ceb72ed4be7cdc2bed59174d35
+      - 77f3022f86fb4746732f9b7ae11408ce
+      - e4b7d903b6ab6314e648f24ff0fb04c5

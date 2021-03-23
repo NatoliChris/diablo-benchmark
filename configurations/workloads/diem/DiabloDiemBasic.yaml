@@ -16,10 +16,12 @@ contract:
       ratio: 100
       params:
         - type: "string" #sender account address
-          value: "0"
+          value: "1"
         - type: "string"
-          value: "receiver_account_address"
+          value: "/home/admin/shared_backend/scripts/compiled/transfer.mv" #path to script
+        - type: "string"
+          value: "bf9e02ceb72ed4be7cdc2bed59174d35" #address of receiver
         - type: "string" # amount to send
-          value: "100"
+          value: "1000000"
 
 

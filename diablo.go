@@ -139,7 +139,6 @@ func runPrimary(primaryArgs *core.PrimaryArgs) {
 		zap.L().Error(err.Error())
 		os.Exit(1)
 	}
-
 	generatorClass, err := workloadgenerators.GetWorkloadGenerator(cConfig)
 
 	if err != nil {
