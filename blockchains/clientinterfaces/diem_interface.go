@@ -45,9 +45,9 @@ func (f *DiemInterface) Init(chainConfig *configs.ChainConfig) {
 	f.TransactionInfo = make(map[uint64][]time.Time, 0)
 
 	mapConfig := chainConfig.Extra[0].(map[string]interface{})
-	fmt.Println(mapConfig)
 	// Configure result server
-	l, err := net.Listen("tcp", mapConfig["tcpServerAddress"].(string))
+	urlResultServer := mapConfig["tcpServerAddress"].(string)
+	l, err := net.Listen("tcp", urlResultServer)
 	if err != nil {
 		println("Fail to start a server")
 		panic(err)
@@ -66,7 +66,7 @@ func (f *DiemInterface) Init(chainConfig *configs.ChainConfig) {
 	//}
 	f.commandSender = tcpAddr
 
-	err = f.enableRustCommunication("127.0.0.1:3333")
+	err = f.enableRustCommunication(urlResultServer)
 	if err != nil{
 		panic(err)
 	}
