@@ -35,7 +35,7 @@ ganache-cli --mnemonic "nice charge tank ivory warfare spin deposit ecology beau
 
 * You will need one terminal per secondary, so for 1 more secondary, start the secondary
 ```sh
-./diablo secondary -m ":8323" --chain-config configurations/blockchain-configs/ethereum/ethereum-basic.yaml
+./diablo secondary -m ":8323" --chain-config configurations/blockchain-configs/ethereum/ethereum-basic.yaml --config configurations/workloads/sample/sample_contract_store.yaml
 ```
 	* Launch the number of secondaries specified in the configuration file.
 
