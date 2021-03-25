@@ -4,7 +4,6 @@ import (
 	"diablo-benchmark/blockchains/types"
 	"diablo-benchmark/core/configs"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"strconv"
 )
@@ -13,14 +12,25 @@ import (
 type DiemWorkloadGenerator struct {
 	BenchConfig *configs.BenchConfig // Benchmark configuration for workload intervals / type
 	ChainConfig *configs.ChainConfig // Chain configuration to get number of transactions to make
+	accounts []types.DiemAccount	 // List of Libra accounts
 	GenericWorkloadGenerator
 }
 
 //NewGenerator returns a new instance of the generator
 func (f DiemWorkloadGenerator) NewGenerator(chainConfig *configs.ChainConfig, benchConfig *configs.BenchConfig) WorkloadGenerator {
+	mapConfig := chainConfig.Extra[0].(map[string]interface{})
+	addressList := mapConfig["accountAddress"].([]interface{})
+	var accountList []types.DiemAccount
+	for _, address := range  addressList{
+		accountList = append(accountList, types.DiemAccount{
+			Address:        address.(string),
+			SequenceNumber: 0,
+		})
+	}
 	return &DiemWorkloadGenerator{
 		BenchConfig: benchConfig,
 		ChainConfig: chainConfig,
+		accounts: accountList,
 	}
 }
 // BlockchainSetup
@@ -59,9 +69,10 @@ func (f DiemWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, functionT
 	var tx types.DiemTX
 	txId, err := strconv.ParseUint(contractParams[0].Value, 10, 64)
 	senderRefId, err := strconv.ParseUint(contractParams[1].Value, 10, 64)
-
+	senderAddress := f.accounts[senderRefId]
 	tx.ID = txId
 	tx.SenderRefId = senderRefId
+	tx.SequenceNumber = senderAddress.SequenceNumber
 	tx.ScriptPath = contractParams[2].Value
 	tx.FunctionType = functionType
 	tx.Name = functionName
@@ -70,7 +81,7 @@ func (f DiemWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, functionT
 		args = append(args, v.Value)
 	}
 	tx.Args = args
-	fmt.Println(tx)
+	f.accounts[senderRefId].SequenceNumber = tx.SequenceNumber + 1
 	bytes, err := json.Marshal(&tx)
 	if err != nil {
 		panic(err)
