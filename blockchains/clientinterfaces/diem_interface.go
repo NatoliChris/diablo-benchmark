@@ -24,9 +24,8 @@ type DiemInterface struct {
 	// Client to send transaction
 	resultReceiver net.Listener
 	commandSender *net.TCPAddr
-	AccountPath string // path to file saving account addresses
 	commitChannel chan *types.DiemCommitEvent // channel where we continuously listen to commit events to register throughput
-	accounts []types.DiemAccount
+
 
 	TransactionInfo  map[uint64][]time.Time // Transaction information (used for throughput calculation)
 	StartTime        time.Time              // Start time of the benchmark
@@ -59,11 +58,6 @@ func (f *DiemInterface) Init(chainConfig *configs.ChainConfig) {
 		println("Address resolve failed")
 		panic(err)
 	}
-	//conn, err := net.DialTCP("tcp", nil, tcpAddr)
-	//if err != nil {
-	//	println("Dial failed")
-	//	panic(err)
-	//}
 	f.commandSender = tcpAddr
 
 	err = f.enableRustCommunication("127.0.0.1:3333")
@@ -71,13 +65,13 @@ func (f *DiemInterface) Init(chainConfig *configs.ChainConfig) {
 		panic(err)
 	}
 	// Read account address from config file and set sequence number to 0
-	addressList := mapConfig["accountAddress"].([]interface{})
-	for _, address := range  addressList{
-		f.accounts = append(f.accounts, types.DiemAccount{
-			Address:        address.(string),
-			SequenceNumber: 0,
-		})
-	}
+	//addressList := mapConfig["accountAddress"].([]interface{})
+	//for _, address := range  addressList{
+	//	f.accounts = append(f.accounts, types.DiemAccount{
+	//		Address:        address.(string),
+	//		SequenceNumber: 0,
+	//	})
+	//}
 	// TODO function to wait for transaction, by handle tcp result
 	//go func() {
 	//	select {}
@@ -114,8 +108,8 @@ func (f *DiemInterface) enableRustCommunication( urlOfResultServer string) error
 
 // Invoke command on rust client to create actual signed transaction with sequence number for execution later
 func (f *DiemInterface) createSignedTransactions(t *types.DiemTX) error {
-	senderAddress := f.accounts[t.SenderRefId]
-	command := "d mt "+ strconv.FormatUint(t.SenderRefId, 10) +" "+ strconv.FormatUint(senderAddress.SequenceNumber, 10) +" " + t.ScriptPath
+	//senderAddress := f.accounts[t.SenderRefId]
+	command := "d mt "+ strconv.FormatUint(t.SenderRefId, 10) +" "+ strconv.FormatUint(t.SequenceNumber, 10) +" " + t.ScriptPath
 	for _, arg := range t.Args{
 		command = command + " " + arg
 	}
@@ -130,7 +124,7 @@ func (f *DiemInterface) createSignedTransactions(t *types.DiemTX) error {
 	if err != nil {
 		return err
 	}
-	f.accounts[t.SenderRefId].SequenceNumber = senderAddress.SequenceNumber+1
+	//f.accounts[t.SenderRefId].SequenceNumber = senderAddress.SequenceNumber+1
 	return nil
 }
 
