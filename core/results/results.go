@@ -18,7 +18,7 @@ import (
 type Results struct {
 	TxLatencies       []float64              `json:"TxLatencies"`       // Latency of each transaction, can be used in CDF
 	AverageLatency    float64                `json:"AverageLatency"`    // Averaged latency of the transactions
-	LatencySeconds    map[string][]time.Time `json:"TxTimes"`           // All the transaction sent times.
+	TxTime            map[string][]time.Time `json:"TxTimes"`           // All the transaction sent times.
 	MedianLatency     float64                `json:"MedianLatency"`     // Median Latency of the transaction
 	Throughput        float64                `json:"Throughput"`        // Number of transactions per second "committed"
 	ThroughputSeconds []float64              `json:"ThroughputSeconds"` // Number of transactions "committed" over second periods to measure dynamic throughput
@@ -93,6 +93,7 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 
 	var latencyPerSecondary []float64
 	var allTxLatencies []float64
+	var allTxTimes map[string][]time.Time
 
 	// Throughput total
 	maxTotalThroughput := float64(0)
@@ -109,6 +110,7 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 		secondaryThroughputs := make([]float64, 0)
 		latencyEntries := float64(0)
 		avgThroughputPerSecondary := float64(0)
+		var secondaryTxTimes map[string][]time.Time
 		// For each worker
 		numSuccess := uint(0)
 		numFails := uint(0)
@@ -131,6 +133,12 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 
 				txLatencies = append(txLatencies, v)
 				allTxLatencies = append(allTxLatencies, v)
+			}
+
+			// Concatenate the transaction times
+			for txhash, times := range workerResult.TxTime {
+				allTxTimes[txhash] = times
+				secondaryTxTimes[txhash] = times
 			}
 
 			// 2. Obtain throughputs
@@ -183,6 +191,7 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 
 		ResultsPerSecondary = append(ResultsPerSecondary, Results{
 			TxLatencies:       txLatencies,
+			TxTime:            secondaryTxTimes,
 			ThroughputSeconds: secondaryThroughputs,
 			Throughput:        avgThroughputPerSecondary / float64(len(secondaryResult)),
 			AverageLatency:    avgLatency,
@@ -248,5 +257,6 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 		TotalFails:                   totalFails,
 		TotalTimeout:                 totalTimeouts,
 		AllTxLatencies:               allTxLatencies,
+		AllTxTimes:                   allTxTimes,
 	}
 }
