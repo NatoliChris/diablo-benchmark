@@ -93,7 +93,7 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 
 	var latencyPerSecondary []float64
 	var allTxLatencies []float64
-	var allTxTimes map[string][]time.Time
+	allTxTimes := make(map[string][]time.Time)
 
 	// Throughput total
 	maxTotalThroughput := float64(0)
@@ -110,7 +110,7 @@ func CalculateAggregatedResults(secondaryResults [][]Results) AggregatedResults 
 		secondaryThroughputs := make([]float64, 0)
 		latencyEntries := float64(0)
 		avgThroughputPerSecondary := float64(0)
-		var secondaryTxTimes map[string][]time.Time
+		secondaryTxTimes := make(map[string][]time.Time)
 		// For each worker
 		numSuccess := uint(0)
 		numFails := uint(0)
