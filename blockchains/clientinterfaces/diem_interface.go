@@ -216,19 +216,33 @@ func (f *DiemInterface) throughputSeconds() {
 func (f *DiemInterface) listenForCommits() {
 	go func() {
 		// start the sequence counting
-		conn, err := net.DialTCP("tcp", nil,f.throughputCommandSender)
-		if err != nil{
-			println("Failed to create connection SendRawTransaction")
-			return
-		}
-		_, err = conn.Write([]byte("diablo connect "+ f.resultReceiver.Addr().String()))
+		go func() {
+			conn, err := net.DialTCP("tcp", nil,f.throughputCommandSender)
+			if err != nil{
+				println("Failed to create connection listenForCommits")
+				return
+			}
+			_,err = conn.Write([]byte("diablo connect "+ f.resultReceiver.Addr().String()))
 
-		if err != nil {
-			println("rust client unable to connect to diablo ResultReceiver")
-			return
-		}
-		defer conn.Close()
-		_, err = conn.Write([]byte("d gsn "+ strconv.FormatUint(f.senderRefId, 10))) //TODO
+			if err != nil {
+				println("rust client unable to connect to diablo ResultReceiver")
+				return
+			}
+			conn.Close()
+			conn, err = net.DialTCP("tcp", nil,f.throughputCommandSender)
+			if err != nil{
+				println("Failed to create connection listenForCommits")
+				return
+			}
+
+			defer conn.Close()
+			_, err = conn.Write([]byte("d gsn "+ strconv.FormatUint(f.senderRefId, 10))) //TODO
+			if err != nil {
+				println("rust client unable to carry out command to get Sequence Number")
+				return
+			}
+		}()
+
 
 		c, err := f.resultReceiver.Accept()
 
