@@ -10,6 +10,6 @@ extra:
     throughputServer: 127.0.0.1:9690
   # address of local libra accounts
     accountAddress:
-      - bf9e02ceb72ed4be7cdc2bed59174d35
-      - 77f3022f86fb4746732f9b7ae11408ce
+      - f93c4f46ad13af785dd9d6050547a135
+      - 8dfa7a69ff51407f31ea0509f45c2b61
       - e4b7d903b6ab6314e648f24ff0fb04c5

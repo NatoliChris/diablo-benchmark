@@ -215,7 +215,7 @@ func (f *DiemInterface) throughputSeconds() {
 func (f *DiemInterface) listenForCommits() {
 	go func() {
 		// start the sequence counting
-		conn, err := net.DialTCP("tcp", nil,f.commandSender)
+		conn, err := net.DialTCP("tcp", nil,f.throughputCommandSender)
 		if err != nil{
 			println("Failed to create connection SendRawTransaction")
 			return
@@ -331,7 +331,11 @@ func (f *DiemInterface) SendRawTransaction(tx interface{}) error {
 			return
 		}
 		defer conn.Close()
-		_, err = conn.Write([]byte("d et"))
+		command := "d et"
+		if transaction.FunctionType == "throughput"{
+			command = "d etn"
+		}
+		_, err = conn.Write([]byte(command))
 
 		if err != nil {
 			zap.L().Debug("TX got an error WRITE",
