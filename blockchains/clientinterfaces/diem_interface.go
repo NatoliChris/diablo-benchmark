@@ -235,7 +235,7 @@ func (f *DiemInterface) listenForCommits() {
 		if err != nil {
 			fmt.Println(err)
 		}
-		defer c.Close()
+
 		for{
 			buffer := make([]byte, 1024)
 			length, err := c.Read(buffer)
