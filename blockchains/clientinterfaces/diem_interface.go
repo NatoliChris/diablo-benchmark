@@ -87,30 +87,31 @@ func (f *DiemInterface) Init(chainConfig *configs.ChainConfig) {
 }
 
 func (f *DiemInterface) enableRustCommunication( urlOfResultServer string) error{
+	//conn, err := net.DialTCP("tcp", nil, f.commandSender)
+	//if err != nil{
+	//	println("Failed to create connection in enableRustCommunication: diablo connect")
+	//	return err
+	//}
+
+	//_, err = conn.Write([]byte("diablo connect "+ urlOfResultServer))
+	//
+	//if err != nil {
+	//	println("rust client unable to connect to diablo ResultReceiver")
+	//	return err
+	//}
+	//conn.Close()
 	conn, err := net.DialTCP("tcp", nil,f.commandSender)
-	if err != nil{
-		println("Failed to create connection in enableRustCommunication: diablo connect")
-		return err
-	}
-
-	_, err = conn.Write([]byte("diablo connect "+ urlOfResultServer))
-
-	if err != nil {
-		println("rust client unable to connect to diablo ResultReceiver")
-		return err
-	}
-	conn.Close()
-	conn, err = net.DialTCP("tcp", nil,f.commandSender)
 	if err != nil{
 		println("Failed to create connection in enableRustCommunication: dev enable_custom_script")
 		return err
 	}
+	defer conn.Close()
 	_, err = conn.Write([]byte("dev enable_custom_script"))
 	if err != nil {
 		println("rust client failed to enable custom script")
 		return err
 	}
-	conn.Close()
+
 	return nil
 }
 
@@ -218,6 +219,12 @@ func (f *DiemInterface) listenForCommits() {
 		conn, err := net.DialTCP("tcp", nil,f.throughputCommandSender)
 		if err != nil{
 			println("Failed to create connection SendRawTransaction")
+			return
+		}
+		_, err = conn.Write([]byte("diablo connect "+ f.resultReceiver.Addr().String()))
+
+		if err != nil {
+			println("rust client unable to connect to diablo ResultReceiver")
 			return
 		}
 		defer conn.Close()
