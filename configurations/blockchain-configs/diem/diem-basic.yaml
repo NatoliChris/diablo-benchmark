@@ -6,7 +6,8 @@ extra:
   # server to receive result from rust client
   - tcpServerAddress: 0.0.0.0:9999
   # server address of the rust client to execute actual commands
-    tcpClientAddress: 54.152.155.160:9898
+    tcpClientAddress: 127.0.0.1:9890
+    throughputServer: 127.0.0.1:9690
   # address of local libra accounts
     accountAddress:
       - bf9e02ceb72ed4be7cdc2bed59174d35

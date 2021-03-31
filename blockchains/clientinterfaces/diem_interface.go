@@ -22,8 +22,10 @@ type DiemInterface struct {
 	//MintKeyPath string // path to mink.key file which is necessary for coin minting and transaction activity
 	// Server to receive commit
 	// Client to send transaction
+	senderRefId	uint64
 	resultReceiver net.Listener
 	commandSender *net.TCPAddr
+	throughputCommandSender *net.TCPAddr
 	commitChannel chan *types.DiemCommitEvent // channel where we continuously listen to commit events to register throughput
 
 
@@ -60,6 +62,12 @@ func (f *DiemInterface) Init(chainConfig *configs.ChainConfig) {
 	}
 	f.commandSender = tcpAddr
 
+	throughputTcpAddr, err := net.ResolveTCPAddr("tcp", mapConfig["throughputServer"].(string))
+	if err != nil {
+		println("Address resolve failed")
+		panic(err)
+	}
+	f.throughputCommandSender = throughputTcpAddr
 	err = f.enableRustCommunication(urlResultServer)
 	if err != nil{
 		panic(err)
@@ -203,8 +211,36 @@ func (f *DiemInterface) throughputSeconds() {
 		}
 	}
 }
-
+// TODO
 func (f *DiemInterface) listenForCommits() {
+	go func() {
+		// start the sequence counting
+		conn, err := net.DialTCP("tcp", nil,f.commandSender)
+		if err != nil{
+			println("Failed to create connection SendRawTransaction")
+			return
+		}
+		defer conn.Close()
+		_, err = conn.Write([]byte("d gsn "+ strconv.FormatUint(f.senderRefId, 10))) //TODO
+
+		c, err := f.resultReceiver.Accept()
+
+		if err != nil {
+			fmt.Println(err)
+		}
+		defer c.Close()
+		for{
+			buffer := make([]byte, 1024)
+			length, err := c.Read(buffer)
+			if err != nil {
+				return
+			}
+			result := string(buffer[:length])
+			seqNum, _ := strconv.ParseUint(result, 10, 64)
+			f.NumTxDone = seqNum
+		}
+	}()
+
 	for {
 		select {
 		case commit := <-f.commitChannel:
@@ -221,7 +257,7 @@ func (f *DiemInterface) listenForCommits() {
 				atomic.AddUint64(&f.Success, 1)
 			}
 
-			atomic.AddUint64(&f.NumTxDone, 1)
+			//atomic.AddUint64(&f.NumTxDone, 1)
 		}
 	}
 }
@@ -245,6 +281,7 @@ func (f *DiemInterface) ParseWorkload(workload workloadgenerators.WorkerThreadWo
 			if err != nil {
 				return nil, err
 			}
+			f.senderRefId = t.SenderRefId
 			intervalTxs = append(intervalTxs, &t)
 			err = f.createSignedTransactions(&t)
 			if err != nil {
