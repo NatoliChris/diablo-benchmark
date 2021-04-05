@@ -243,7 +243,6 @@ func (f *DiemInterface) listenForCommits() {
 			}
 		}()
 
-
 		c, err := f.resultReceiver.Accept()
 
 		if err != nil {
@@ -304,10 +303,10 @@ func (f *DiemInterface) ParseWorkload(workload workloadgenerators.WorkerThreadWo
 			}
 			f.senderRefId = t.SenderRefId
 			intervalTxs = append(intervalTxs, &t)
-			err = f.createSignedTransactions(&t)
-			if err != nil {
-				return nil, err
-			}
+			//err = f.createSignedTransactions(&t)
+			//if err != nil {
+			//	return nil, err
+			//}
 		}
 		parsedWorkload = append(parsedWorkload, intervalTxs)
 	}
@@ -337,9 +336,9 @@ func getTimeFromString(str string) time.Time {
 }
 // Not used?
 func (f *DiemInterface) SendRawTransaction(tx interface{}) error {
-	transaction := tx.(*types.DiemTX)
+	t := tx.(*types.DiemTX)
 	zap.L().Debug("Submitting TX",
-		zap.Uint64("ID", transaction.ID))
+		zap.Uint64("ID", t.ID))
 
 	// making note of the time we send the transaction
 	//f.TransactionInfo[transaction.ID] = []time.Time{time.Now()}
@@ -352,9 +351,13 @@ func (f *DiemInterface) SendRawTransaction(tx interface{}) error {
 			return
 		}
 		defer conn.Close()
-		command := "d et"
-		if transaction.FunctionType == "throughput"{
-			command = "d etn"
+		command := "d me "
+		if t.FunctionType == "throughput"{
+			command = "d men "
+		}
+		command = command + strconv.FormatUint(t.SenderRefId, 10) +" "+ strconv.FormatUint(t.SequenceNumber, 10) +" " + t.ScriptPath
+		for _, arg := range t.Args{
+			command = command + " " + arg
 		}
 		_, err = conn.Write([]byte(command))
 
@@ -369,12 +372,12 @@ func (f *DiemInterface) SendRawTransaction(tx interface{}) error {
 				zap.Error(err))
 		}
 		replyInfo := strings.Split(string(reply[:replyLenth]), "|")
-		f.TransactionInfo[transaction.ID] = []time.Time{getTimeFromString(replyInfo[0])}
+		f.TransactionInfo[t.ID] = []time.Time{getTimeFromString(replyInfo[0])}
 		responseTime := getTimeFromString(replyInfo[1])
 		valid := err == nil
 		commit := types.DiemCommitEvent{
 			Valid:      valid,
-			ID:         transaction.ID,
+			ID:         t.ID,
 			CommitTime: responseTime,
 		}
 		f.commitChannel <- &commit
