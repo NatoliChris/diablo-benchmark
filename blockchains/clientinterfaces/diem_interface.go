@@ -18,15 +18,11 @@ import (
 // DiemInterface the Diem implementation of the clientinterface
 // provide the means to communicate with the Diem blockchain
 type DiemInterface struct {
-	//WaypointPath string // path to waypoint file which is necessary to connect to JSON-RPC service
-	//MintKeyPath string // path to mink.key file which is necessary for coin minting and transaction activity
-	// Server to receive commit
-	// Client to send transaction
-	senderRefId	uint64
-	resultReceiver net.Listener
-	commandSender *net.TCPAddr
-	throughputCommandSender *net.TCPAddr
-	commitChannel chan *types.DiemCommitEvent // channel where we continuously listen to commit events to register throughput
+	senderRefId	uint64							// reference id of the sender account which sends all transactions
+	resultReceiver net.Listener 				// TCP Server to receive commit result (success or fail)
+	commandSender *net.TCPAddr  				// TCP Client to send transaction
+	throughputCommandSender *net.TCPAddr 		// TCP Client to send command to throughput server
+	commitChannel chan *types.DiemCommitEvent 	// channel where we continuously listen to commit events to register throughput
 
 
 	TransactionInfo  map[uint64][]time.Time // Transaction information (used for throughput calculation)
@@ -68,52 +64,9 @@ func (f *DiemInterface) Init(chainConfig *configs.ChainConfig) {
 		panic(err)
 	}
 	f.throughputCommandSender = throughputTcpAddr
-	err = f.enableRustCommunication(urlResultServer)
-	if err != nil{
-		panic(err)
-	}
-	// Read account address from config file and set sequence number to 0
-	//addressList := mapConfig["accountAddress"].([]interface{})
-	//for _, address := range  addressList{
-	//	f.accounts = append(f.accounts, types.DiemAccount{
-	//		Address:        address.(string),
-	//		SequenceNumber: 0,
-	//	})
-	//}
-	// TODO function to wait for transaction, by handle tcp result
-	//go func() {
-	//	select {}
-	//}()
+
 }
 
-func (f *DiemInterface) enableRustCommunication( urlOfResultServer string) error{
-	//conn, err := net.DialTCP("tcp", nil, f.commandSender)
-	//if err != nil{
-	//	println("Failed to create connection in enableRustCommunication: diablo connect")
-	//	return err
-	//}
-
-	//_, err = conn.Write([]byte("diablo connect "+ urlOfResultServer))
-	//
-	//if err != nil {
-	//	println("rust client unable to connect to diablo ResultReceiver")
-	//	return err
-	//}
-	//conn.Close()
-	conn, err := net.DialTCP("tcp", nil,f.commandSender)
-	if err != nil{
-		println("Failed to create connection in enableRustCommunication: dev enable_custom_script")
-		return err
-	}
-	defer conn.Close()
-	_, err = conn.Write([]byte("dev enable_custom_script"))
-	if err != nil {
-		println("rust client failed to enable custom script")
-		return err
-	}
-
-	return nil
-}
 
 // Invoke command on rust client to create actual signed transaction with sequence number for execution later
 func (f *DiemInterface) createSignedTransactions(t *types.DiemTX) error {
@@ -303,10 +256,6 @@ func (f *DiemInterface) ParseWorkload(workload workloadgenerators.WorkerThreadWo
 			}
 			f.senderRefId = t.SenderRefId
 			intervalTxs = append(intervalTxs, &t)
-			//err = f.createSignedTransactions(&t)
-			//if err != nil {
-			//	return nil, err
-			//}
 		}
 		parsedWorkload = append(parsedWorkload, intervalTxs)
 	}
@@ -359,6 +308,7 @@ func (f *DiemInterface) SendRawTransaction(tx interface{}) error {
 		for _, arg := range t.Args{
 			command = command + " " + arg
 		}
+		println(command)
 		_, err = conn.Write([]byte(command))
 
 		if err != nil {
