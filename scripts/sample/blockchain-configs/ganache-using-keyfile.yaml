@@ -1,0 +1,8 @@
+name: "ethereum"
+nodes:
+  - 127.0.0.1:8545
+  - 127.0.0.2:8545
+  - 127.0.0.3:8545
+  - 127.0.0.4:8545
+key_file: "./scripts/sample/keys.json"
+window: 3
