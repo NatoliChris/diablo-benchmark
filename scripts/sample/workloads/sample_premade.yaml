@@ -1,0 +1,10 @@
+name: "sample benchmark config"
+description: "The description of the benchmark"
+secondaries: 1
+threads: 1
+bench:
+  type: "premade"
+  datapath: "scripts/sample/workloads/premade_data.json"
+  txs:
+    0: 10
+    10: 10
