@@ -68,7 +68,7 @@ The secondary clients are acting as clients interacting with the blockchain. Eac
 ```
 for example:
 ```sh
-./diablo primary -c  configurations/workloads/sample/sample_simple.yaml -cc configurations/blockchain-configs/ethereum/ethereum-basic.yaml -a "0.0.0.0:8323"
+./diablo primary -c  scripts/sample/workloads/sample_simple.yaml -cc scripts/sample/blockchain-configs/ganache-basic-accounts.yaml -a "0.0.0.0:8323"
 ```
 
 2. Once you see the "ready to connect", start the secondaries on their respective machines:
@@ -77,7 +77,7 @@ for example:
 ```
 for example:
 ```sh
-./diablo secondary -m "127.0.0.1:8323" --chain-config configurations/blockchain-configs/ethereum/ethereum-basic.yaml --config configurations/workloads/sample/sample-simple.yaml
+./diablo secondary -m "127.0.0.1:8323" --chain-config scripts/sample/blockchain-configs/ganache-basic-accounts.yaml --config scripts/sample/workloads/sample-simple.yaml
 ```
 
 If you would like to run the sample benchmark for seeing how diablo operates, please see [Sample Example](docs/sample-example.md).
