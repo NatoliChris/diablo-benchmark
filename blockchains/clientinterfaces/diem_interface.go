@@ -300,11 +300,11 @@ func (f *DiemInterface) SendRawTransaction(tx interface{}) error {
 			return
 		}
 		defer conn.Close()
-		command := "d me "
+		command := "dev execute " + strconv.FormatUint(t.SenderRefId, 10)
 		if t.FunctionType == "throughput"{
-			command = "d men "
+			command = "d men " + strconv.FormatUint(t.SenderRefId, 10) +" "+ strconv.FormatUint(t.SequenceNumber, 10)
 		}
-		command = command + strconv.FormatUint(t.SenderRefId, 10) +" "+ strconv.FormatUint(t.SequenceNumber, 10) +" " + t.ScriptPath
+		command = command + " " + t.ScriptPath
 		for _, arg := range t.Args{
 			command = command + " " + arg
 		}
