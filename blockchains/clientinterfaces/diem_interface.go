@@ -166,72 +166,122 @@ func (f *DiemInterface) throughputSeconds() {
 	}
 }
 // TODO
-func (f *DiemInterface) listenForCommits() {
+func (f *DiemInterface) getThroughput()  {
+	// start the sequence counting
 	go func() {
-		// start the sequence counting
-		go func() {
-			conn, err := net.DialTCP("tcp", nil,f.throughputCommandSender)
-			if err != nil{
-				println("Failed to create connection listenForCommits")
-				return
-			}
-			_,err = conn.Write([]byte("diablo connect "+ f.resultReceiver.Addr().String()))
-
-			if err != nil {
-				println("rust client unable to connect to diablo ResultReceiver")
-				return
-			}
-			conn.Close()
-			conn, err = net.DialTCP("tcp", nil,f.throughputCommandSender)
-			if err != nil{
-				println("Failed to create connection listenForCommits")
-				return
-			}
-
-			defer conn.Close()
-			_, err = conn.Write([]byte("d gsn "+ strconv.FormatUint(f.senderRefId, 10))) //TODO
-			if err != nil {
-				println("rust client unable to carry out command to get Sequence Number")
-				return
-			}
-		}()
-
-		c, err := f.resultReceiver.Accept()
+		conn, err := net.DialTCP("tcp", nil,f.throughputCommandSender)
+		if err != nil{
+			println("Failed to create connection listenForCommits")
+			return
+		}
+		_,err = conn.Write([]byte("diablo connect "+ f.resultReceiver.Addr().String()))
 
 		if err != nil {
-			fmt.Println(err)
+			println("rust client unable to connect to diablo ResultReceiver")
+			return
+		}
+		conn.Close()
+		conn, err = net.DialTCP("tcp", nil,f.throughputCommandSender)
+		if err != nil{
+			println("Failed to create connection listenForCommits")
+			return
 		}
 
-		for{
-			buffer := make([]byte, 1024)
-			length, err := c.Read(buffer)
-			if err != nil {
-				return
-			}
-			result := string(buffer[:length])
-			seqNum, _ := strconv.ParseUint(result, 10, 64)
-			f.NumTxDone = seqNum
+		defer conn.Close()
+		_, err = conn.Write([]byte("d gsn "+ strconv.FormatUint(f.senderRefId, 10))) //TODO
+		if err != nil {
+			println("rust client unable to carry out command to get Sequence Number")
+			return
 		}
 	}()
 
-	for {
-		select {
-		case commit := <-f.commitChannel:
+	c, err := f.resultReceiver.Accept()
 
-			ID := commit.ID
-			zap.L().Debug("CommitChannel",
-				zap.Uint64("ID", ID))
-			// transaction failed, incrementing number of done and failed transactions
-			if !commit.Valid {
-				atomic.AddUint64(&f.Fail, 1)
-			} else {
-				//transaction validated, making the note of the time of return
-				f.TransactionInfo[ID] = append(f.TransactionInfo[ID], commit.CommitTime)
-				atomic.AddUint64(&f.Success, 1)
-			}
+	if err != nil {
+		fmt.Println(err)
+	}
 
-			//atomic.AddUint64(&f.NumTxDone, 1)
+	for{
+		buffer := make([]byte, 1024)
+		length, err := c.Read(buffer)
+		if err != nil {
+			return
 		}
+		result := string(buffer[:length])
+		seqNum, _ := strconv.ParseUint(result, 10, 64)
+		f.NumTxDone = seqNum
+	}
+}
+func (f *DiemInterface) listenForCommits() {
+	//go f.getThroughput()
+	conn, err := net.DialTCP("tcp", nil,f.throughputCommandSender)
+	if err != nil{
+		println("Failed to create connection listenForCommits")
+		return
+	}
+	_,err = conn.Write([]byte("diablo connect "+ f.resultReceiver.Addr().String()))
+
+	if err != nil {
+		println("rust client unable to connect to diablo ResultReceiver")
+		return
+	}
+	conn.Close()
+
+
+	c, err := f.resultReceiver.Accept()
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	var counter = uint64(0)
+	for {
+		if int(counter) >= len(f.TransactionInfo) {break}
+
+		conn, err = net.DialTCP("tcp", nil,f.throughputCommandSender)
+		if err != nil{
+			println("Failed to create connection listenForCommits")
+			return
+		}
+
+		defer conn.Close()
+		_, err = conn.Write([]byte("d gt "+ strconv.FormatUint(f.senderRefId, 10)+" "+strconv.FormatUint(counter, 10)+" "+"false"))
+		if err != nil {
+			println("rust client unable to carry out command to get DONE/NOT_DONE info")
+			return
+		}
+
+		buffer := make([]byte, 1024)
+		length, err := c.Read(buffer)
+		if err != nil {
+			return
+		}
+		result := string(buffer[:length])
+		if result == "DONE"{
+			f.TransactionInfo[counter] = append(f.TransactionInfo[counter], time.Now())
+			counter++
+			atomic.AddUint64(&f.Success, 1)
+			atomic.AddUint64(&f.NumTxDone, 1)
+		}else if result == "NOT_DONE"{
+			continue
+		}
+		//select {
+		//case commit := <-f.commitChannel:
+		//
+		//	ID := commit.ID
+		//	zap.L().Debug("CommitChannel",
+		//		zap.Uint64("ID", ID))
+		//	// transaction failed, incrementing number of done and failed transactions
+		//	if !commit.Valid {
+		//		atomic.AddUint64(&f.Fail, 1)
+		//	} else {
+		//		//transaction validated, making the note of the time of return
+		//		f.TransactionInfo[ID] = append(f.TransactionInfo[ID], commit.CommitTime)
+		//		atomic.AddUint64(&f.Success, 1)
+		//	}
+		//	//atomic.AddUint64(&f.NumTxDone, 1)
+		//}
+
 	}
 }
 
@@ -283,7 +333,8 @@ func getTimeFromString(str string) time.Time {
 	timeMillis, _ := strconv.ParseUint(str,10, 64)
 	return time.Unix(int64(timeMillis/1000), int64(timeMillis%1000*1_000_000))
 }
-// Not used?
+
+
 func (f *DiemInterface) SendRawTransaction(tx interface{}) error {
 	t := tx.(*types.DiemTX)
 	zap.L().Debug("Submitting TX",
@@ -323,14 +374,14 @@ func (f *DiemInterface) SendRawTransaction(tx interface{}) error {
 		}
 		replyInfo := strings.Split(string(reply[:replyLenth]), "|")
 		f.TransactionInfo[t.ID] = []time.Time{getTimeFromString(replyInfo[0])}
-		responseTime := getTimeFromString(replyInfo[1])
-		valid := err == nil
-		commit := types.DiemCommitEvent{
-			Valid:      valid,
-			ID:         t.ID,
-			CommitTime: responseTime,
-		}
-		f.commitChannel <- &commit
+		//responseTime := getTimeFromString(replyInfo[1])
+		//valid := err == nil
+		//commit := types.DiemCommitEvent{
+		//	Valid:      valid,
+		//	ID:         t.ID,
+		//	CommitTime: responseTime,
+		//}
+		//f.commitChannel <- &commit
 	}()
 	return nil
 }
