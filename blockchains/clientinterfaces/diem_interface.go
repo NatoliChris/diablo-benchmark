@@ -234,23 +234,22 @@ func (f *DiemInterface) listenForCommits() {
 		fmt.Println(err)
 	}
 
+	conn, err = net.DialTCP("tcp", nil,f.throughputCommandSender)
+	if err != nil{
+		println("Failed to create connection listenForCommits")
+		return
+	}
+
+	defer conn.Close()
 	var counter = uint64(0)
+	_, err = conn.Write([]byte("d gt "+ strconv.FormatUint(f.senderRefId, 10)+" "+strconv.FormatUint(counter, 10)+" "+"false"))
+	if err != nil {
+		println("rust client unable to carry out command to get DONE/NOT_DONE info")
+		return
+	}
+
 	for {
-		if int(counter) >= len(f.TransactionInfo) {break}
-
-		conn, err = net.DialTCP("tcp", nil,f.throughputCommandSender)
-		if err != nil{
-			println("Failed to create connection listenForCommits")
-			return
-		}
-
-		defer conn.Close()
-		_, err = conn.Write([]byte("d gt "+ strconv.FormatUint(f.senderRefId, 10)+" "+strconv.FormatUint(counter, 10)+" "+"false"))
-		if err != nil {
-			println("rust client unable to carry out command to get DONE/NOT_DONE info")
-			return
-		}
-
+		//if int(counter) >= len(f.TransactionInfo) {break}
 		buffer := make([]byte, 1024)
 		length, err := c.Read(buffer)
 		if err != nil {
@@ -262,9 +261,11 @@ func (f *DiemInterface) listenForCommits() {
 			counter++
 			atomic.AddUint64(&f.Success, 1)
 			atomic.AddUint64(&f.NumTxDone, 1)
+			println("DONE", counter)
 		}else if result == "NOT_DONE"{
 			continue
 		}
+
 		//select {
 		//case commit := <-f.commitChannel:
 		//
