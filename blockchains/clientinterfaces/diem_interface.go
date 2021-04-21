@@ -25,6 +25,7 @@ type DiemInterface struct {
 	commitChannel chan *types.DiemCommitEvent 	// channel where we continuously listen to commit events to register throughput
 
 
+	functionType string						// Function type of transaction
 	TransactionInfo  map[uint64][]time.Time // Transaction information (used for throughput calculation)
 	StartTime        time.Time              // Start time of the benchmark
 	ThroughputTicker *time.Ticker           // Ticker for throughput (1s)
@@ -212,8 +213,7 @@ func (f *DiemInterface) getThroughput()  {
 		f.NumTxDone = seqNum
 	}
 }
-func (f *DiemInterface) listenForCommits() {
-	//go f.getThroughput()
+func (f *DiemInterface) getLatency(){
 	conn, err := net.DialTCP("tcp", nil,f.throughputCommandSender)
 	if err != nil{
 		println("Failed to create connection listenForCommits")
@@ -265,24 +265,31 @@ func (f *DiemInterface) listenForCommits() {
 		}else if result == "NOT_DONE"{
 			continue
 		}
-
-		//select {
-		//case commit := <-f.commitChannel:
+	}
+}
+func (f *DiemInterface) listenForCommits() {
+	if f.functionType == "throughput"{
+		go f.getThroughput()
+		//for{
+		//	select {
+		//	case commit := <-f.commitChannel:
 		//
-		//	ID := commit.ID
-		//	zap.L().Debug("CommitChannel",
-		//		zap.Uint64("ID", ID))
-		//	// transaction failed, incrementing number of done and failed transactions
-		//	if !commit.Valid {
-		//		atomic.AddUint64(&f.Fail, 1)
-		//	} else {
-		//		//transaction validated, making the note of the time of return
-		//		f.TransactionInfo[ID] = append(f.TransactionInfo[ID], commit.CommitTime)
-		//		atomic.AddUint64(&f.Success, 1)
+		//		ID := commit.ID
+		//		zap.L().Debug("CommitChannel",
+		//			zap.Uint64("ID", ID))
+		//		// transaction failed, incrementing number of done and failed transactions
+		//		if !commit.Valid {
+		//			atomic.AddUint64(&f.Fail, 1)
+		//		} else {
+		//			//transaction validated, making the note of the time of return
+		//			f.TransactionInfo[ID] = append(f.TransactionInfo[ID], commit.CommitTime)
+		//			atomic.AddUint64(&f.Success, 1)
+		//		}
+		//		//atomic.AddUint64(&f.NumTxDone, 1)
 		//	}
-		//	//atomic.AddUint64(&f.NumTxDone, 1)
 		//}
-
+	} else{
+		f.getLatency()
 	}
 }
 
@@ -306,6 +313,7 @@ func (f *DiemInterface) ParseWorkload(workload workloadgenerators.WorkerThreadWo
 				return nil, err
 			}
 			f.senderRefId = t.SenderRefId
+			f.functionType = t.FunctionType
 			intervalTxs = append(intervalTxs, &t)
 		}
 		parsedWorkload = append(parsedWorkload, intervalTxs)
@@ -352,15 +360,12 @@ func (f *DiemInterface) SendRawTransaction(tx interface{}) error {
 			return
 		}
 		defer conn.Close()
-		command := "dev execute " + strconv.FormatUint(t.SenderRefId, 10)
-		if t.FunctionType == "throughput"{
-			command = "d men " + strconv.FormatUint(t.SenderRefId, 10) +" "+ strconv.FormatUint(t.SequenceNumber, 10)
-		}
-		command = command + " " + t.ScriptPath
+		command := "d men " + strconv.FormatUint(t.SenderRefId, 10) +" "+ strconv.FormatUint(t.SequenceNumber, 10) + " " + t.ScriptPath
+
 		for _, arg := range t.Args{
 			command = command + " " + arg
 		}
-		println(command)
+
 		_, err = conn.Write([]byte(command))
 
 		if err != nil {
@@ -375,14 +380,16 @@ func (f *DiemInterface) SendRawTransaction(tx interface{}) error {
 		}
 		replyInfo := strings.Split(string(reply[:replyLenth]), "|")
 		f.TransactionInfo[t.ID] = []time.Time{getTimeFromString(replyInfo[0])}
-		//responseTime := getTimeFromString(replyInfo[1])
-		//valid := err == nil
-		//commit := types.DiemCommitEvent{
-		//	Valid:      valid,
-		//	ID:         t.ID,
-		//	CommitTime: responseTime,
+		//if f.functionType == "throughput"{
+		//	responseTime := getTimeFromString(replyInfo[1])
+		//	valid := err == nil
+		//	commit := types.DiemCommitEvent{
+		//		Valid:      valid,
+		//		ID:         t.ID,
+		//		CommitTime: responseTime,
+		//	}
+		//	f.commitChannel <- &commit
 		//}
-		//f.commitChannel <- &commit
 	}()
 	return nil
 }
