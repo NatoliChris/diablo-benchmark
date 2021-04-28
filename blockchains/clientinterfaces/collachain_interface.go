@@ -1,0 +1,413 @@
+package clientinterfaces
+
+// This client is based off the examples:
+// https://github.com/ethereum/go-ethereum/blob/master/rpc/client_example_test.go
+
+import (
+	"context"
+	"diablo-benchmark/blockchains/workloadgenerators"
+	"diablo-benchmark/core/configs"
+	"diablo-benchmark/core/results"
+	"errors"
+	"fmt"
+	"math/big"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"go.uber.org/zap"
+)
+
+// CollachainInterface is the the Ethereum implementation of the clientinterface
+// Provides functionality to interaact with the Ethereum blockchain
+type CollachainInterface struct {
+	PrimaryNode      *ethclient.Client      // The primary node connected for this client.
+	SecondaryNodes   []*ethclient.Client    // The other node information (for secure reads etc.)
+	SubscribeDone    chan bool              // Event channel that will unsub from events
+	TransactionInfo  map[string][]time.Time // Transaction information
+	HandlersStarted  bool                   // Have the handlers been initiated?
+	StartTime        time.Time              // Start time of the benchmark
+	ThroughputTicker *time.Ticker           // Ticker for throughput (1s)
+	Throughputs      []float64              // Throughput over time with 1 second intervals
+	infolock         sync.Mutex
+	GenericInterface
+}
+
+// Init initialises the list of nodes
+func (e *CollachainInterface) Init(chainConfig *configs.ChainConfig) {
+	e.Nodes = chainConfig.Nodes
+	e.TransactionInfo = make(map[string][]time.Time, 0)
+	e.SubscribeDone = make(chan bool)
+	e.HandlersStarted = false
+	e.NumTxDone = 0
+}
+
+// Cleanup formats results and unsubscribes from the blockchain
+func (e *CollachainInterface) Cleanup() results.Results {
+	// Stop the ticker
+	e.ThroughputTicker.Stop()
+
+	e.infolock.Lock()
+	// clean up connections and format results
+	if e.HandlersStarted {
+		e.SubscribeDone <- true
+	}
+
+	txLatencies := make([]float64, 0)
+	var avgLatency float64
+
+	var endTime time.Time
+
+	success := uint(0)
+	fails := uint(e.Fail)
+	timeout := uint(0)
+
+	for _, v := range e.TransactionInfo {
+		if len(v) > 1 {
+			txLatency := v[1].Sub(v[0]).Milliseconds()
+			txLatencies = append(txLatencies, float64(txLatency))
+			avgLatency += float64(txLatency)
+			if v[1].After(endTime) {
+				endTime = v[1]
+			}
+
+			success++
+		} else {
+			fails++
+			timeout++
+		}
+	}
+
+	zap.L().Debug("Statistics being returned",
+		zap.Uint("success", success),
+		zap.Uint("fail", fails))
+
+	// Calculate the throughput and latencies
+	var throughput float64
+	if len(txLatencies) > 0 {
+		throughput = (float64(e.NumTxDone) - float64(e.Fail)) / (endTime.Sub(e.StartTime).Seconds())
+		avgLatency = avgLatency / float64(len(txLatencies))
+	} else {
+		avgLatency = 0
+		throughput = 0
+	}
+
+	averageThroughput := float64(0)
+	var calculatedThroughputSeconds = []float64{e.Throughputs[0]}
+	for i := 1; i < len(e.Throughputs); i++ {
+		calculatedThroughputSeconds = append(calculatedThroughputSeconds, float64(e.Throughputs[i]-e.Throughputs[i-1]))
+		averageThroughput += float64(e.Throughputs[i] - e.Throughputs[i-1])
+	}
+
+	averageThroughput = averageThroughput / float64(len(e.Throughputs))
+
+	zap.L().Debug("Results being returned",
+		zap.Float64("avg throughput", averageThroughput),
+		zap.Float64("throughput (as is)", throughput),
+		zap.Float64("latency", avgLatency),
+		zap.String("ThroughputWindow", fmt.Sprintf("%v", calculatedThroughputSeconds)),
+	)
+
+	e.infolock.Unlock()
+	return results.Results{
+		TxLatencies:       txLatencies,
+		AverageLatency:    avgLatency,
+		TxTime:            e.TransactionInfo,
+		Throughput:        averageThroughput,
+		ThroughputSeconds: calculatedThroughputSeconds,
+		Success:           success,
+		Fail:              fails,
+		Timeout:           timeout,
+	}
+}
+
+// throughputSeconds calculates the throughput over time, to show dynamic
+func (e *CollachainInterface) throughputSeconds() {
+	e.ThroughputTicker = time.NewTicker((time.Duration(e.Window) * time.Second))
+	seconds := float64(0)
+
+	for {
+		select {
+		case <-e.ThroughputTicker.C:
+			seconds += float64(e.Window)
+			e.Throughputs = append(e.Throughputs, float64(e.NumTxDone-e.Fail))
+		}
+	}
+}
+
+// Start sets up the start time and starts the periodic checking of the
+// throughput.
+func (e *CollachainInterface) Start() {
+	e.StartTime = time.Now()
+	go e.throughputSeconds()
+}
+
+// ParseWorkload parses the workload and converts into the type for the benchmark.
+func (e *CollachainInterface) ParseWorkload(workload workloadgenerators.WorkerThreadWorkload) ([][]interface{}, error) {
+	parsedWorkload := make([][]interface{}, 0)
+
+	for _, v := range workload {
+		intervalTxs := make([]interface{}, 0)
+		for _, txBytes := range v {
+			t := ethtypes.Transaction{}
+			err := t.UnmarshalJSON(txBytes)
+			if err != nil {
+				return nil, err
+			}
+
+			intervalTxs = append(intervalTxs, &t)
+		}
+		parsedWorkload = append(parsedWorkload, intervalTxs)
+	}
+
+	e.TotalTx = len(parsedWorkload)
+
+	return parsedWorkload, nil
+}
+
+// parseBlocksForTransactions parses the the given block number for the transactions
+func (e *CollachainInterface) parseBlocksForTransactions(blockNumber *big.Int) {
+	block, err := e.PrimaryNode.BlockByNumber(context.Background(), blockNumber)
+
+	if err != nil {
+		zap.L().Warn(err.Error())
+		return
+	}
+
+	tNow := time.Now()
+	var tAdd uint64
+	for _, v := range block.Transactions() {
+		tHash := v.Hash().String()
+		e.infolock.Lock()
+		if _, ok := e.TransactionInfo[tHash]; ok {
+			e.TransactionInfo[tHash] = append(e.TransactionInfo[tHash], tNow)
+			tAdd++
+		}
+		e.infolock.Unlock()
+	}
+
+	atomic.AddUint64(&e.NumTxDone, tAdd)
+}
+
+// EventHandler subscribes to the blocks and handles the incoming information about the transactions
+func (e *CollachainInterface) EventHandler() {
+	// Channel for the events
+	eventCh := make(chan *ethtypes.Header)
+
+	sub, err := e.PrimaryNode.SubscribeNewHead(context.Background(), eventCh)
+	if err != nil {
+		zap.Error(err)
+		return
+	}
+
+	for {
+		select {
+		case <-e.SubscribeDone:
+			sub.Unsubscribe()
+			return
+		case header := <-eventCh:
+			// Got a head
+			go e.parseBlocksForTransactions(header.Number)
+		case err := <-sub.Err():
+			zap.L().Warn(err.Error())
+		}
+	}
+}
+
+// ParseBlocksForTransactions Goes through all the blocks between start and end index, and check for the
+// transactions contained in the blocks. This can help with (A) latency, and
+// (B) correctness to ensure that committed transactions are actually in the blocks.
+func (e *CollachainInterface) ParseBlocksForTransactions(startNumber uint64, endNumber uint64) error {
+	for i := startNumber; i <= endNumber; i++ {
+		b, err := e.GetBlockByNumber(i)
+
+		if err != nil {
+			return err
+		}
+		e.infolock.Lock()
+		for _, v := range b.TransactionHashes {
+
+			if _, ok := e.TransactionInfo[v]; ok {
+				e.TransactionInfo[v] = append(e.TransactionInfo[v], time.Unix(int64(b.Timestamp), 0))
+			}
+		}
+		e.infolock.Unlock()
+	}
+
+	return nil
+}
+
+// ConnectOne connects to one node with the node index matching the "ID".
+func (e *CollachainInterface) ConnectOne(id int) error {
+	// If our ID is greater than the nodes we know, there's a problem!
+
+	if id >= len(e.Nodes) {
+		return errors.New("invalid client ID")
+	}
+
+	// Connect to the node
+	c, err := ethclient.Dial(fmt.Sprintf("ws://%s", e.Nodes[id]))
+
+	// If there's an error, raise it.
+	if err != nil {
+		return err
+	}
+
+	e.PrimaryNode = c
+
+	if !e.HandlersStarted {
+		go e.EventHandler()
+		e.HandlersStarted = true
+	}
+
+	return nil
+}
+
+// ConnectAll connects to all nodes given in the hosts
+func (e *CollachainInterface) ConnectAll(primaryID int) error {
+	// If our ID is greater than the nodes we know, there's a problem!
+	if primaryID >= len(e.Nodes) {
+		return errors.New("invalid client primary ID")
+	}
+
+	// primary connect
+	err := e.ConnectOne(primaryID)
+
+	if err != nil {
+		return err
+	}
+
+	// Connect all the others
+	for idx, node := range e.Nodes {
+		if idx != primaryID {
+			c, err := ethclient.Dial(fmt.Sprintf("ws://%s", node))
+			if err != nil {
+				continue
+			}
+
+			e.SecondaryNodes = append(e.SecondaryNodes, c)
+		}
+	}
+
+	return nil
+}
+
+// DeploySmartContract will deploy the transaction and wait for the contract address to be returned.
+func (e *CollachainInterface) DeploySmartContract(tx interface{}) (interface{}, error) {
+	txSigned := tx.(*ethtypes.Transaction)
+	timeoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
+
+	err := e.PrimaryNode.SendTransaction(timeoutCTX, txSigned)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: fix to wait for deploy - look at workloadGenerator!
+	// Wait for transaction receipt
+	r, err := e.PrimaryNode.TransactionReceipt(context.Background(), txSigned.Hash())
+
+	if err != nil {
+		return nil, err
+	}
+
+	return r.ContractAddress, nil
+}
+
+func (e *CollachainInterface) _sendTx(txSigned ethtypes.Transaction) {
+	// timoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
+
+	err := e.PrimaryNode.SendTransaction(context.Background(), &txSigned)
+	ct := time.Now()
+	// The transaction failed - this could be if it was reproposed, or, just failed.
+	// We need to make sure that if it was re-proposed it doesn't count as a "success" on this node.
+	if err != nil {
+		zap.L().Debug("Err",
+			zap.Error(err),
+		)
+		atomic.AddUint64(&e.Fail, 1)
+		atomic.AddUint64(&e.NumTxDone, 1)
+	}
+
+	atomic.AddUint64(&e.NumTxSent, 1)
+
+	e.infolock.Lock()
+	e.TransactionInfo[txSigned.Hash().String()] = []time.Time{ct}
+	e.infolock.Unlock()
+
+}
+
+// SendRawTransaction sends a raw transaction to the blockchain node.
+// It assumes that the transaction is the correct type
+// and has already been signed and is ready to send into the network.
+func (e *CollachainInterface) SendRawTransaction(tx interface{}) error {
+	// NOTE: type conversion might be slow, there might be a better way to send this.
+	txSigned := tx.(*ethtypes.Transaction)
+	go e._sendTx(*txSigned)
+
+	return nil
+}
+
+// SecureRead will implement a "secure read" - will read a value from all connected nodes to ensure that the
+// value is the same.
+func (e *CollachainInterface) SecureRead(callFunc string, callPrams []byte) (interface{}, error) {
+	// TODO implement
+	return nil, nil
+}
+
+// GetBlockByNumber will request the block information by passing it the height number.
+func (e *CollachainInterface) GetBlockByNumber(index uint64) (block GenericBlock, error error) {
+
+	var ethBlock map[string]interface{}
+	var txList []string
+
+	bigIndex := big.NewInt(0).SetUint64(index)
+
+	b, err := e.PrimaryNode.BlockByNumber(context.Background(), bigIndex)
+
+	if err != nil {
+		return GenericBlock{}, err
+	}
+
+	if &ethBlock == nil {
+		return GenericBlock{}, errors.New("nil block returned")
+	}
+
+	for _, v := range b.Transactions() {
+		txList = append(txList, v.Hash().String())
+	}
+
+	return GenericBlock{
+		Hash:              b.Hash().String(),
+		Index:             b.NumberU64(),
+		Timestamp:         b.Time(),
+		TransactionNumber: b.Transactions().Len(),
+		TransactionHashes: txList,
+	}, nil
+}
+
+// GetBlockHeight will get the block height through the RPC interaction. Should return the index
+// of the block.
+func (e *CollachainInterface) GetBlockHeight() (uint64, error) {
+
+	h, err := e.PrimaryNode.HeaderByNumber(context.Background(), nil)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return h.Number.Uint64(), nil
+}
+
+// Close all the client connections
+func (e *CollachainInterface) Close() {
+	// Close the main client connection
+	e.PrimaryNode.Close()
+
+	// Close all other connections
+	for _, client := range e.SecondaryNodes {
+		client.Close()
+	}
+}
