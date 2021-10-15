@@ -13,6 +13,7 @@ To perform the benchmark as an example, follow the steps below.
 * [ganache-cli](https://github.com/trufflesuite/ganache-cli)
 	* requires nodejs/npm
 * Go version 1.14+
+* Solidity `solc` verison 0.7.5 (prebuilt binary: [here](https://github.com/ethereum/solc-bin))
 
 
 ## Steps
@@ -23,19 +24,18 @@ make
 ```
 * In one terminal, start the ganache developer network with the following parameters, as this generates keys used in the configuration file already provided.
 ```sh
-ganache-cli --mnemonic "nice charge tank ivory warfare spin deposit ecology beauty unusual comic melt" \
-  --defaultBalanceEther 10000000000000000
+./scripts/sample/start_testnet.sh
 ```
 	* Alternatively, you can also add the `-b` flag to make blocks created on a timed basis rather than per-transaction.
-* Modify the benchmark configuration in ``configurations/workloads/sample/`` to a workload you would like to see, paying careful attention to the transaction intervals, as well as the number of secondaries and the number of threads.
+* View the benchmark configuration in ``scripts/sample/workloads/`` to a workload you would like to see, paying careful attention to the transaction intervals, as well as the number of secondaries and the number of threads.
 * In another terminal, start the diablo primary
 ```sh
-./diablo primary -c configurations/workloads/sample/sample_contract_store.yaml -cc configurations/blockchain-configs/ethereum/ethereum-basic.yaml -a "0.0.0.0:8323"
+./diablo primary -c scripts/sample/workloads/sample_contract_store.yaml -cc scripts/sample/blockchain-configs/ganache-using-keyfile.yaml -a "0.0.0.0:8323" --level DEBUG
 ```
 
 * You will need one terminal per secondary, so for 1 more secondary, start the secondary
 ```sh
-./diablo secondary -m ":8323" --chain-config configurations/blockchain-configs/ethereum/ethereum-basic.yaml
+./diablo secondary -m ":8323" -c scripts/sample/workloads/sample_contract_store.yaml -cc scripts/sample/blockchain-configs/ganache-using-keyfile.yaml --level DEBUG --timeout 2
 ```
 	* Launch the number of secondaries specified in the configuration file.
 
@@ -49,7 +49,7 @@ Congratulations on running the benchmark!
 ```
 2020-09-14T10:47:40.080+1000	WARN	clientinterfaces/ethereum_interface.go:107	json: cannot unmarshal hex number with leading zero digits into Go struct field rpcBlock.transactions of type *hexutil.Big
 diablo-benchmark/blockchains/clientinterfaces.(*EthereumInterface).parseBlocksForTransactions
-	/home/natc/dev/go/src/github.com/NatoliChris/diablo-benchmark/blockchains/clientinterfaces/ethereum_interface.go:107
+	diablo-benchmark/blockchains/clientinterfaces/ethereum_interface.go:107
 ```
 
 Ganache has a slightly different block structure, which is incorrectly decoded

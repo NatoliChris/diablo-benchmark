@@ -1,0 +1,18 @@
+name: "Check if fallback function works"
+description: "Can we do fallback function?"
+secondaries: 1
+threads: 1
+bench:
+  type: "contract"
+  txs:
+    0: 5
+    5: 5
+contract:
+  path: "./scripts/sample/contracts/test_fallback.sol"
+  name: "FallbackContract"
+  functions:
+    - name: "()"
+      ftype: "write"
+      ratio: 100
+      value: "de0b6b3a7640000"
+

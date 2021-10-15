@@ -66,20 +66,20 @@ The secondary clients are acting as clients interacting with the blockchain. Eac
 
 1. Start the primary benchmark node:
 ```sh
-./diablo primary -bc /path/to/benchmark/config -cc /path/to/chain/config -a "<listen_address>:<port>"
+./diablo primary -c /path/to/benchmark/config -cc /path/to/chain/config -a "<listen_address>:<port>"
 ```
 for example:
 ```sh
-./diablo primary -bc  configurations/workloads/sample/sample_simple.yaml -cc configurations/blockchain-configs/ethereum/ethereum-basic.yaml -a "0.0.0.0:8323"
+./diablo primary -c  scripts/sample/workloads/sample_simple.yaml -cc scripts/sample/blockchain-configs/ganache-basic-accounts.yaml -a "0.0.0.0:8323"
 ```
 
 2. Once you see the "ready to connect", start the secondaries on their respective machines:
 ```sh
-./diablo secondary -m "<Primary IP>:<port>" -cc /path/to/chain/config
+./diablo secondary -m "<Primary IP>:<port>" -cc /path/to/chain/config -c /path/to/config
 ```
 for example:
 ```sh
-./diablo secondary -m "127.0.0.1:8323" --chain-config configurations/blockchain-configs/ethereum/ethereum-basic.yaml
+./diablo secondary -m "127.0.0.1:8323" --chain-config scripts/sample/blockchain-configs/ganache-basic-accounts.yaml --config scripts/sample/workloads/sample-simple.yaml
 ```
 
 If you would like to run the sample benchmark for seeing how diablo operates, please see [Sample Example](docs/sample-example.md).
