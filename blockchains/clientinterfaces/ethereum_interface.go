@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -26,6 +27,7 @@ type EthereumInterface struct {
 	SecondaryNodes   []*ethclient.Client    // The other node information (for secure reads etc.)
 	SubscribeDone    chan bool              // Event channel that will unsub from events
 	TransactionInfo  map[string][]time.Time // Transaction information
+	bigLock          sync.Mutex
 	HandlersStarted  bool                   // Have the handlers been initiated?
 	StartTime        time.Time              // Start time of the benchmark
 	ThroughputTicker *time.Ticker           // Ticker for throughput (1s)
@@ -170,6 +172,9 @@ func (e *EthereumInterface) parseBlocksForTransactions(blockNumber *big.Int) {
 
 	tNow := time.Now()
 	var tAdd uint64
+
+	e.bigLock.Lock()
+
 	for _, v := range block.Transactions() {
 		tHash := v.Hash().String()
 		if _, ok := e.TransactionInfo[tHash]; ok {
@@ -177,6 +182,8 @@ func (e *EthereumInterface) parseBlocksForTransactions(blockNumber *big.Int) {
 			tAdd++
 		}
 	}
+
+	e.bigLock.Unlock()
 
 	atomic.AddUint64(&e.NumTxDone, tAdd)
 }
@@ -217,11 +224,15 @@ func (e *EthereumInterface) ParseBlocksForTransactions(startNumber uint64, endNu
 			return err
 		}
 
+		e.bigLock.Lock()
+
 		for _, v := range b.TransactionHashes {
 			if _, ok := e.TransactionInfo[v]; ok {
 				e.TransactionInfo[v] = append(e.TransactionInfo[v], time.Unix(int64(b.Timestamp), 0))
 			}
 		}
+
+		e.bigLock.Unlock()
 	}
 
 	return nil
@@ -319,7 +330,10 @@ func (e *EthereumInterface) _sendTx(txSigned ethtypes.Transaction) {
 		atomic.AddUint64(&e.NumTxDone, 1)
 	}
 
+	e.bigLock.Lock()
 	e.TransactionInfo[txSigned.Hash().String()] = []time.Time{time.Now()}
+	e.bigLock.Unlock()
+
 	atomic.AddUint64(&e.NumTxSent, 1)
 }
 

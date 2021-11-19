@@ -1,13 +1,15 @@
 package workloadgenerators
 
 import (
-	"diablo-benchmark/core/configs"
 	"errors"
 	"math"
 	"math/rand"
 	"time"
 
 	"go.uber.org/zap"
+
+	"diablo-benchmark/blockchains/algorand"
+	"diablo-benchmark/core/configs"
 )
 
 // GetWorkloadGenerator matches the workload generator with the name provided of the chain in the configuration
@@ -17,6 +19,8 @@ func GetWorkloadGenerator(config *configs.ChainConfig) (WorkloadGenerator, error
 	var wg WorkloadGenerator
 
 	switch config.Name {
+	case "algorand":
+		wg = NewControllerBridge(algorand.NewController())
 	case "ethereum":
 		// Return the ethereum workload generator
 		// TODO get the type of the ethereum workload generator

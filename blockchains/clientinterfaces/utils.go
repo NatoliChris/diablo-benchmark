@@ -1,6 +1,7 @@
 package clientinterfaces
 
 import (
+	"diablo-benchmark/blockchains/algorand"
 	"diablo-benchmark/core/configs"
 	"errors"
 )
@@ -9,6 +10,9 @@ import (
 // Is used by the clients to select the correct chain configuration
 func GetBlockchainInterface(config *configs.ChainConfig) (BlockchainInterface, error) {
 	switch config.Name {
+	case "algorand":
+		bci := NewWorkerBridge(algorand.NewWorker())
+		return bci, nil
 	case "ethereum":
 		bci := EthereumInterface{}
 		return &bci, nil

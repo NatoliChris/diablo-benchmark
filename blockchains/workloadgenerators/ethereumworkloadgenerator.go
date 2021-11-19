@@ -74,7 +74,6 @@ func (e *EthereumWorkloadGenerator) BlockchainSetup() error {
 
 // InitParams sets initial aspects such as the suggested gas price and sets up a small connection to get information from the blockchain.
 func (e *EthereumWorkloadGenerator) InitParams() error {
-
 	// Connect to the blockchain
 	c, err := ethclient.Dial(fmt.Sprintf("ws://%s", e.ChainConfig.Nodes[0]))
 
@@ -634,14 +633,6 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, 
 	// Get the transaction fields
 	toConverted := common.HexToAddress(toAddress)
 	gasLimit := uint64(300000)
-
-	zap.L().Debug("transaction params",
-		zap.String("addrFrom", addrFrom.String()),
-		zap.String("addrTo", toAddress),
-		zap.Uint64("nonce", e.Nonces[strings.ToLower(addrFrom.String())]),
-		zap.String("data", hex.EncodeToString(data)),
-		zap.String("val", value.String()),
-	)
 
 	// Make and sign the transaction
 	tx := types.NewTransaction(e.Nonces[strings.ToLower(addrFrom.String())], toConverted, value, gasLimit, e.SuggestedGasPrice, data)
