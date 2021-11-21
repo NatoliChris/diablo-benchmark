@@ -27,6 +27,8 @@ func GetWorkloadGenerator(config *configs.ChainConfig) (WorkloadGenerator, error
 		wg = &EthereumWorkloadGenerator{}
 	case "fabric":
 		wg = &FabricWorkloadGenerator{}
+	case "solana":
+		wg = NewSolanaWorkloadGenerator()
 	default:
 		zap.L().Warn("unknown chain defined in config",
 			zap.String("chain_name", config.Name))

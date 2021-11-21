@@ -3,7 +3,7 @@ package clientinterfaces
 import (
 	"diablo-benchmark/blockchains/algorand"
 	"diablo-benchmark/core/configs"
-	"errors"
+	"fmt"
 )
 
 // GetBlockchainInterface maps the name of the blockchain in the config with the interface to implement.
@@ -18,8 +18,11 @@ func GetBlockchainInterface(config *configs.ChainConfig) (BlockchainInterface, e
 		return &bci, nil
 	case "fabric":
 		bci := FabricInterface{}
-		return &bci,nil
+		return &bci, nil
+	case "solana":
+		bci := NewSolanaInterface()
+		return bci, nil
 	default:
-		return nil, errors.New("unsupported blockchain in chain config")
+		return nil, fmt.Errorf("unsupported blockchain '%s' in chain config", config.Name)
 	}
 }

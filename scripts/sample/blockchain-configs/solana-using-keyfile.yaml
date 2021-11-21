@@ -1,0 +1,5 @@
+name: "solana"
+nodes:
+  - 127.0.0.1:8899
+key_file: "./scripts/sample/accounts.json"
+window: 3
