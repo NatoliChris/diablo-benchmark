@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -25,6 +26,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/gagliardetto/solana-go/rpc/ws"
 	"go.uber.org/zap"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -112,6 +114,27 @@ func (s *SolanaWorkloadGenerator) BlockchainSetup() error {
 		s.KnownAccounts = s.ChainConfig.Keys
 		return nil
 	}
+	if len(s.ChainConfig.Extra) > 0 {
+		accountsData, err := os.ReadFile(s.ChainConfig.Extra[0].(string))
+		if err != nil {
+			return err
+		}
+		var accounts map[string]interface{}
+		err = yaml.Unmarshal(accountsData, &accounts)
+		if err != nil {
+			return err
+		}
+
+		for k := range accounts {
+			var priv solana.PrivateKey
+			err := json.Unmarshal([]byte(k), &priv)
+			if err != nil {
+				return err
+			}
+
+			s.KnownAccounts = append(s.KnownAccounts, configs.ChainKey{PrivateKey: priv, Address: priv.PublicKey().String()})
+		}
+	}
 	// 2 - fund with genesis block, write to genesis location
 	// 3 - copy genesis to blockchain nodes
 	return nil
@@ -144,31 +167,6 @@ func (s *SolanaWorkloadGenerator) CreateAccount() (interface{}, error) {
 	return solana.NewWallet().PrivateKey, nil
 }
 
-func confirmTransaction(
-	wsClient *ws.Client,
-	commitment rpc.CommitmentType, sig solana.Signature) (signature solana.Signature, err error) {
-	sub, err := wsClient.SignatureSubscribe(
-		sig,
-		commitment,
-	)
-	if err != nil {
-		return sig, err
-	}
-	defer sub.Unsubscribe()
-
-	for {
-		got, err := sub.Recv()
-		if err != nil {
-			return sig, err
-		}
-		if got.Value.Err != nil {
-			return sig, fmt.Errorf("transaction confirmation failed: %v", got.Value.Err)
-		} else {
-			return sig, nil
-		}
-	}
-}
-
 func (s *SolanaWorkloadGenerator) DeployContract(fromPrivKey []byte, contractPath string) (string, error) {
 	s.logger.Debug("DeployContract", zap.Binary("fromPrivKey", fromPrivKey), zap.String("contractPath", contractPath))
 	txBatchesBytes, err := s.CreateContractDeployTX(fromPrivKey, contractPath)
@@ -182,17 +180,43 @@ func (s *SolanaWorkloadGenerator) DeployContract(fromPrivKey []byte, contractPat
 		return "", err
 	}
 
-	for _, batch := range txBatches {
+	for n, batch := range txBatches {
+		s.logger.Debug("Processing batch", zap.Int("index", n))
+		var sigs []solana.Signature
 		for _, tx := range batch {
 			sig, err := s.ActiveConn.rpcClient.SendTransactionWithOpts(context.Background(), tx, false, rpc.CommitmentFinalized)
 			if err != nil {
 				return "", err
 			}
-
-			_, err = confirmTransaction(s.ActiveConn.wsClient, rpc.CommitmentFinalized, sig)
+			sigs = append(sigs, sig)
+		}
+		for i := 0; i < 60; i++ {
+			s.logger.Debug("waiting for", zap.Int("txs", len(sigs)))
+			got, err := s.ActiveConn.rpcClient.GetSignatureStatuses(context.Background(), true, sigs...)
 			if err != nil {
 				return "", err
 			}
+			if got == nil {
+				return "", errors.New("empty signatures")
+			}
+			var requiredSigs []solana.Signature
+			for idx, status := range got.Value {
+				if status != nil && status.ConfirmationStatus == rpc.ConfirmationStatusFinalized {
+					continue
+				}
+				requiredSigs = append(requiredSigs, sigs[idx])
+				if status != nil {
+					s.logger.Debug("status", zap.String("sig", sigs[idx].String()), zap.String("status", string(status.ConfirmationStatus)))
+				}
+			}
+			sigs = requiredSigs
+			if len(requiredSigs) == 0 {
+				break
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+		if len(sigs) > 0 {
+			return "", errors.New("failed to wait for transaction finalization")
 		}
 	}
 
@@ -310,8 +334,8 @@ func makePrivateKeyGetter(
 }
 
 type SolangSeed struct {
-	seed    []byte
-	address solana.PublicKey
+	seed []byte
+	// address solana.PublicKey
 }
 
 func encodeSeeds(seeds ...SolangSeed) []byte {
@@ -374,13 +398,12 @@ func (s *SolanaWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, con
 		// 1 - create program account
 		// 2 - call loader writes
 		// 3 - call loader finalize
-		// 4 - create storage account
-		// 5 - call contract constructor
-		transactionBatches := make([][]*solana.Transaction, 5)
+		// 4 - create storage account and call contract constructor
+		transactionBatches := make([][]*solana.Transaction, 4)
 
-		createTransaction := func(instruction solana.Instruction) (*solana.Transaction, error) {
+		createTransaction := func(instructions ...solana.Instruction) (*solana.Transaction, error) {
 			tx, err := solana.NewTransaction(
-				[]solana.Instruction{instruction},
+				instructions,
 				blockhash.Value.Blockhash,
 				solana.TransactionPayer(priv.PublicKey()))
 			if err != nil {
@@ -468,17 +491,6 @@ func (s *SolanaWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, con
 			return nil, err
 		}
 
-		transaction, err = createTransaction(system.NewCreateAccountInstruction(
-			lamports,
-			contract.RequiredSpace,
-			programAccount.PublicKey(),
-			priv.PublicKey(),
-			storageAccount.PublicKey()).Build())
-		if err != nil {
-			return nil, err
-		}
-		transactionBatches[3] = append(transactionBatches[3], transaction)
-
 		// assuming that constructor does not have arguments
 		{
 			input, err := contract.Abi.Constructor.Inputs.Pack()
@@ -500,6 +512,12 @@ func (s *SolanaWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, con
 			data = append(data, input...)
 
 			transaction, err = createTransaction(
+				system.NewCreateAccountInstruction(
+					lamports,
+					contract.RequiredSpace,
+					programAccount.PublicKey(),
+					priv.PublicKey(),
+					storageAccount.PublicKey()).Build(),
 				solana.NewInstruction(
 					programAccount.PublicKey(),
 					[]*solana.AccountMeta{
@@ -511,7 +529,7 @@ func (s *SolanaWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, con
 			if err != nil {
 				return nil, err
 			}
-			transactionBatches[4] = append(transactionBatches[4], transaction)
+			transactionBatches[3] = append(transactionBatches[3], transaction)
 		}
 
 		s.CompiledContract = &SolangDeployedContract{Contract: contract, ProgramAccount: programAccount, StorageAccount: storageAccount}
