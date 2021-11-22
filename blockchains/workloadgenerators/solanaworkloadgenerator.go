@@ -859,26 +859,22 @@ func (s *SolanaWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, to
 
 	priv := &solana.Wallet{PrivateKey: solana.PrivateKey(fromPrivKey)}
 
-	valueBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(valueBytes[0:], value.Uint64())
+	var instruction solana.Instruction
+	var privateKeyGetter func(solana.PublicKey) *solana.PrivateKey
 
-	instructionData := []byte{}
-	instructionData = append(instructionData, s.CompiledContract.StorageAccount.PublicKey().Bytes()...)
-	instructionData = append(instructionData, priv.PublicKey().Bytes()...)
-	instructionData = append(instructionData, valueBytes...)
-	instructionData = append(instructionData, make([]byte, 4)...)
-	instructionData = append(instructionData, encodeSeeds()...)
-	instructionData = append(instructionData, data...)
+	if s.CompiledContract != nil {
+		valueBytes := make([]byte, 8)
+		binary.LittleEndian.PutUint64(valueBytes[0:], value.Uint64())
 
-	blockhash, err := s.ActiveConn.rpcClient.GetRecentBlockhash(
-		context.Background(),
-		rpc.CommitmentFinalized)
-	if err != nil {
-		return nil, err
-	}
+		instructionData := []byte{}
+		instructionData = append(instructionData, s.CompiledContract.StorageAccount.PublicKey().Bytes()...)
+		instructionData = append(instructionData, priv.PublicKey().Bytes()...)
+		instructionData = append(instructionData, valueBytes...)
+		instructionData = append(instructionData, make([]byte, 4)...)
+		instructionData = append(instructionData, encodeSeeds()...)
+		instructionData = append(instructionData, data...)
 
-	tx, err := solana.NewTransaction(
-		[]solana.Instruction{solana.NewInstruction(
+		instruction = solana.NewInstruction(
 			s.CompiledContract.ProgramAccount.PublicKey(),
 			[]*solana.AccountMeta{
 				solana.NewAccountMeta(
@@ -893,18 +889,125 @@ func (s *SolanaWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, to
 					solana.PublicKey{},
 					false,
 					false),
-			}, instructionData)},
+			}, instructionData)
+		privateKeyGetter = makePrivateKeyGetter(priv, s.CompiledContract.StorageAccount)
+	} else {
+		instruction = system.NewTransferInstruction(
+			1,
+			priv.PublicKey(),
+			solana.MustPublicKeyFromBase58(toAddress)).Build()
+		privateKeyGetter = makePrivateKeyGetter(priv)
+	}
+
+	blockhash, err := s.ActiveConn.rpcClient.GetRecentBlockhash(
+		context.Background(),
+		rpc.CommitmentFinalized)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := solana.NewTransaction(
+		[]solana.Instruction{instruction},
 		blockhash.Value.Blockhash,
 		solana.TransactionPayer(priv.PublicKey()))
 	if err != nil {
 		return nil, err
 	}
-	_, err = tx.Sign(makePrivateKeyGetter(priv, s.CompiledContract.StorageAccount))
+	_, err = tx.Sign(privateKeyGetter)
 	if err != nil {
 		return nil, err
 	}
 
 	return json.Marshal(tx)
+}
+
+func (s *SolanaWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
+
+	// get the known accounts
+	var totalWorkload Workload
+
+	// 1. Set up the accounts into buckets for each
+	accountDistribution := make([][]*configs.ChainKey, s.BenchConfig.Secondaries*s.BenchConfig.Threads)
+
+	accountCount := 0
+	for {
+		// exit condition - each thread has an assigned account, and we've run out of accounts.
+		if accountCount >= len(s.KnownAccounts) && accountCount >= len(accountDistribution) {
+			break
+		}
+
+		currentAccount := accountCount % len(s.KnownAccounts)
+		currentDist := accountCount % len(accountDistribution)
+
+		accountDistribution[currentDist] = append(accountDistribution[currentDist], &s.KnownAccounts[currentAccount])
+
+		accountCount++
+	}
+
+	// 2. Generate the transactions
+	txID := 0
+	accountBatch := 0
+	for secondaryID := 0; secondaryID < s.BenchConfig.Secondaries; secondaryID++ {
+		// secondaryWorkload = [thread][interval][tx=[]byte]
+		// [][][][]byte
+		secondaryWorkload := make(SecondaryWorkload, 0)
+		for thread := 0; thread < s.BenchConfig.Threads; thread++ {
+			// Thread workload = list of transactions in intervals
+			// [interval][tx] = [][][]byte
+			threadWorkload := make(WorkerThreadWorkload, 0)
+			// for each thread, generate the intervals of transactions.
+			zap.L().Debug("Info",
+				zap.Int("secondary", secondaryID),
+				zap.Int("thread", thread),
+				zap.Int("len", len(accountDistribution)))
+			accountsChoices := accountDistribution[accountBatch]
+			for interval, txnum := range s.TPSIntervals {
+				// Debug print for each interval to monitor correctness.
+				zap.L().Debug("Making workload ",
+					zap.Int("secondary", secondaryID),
+					zap.Int("thread", thread),
+					zap.Int("interval", interval),
+					zap.Int("value", txnum))
+
+				// Time interval = list of transactions
+				// [tx] = [][]byte
+				intervalWorkload := make([][]byte, 0)
+				for txIt := 0; txIt < txnum; txIt++ {
+
+					// Initial assumption: there's as many accounts as transactions
+					// TODO allow for more intricate transaction generation, such as A->B, A->C, etc.
+					txVal, ok := big.NewInt(0).SetString("1000000", 10)
+					if !ok {
+						return nil, errors.New("failed to set TX value")
+					}
+
+					// accFrom := secondaryID + thread + (secondaryID * s.BenchConfig.Threads)
+					accFrom := accountsChoices[txID%len(accountsChoices)]
+					accTo := accountsChoices[(txID+1)%len(accountsChoices)]
+
+					tx, txerr := s.CreateSignedTransaction(
+						accFrom.PrivateKey,
+						accTo.Address,
+						txVal,
+						[]byte{},
+					)
+
+					if txerr != nil {
+						return nil, txerr
+					}
+
+					intervalWorkload = append(intervalWorkload, tx)
+					txID++
+				}
+				threadWorkload = append(threadWorkload, intervalWorkload)
+			}
+			secondaryWorkload = append(secondaryWorkload, threadWorkload)
+			accountBatch++
+		}
+		totalWorkload = append(totalWorkload, secondaryWorkload)
+	}
+
+	return totalWorkload, nil
 }
 
 func (s *SolanaWorkloadGenerator) generateContractWorkload() (Workload, error) {
@@ -1026,6 +1129,137 @@ func (s *SolanaWorkloadGenerator) generateContractWorkload() (Workload, error) {
 	return totalWorkload, nil
 }
 
+func (s *SolanaWorkloadGenerator) generatePremadeWorkload() (Workload, error) {
+	// 1 deploy the contract if it is a contract workload, get the address
+	var contractAddr string
+	if len(s.BenchConfig.ContractInfo.Path) > 0 && len(s.BenchConfig.ContractInfo.Name) > 0 {
+		// Deploy the contract
+		var err error
+		contractAddr, err = s.DeployContract(s.KnownAccounts[0].PrivateKey, s.BenchConfig.ContractInfo.Path)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var fullWorkload Workload
+	// 2 loop through the premade dataset and create the relevant transactions
+	for secondaryIndex, secondaryWorkload := range s.BenchConfig.TxInfo.PremadeInfo {
+
+		secondaryTransactions := make(SecondaryWorkload, 0)
+
+		for threadIndex, threadWorkload := range secondaryWorkload {
+
+			threadTransactions := make(WorkerThreadWorkload, 0)
+
+			for intervalIndex, intervalWorkload := range threadWorkload {
+
+				intervalTransactions := make([][]byte, 0)
+
+				for _, txInfo := range intervalWorkload {
+					// Make the transaction based on its
+					fromID, err := strconv.Atoi(txInfo.From)
+					fromAccount := s.KnownAccounts[fromID%len(s.KnownAccounts)]
+					if err != nil {
+						return nil, fmt.Errorf("[Premade tx: %v] Failed to convert %v to int", txInfo.ID, txInfo.From)
+					}
+
+					var toAccount string
+					if txInfo.To == "contract" {
+						toAccount = contractAddr
+					} else {
+						toID, err := strconv.Atoi(txInfo.To)
+						if err != nil {
+							return nil, fmt.Errorf("[Premade tx: %v] Failed to convert %v to int", txInfo.ID, txInfo.To)
+						}
+						toAccount = s.KnownAccounts[toID%len(s.KnownAccounts)].Address
+					}
+
+					zap.L().Debug("Premade Transaction",
+						zap.String("Tx Info", fmt.Sprintf("[S: %v, T: %v, I: %v]", secondaryIndex, threadIndex, intervalIndex)),
+						zap.String(fmt.Sprintf("From (%v): ", txInfo.From), fmt.Sprintf("%v", fromAccount.Address)),
+						zap.String(fmt.Sprintf("To (%v): ", txInfo.To), fmt.Sprintf("%v", toAccount)),
+						zap.String("ID", txInfo.ID),
+						zap.String("Function", txInfo.Function),
+					)
+
+					var finalTx []byte
+
+					txVal, ok := big.NewInt(0).SetString(txInfo.Value, 10)
+
+					if !ok {
+						return nil, fmt.Errorf("failed to set value to big int: %s", txInfo.Value)
+					}
+
+					if txInfo.Function == "" && len(txInfo.DataParams) == 0 {
+						// This is a simple transaction
+						finalTx, err = s.CreateSignedTransaction(
+							fromAccount.PrivateKey,
+							toAccount,
+							txVal,
+							[]byte{},
+						)
+
+						if err != nil {
+							return nil, err
+						}
+
+					} else {
+						// This is a contract
+						if txInfo.Function == "constructor" {
+							// Constructor = make a deploy transaction
+							finalTx, err = s.CreateContractDeployTX(
+								fromAccount.PrivateKey,
+								s.BenchConfig.ContractInfo.Path,
+							)
+
+							if err != nil {
+								return nil, err
+							}
+
+						} else {
+							// It's an interaction transaction
+
+							// function name should be: function(type,type,type)
+							var txParams []configs.ContractParam
+							var functionParamSigs []string
+							for _, paramVal := range txInfo.DataParams {
+								functionParamSigs = append(functionParamSigs, paramVal.Type)
+								txParams = append(txParams, configs.ContractParam{Type: paramVal.Type, Value: paramVal.Value})
+							}
+
+							functionFinal := fmt.Sprintf("%s(%s)", txInfo.Function, strings.Join(functionParamSigs[:], ","))
+
+							finalTx, err = s.CreateInteractionTX(
+								fromAccount.PrivateKey,
+								toAccount,
+								functionFinal,
+								txParams,
+								txInfo.Value,
+							)
+							if err != nil {
+								return nil, err
+							}
+						}
+
+					}
+
+					intervalTransactions = append(intervalTransactions, finalTx)
+				}
+
+				threadTransactions = append(threadTransactions, intervalTransactions)
+			}
+
+			secondaryTransactions = append(secondaryTransactions, threadTransactions)
+		}
+
+		fullWorkload = append(fullWorkload, secondaryTransactions)
+	}
+
+	// 3 return the workload to be distributed
+	return fullWorkload, nil
+}
+
 func (s *SolanaWorkloadGenerator) GenerateWorkload() (Workload, error) {
 	s.logger.Debug("GenerateWorkload")
 	// 1/ work out the total number of secondaries.
@@ -1061,10 +1295,10 @@ func (s *SolanaWorkloadGenerator) GenerateWorkload() (Workload, error) {
 	switch s.BenchConfig.TxInfo.TxType {
 	case configs.TxTypeContract:
 		return s.generateContractWorkload()
-	// case configs.TxTypeSimple:
-	// 	return s.generateSimpleWorkload()
-	// case configs.TxTypePremade:
-	// 	return s.generatePremadeWorkload()
+	case configs.TxTypeSimple:
+		return s.generateSimpleWorkload()
+	case configs.TxTypePremade:
+		return s.generatePremadeWorkload()
 	default:
 		return nil, errors.New("unknown transaction type in config for workload generation")
 	}
