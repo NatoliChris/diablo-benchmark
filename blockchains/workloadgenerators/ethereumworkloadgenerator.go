@@ -834,7 +834,7 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 
 						functionFinal = fmt.Sprintf("%s(%s)", funcToCreate.Name, strings.Join(functionParamSigs[:], ","))
 					} else {
-						functionFinal = funcToCreate.Name
+						functionFinal = fmt.Sprintf("%s()", funcToCreate.Name)
 					}
 
 					tx, txerr := e.CreateInteractionTX(
