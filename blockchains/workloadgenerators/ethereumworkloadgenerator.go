@@ -762,11 +762,16 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 	// This is a list of [id] pointing to each function
 	// It will occur K times in the list, which is representative of the
 	// ratio.
-	functionsToCreatePerThread := make([]int, numberOfTransactions)
+	functionsToCreatePerThread := make([]int, 0)
 
 	for idx, funcInfo := range e.BenchConfig.ContractInfo.Functions {
 		// add index to functionsToCreate
-		funcRatio := (funcInfo.Ratio / 100) * numberOfTransactions
+		var funcRatio int
+		if idx == len(e.BenchConfig.ContractInfo.Functions) - 1 {
+			funcRatio = numberOfTransactions - len(functionsToCreatePerThread)
+		} else {
+			funcRatio = (funcInfo.Ratio / 100) * numberOfTransactions
+		}
 
 		for i := 0; i < funcRatio; i++ {
 			functionsToCreatePerThread = append(functionsToCreatePerThread, idx)
