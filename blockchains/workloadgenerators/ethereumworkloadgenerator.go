@@ -470,12 +470,6 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 		return nil, fmt.Errorf("contract does not exist in known generator")
 	}
 
-	// If there are empty params, warn - just because this isn't super common
-	if len(contractParams) < 1 {
-		// empty
-		zap.L().Warn(fmt.Sprintf("empty contract params for %s", functionName))
-	}
-
 	// next - get the function hash
 	var funcHash string
 
