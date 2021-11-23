@@ -770,7 +770,7 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 		if idx == len(e.BenchConfig.ContractInfo.Functions) - 1 {
 			funcRatio = numberOfTransactions - len(functionsToCreatePerThread)
 		} else {
-			funcRatio = (funcInfo.Ratio / 100) * numberOfTransactions
+			funcRatio = (funcInfo.Ratio * numberOfTransactions) / 100
 		}
 
 		for i := 0; i < funcRatio; i++ {
