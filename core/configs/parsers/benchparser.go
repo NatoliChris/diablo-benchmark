@@ -177,5 +177,8 @@ func GetTotalNumberOfTransactions(config *configs.BenchConfig) (int, error) {
 		currentKey = nextKey
 	}
 
+	// Do not forget the last second!
+	totalNumberOfTransactions += intervals[intervalKeys[len(intervalKeys)-1]]
+
 	return totalNumberOfTransactions, nil
 }
