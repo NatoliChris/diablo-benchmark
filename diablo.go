@@ -104,6 +104,7 @@ func prepareLogger(logType string, level zapcore.Level) {
 	fileSync := zapcore.AddSync(file)
 	fileEncoder := zapcore.NewJSONEncoder(fileConfig)
 	fileLevel := zap.NewAtomicLevel()
+	fileLevel.SetLevel(level)
 	fileCore := zapcore.NewCore(fileEncoder, fileSync, fileLevel)
 
 	// Set up both the loggers

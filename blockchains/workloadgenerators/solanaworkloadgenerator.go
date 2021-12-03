@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"net"
 	"os"
@@ -115,7 +116,7 @@ func (s *SolanaWorkloadGenerator) BlockchainSetup() error {
 		return nil
 	}
 	if len(s.ChainConfig.Extra) > 0 {
-		accountsData, err := os.ReadFile(s.ChainConfig.Extra[0].(string))
+		accountsData, err := ioutil.ReadFile(s.ChainConfig.Extra[0].(string))
 		if err != nil {
 			return err
 		}
@@ -253,7 +254,7 @@ func solangVersion(solang string) (*Solang, error) {
 
 func (s *SolanaWorkloadGenerator) compileSolidity(contractPath string) (contract *SolangContract, err error) {
 	s.logger.Debug("compileSolidity", zap.String("contractPath", contractPath))
-	dir, err := os.MkdirTemp("", "diablo-solang")
+	dir, err := ioutil.TempDir("", "diablo-solang")
 	if err != nil {
 		return
 	}
@@ -300,14 +301,14 @@ func (s *SolanaWorkloadGenerator) compileSolidity(contractPath string) (contract
 	if len(binaryPathMatches) != 2 {
 		return nil, fmt.Errorf("can't parse binary path %q", stderr.String())
 	}
-	if contract.Data, err = os.ReadFile(binaryPathMatches[1]); err != nil {
+	if contract.Data, err = ioutil.ReadFile(binaryPathMatches[1]); err != nil {
 		return nil, err
 	}
 	abiPathMatches := abiPathRegexp.FindStringSubmatch(stderr.String())
 	if len(abiPathMatches) != 2 {
 		return nil, fmt.Errorf("can't parse ABI path %q", stderr.String())
 	}
-	abiData, err := os.ReadFile(abiPathMatches[1])
+	abiData, err := ioutil.ReadFile(abiPathMatches[1])
 	if err != nil {
 		return nil, err
 	}
@@ -1030,11 +1031,16 @@ func (s *SolanaWorkloadGenerator) generateContractWorkload() (Workload, error) {
 	// This is a list of [id] pointing to each function
 	// It will occur K times in the list, which is representative of the
 	// ratio.
-	functionsToCreatePerThread := make([]int, numberOfTransactions)
+	functionsToCreatePerThread := make([]int, 0)
 
 	for idx, funcInfo := range s.BenchConfig.ContractInfo.Functions {
 		// add index to functionsToCreate
-		funcRatio := (funcInfo.Ratio / 100) * numberOfTransactions
+		var funcRatio int
+		if idx == len(s.BenchConfig.ContractInfo.Functions)-1 {
+			funcRatio = numberOfTransactions - len(functionsToCreatePerThread)
+		} else {
+			funcRatio = (funcInfo.Ratio * numberOfTransactions) / 100
+		}
 
 		for i := 0; i < funcRatio; i++ {
 			functionsToCreatePerThread = append(functionsToCreatePerThread, idx)
@@ -1089,16 +1095,12 @@ func (s *SolanaWorkloadGenerator) generateContractWorkload() (Workload, error) {
 						zap.Int("thread", threadID))
 					var functionParamSigs []string
 					var functionFinal string
-					if len(funcToCreate.Params) > 0 {
 
-						for _, paramVal := range funcToCreate.Params {
-							functionParamSigs = append(functionParamSigs, paramVal.Type)
-						}
-
-						functionFinal = fmt.Sprintf("%s(%s)", funcToCreate.Name, strings.Join(functionParamSigs[:], ","))
-					} else {
-						functionFinal = funcToCreate.Name
+					for _, paramVal := range funcToCreate.Params {
+						functionParamSigs = append(functionParamSigs, paramVal.Type)
 					}
+
+					functionFinal = fmt.Sprintf("%s(%s)", funcToCreate.Name, strings.Join(functionParamSigs[:], ","))
 
 					tx, txerr := s.CreateInteractionTX(
 						accFrom.PrivateKey,
