@@ -168,20 +168,30 @@ func (s *SolanaInterface) ParseWorkload(workload workloadgenerators.WorkerThread
 func (s *SolanaInterface) parseBlocksForTransactions(slot uint64) {
 	s.logger.Debug("parseBlocksForTransactions", zap.Uint64("slot", slot))
 
-	block, err := s.PrimaryNode.rpcClient.GetBlockWithOpts(
-		context.Background(),
-		slot,
-		&rpc.GetBlockOpts{
-			Commitment: rpc.CommitmentFinalized,
-		})
+	var block *rpc.GetBlockResult
+	var err error
+	for attempt := 0; attempt < 100; attempt++ {
+		includeRewards := false
+		block, err = s.PrimaryNode.rpcClient.GetBlockWithOpts(
+			context.Background(),
+			slot,
+			&rpc.GetBlockOpts{
+				TransactionDetails: rpc.TransactionDetailsSignatures,
+				Rewards:            &includeRewards,
+				Commitment:         rpc.CommitmentFinalized,
+			})
 
-	if err != nil {
-		s.logger.Warn("parseBlocksForTransactions", zap.Error(err))
-		return
-	}
-	if block == nil {
-		s.logger.Warn("Empty block", zap.Error(err))
-		return
+		if err != nil {
+			s.logger.Warn("parseBlocksForTransactions", zap.Error(err), zap.Int("attempt", attempt))
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+		if block == nil {
+			s.logger.Warn("Empty block", zap.Error(err), zap.Int("attempt", attempt))
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+		break
 	}
 
 	tNow := time.Now()
@@ -189,10 +199,10 @@ func (s *SolanaInterface) parseBlocksForTransactions(slot uint64) {
 
 	s.bigLock.Lock()
 
-	for _, v := range block.Transactions {
-		tHash := v.Transaction.Signatures[0].String()
-		if _, ok := s.TransactionInfo[tHash]; ok {
-			s.TransactionInfo[tHash] = append(s.TransactionInfo[tHash], tNow)
+	for _, v := range block.Signatures {
+		tHash := v.String()
+		if info, ok := s.TransactionInfo[tHash]; ok && len(info) == 1 {
+			info = append(info, tNow)
 			tAdd++
 		}
 	}
