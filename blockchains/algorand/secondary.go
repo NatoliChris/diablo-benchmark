@@ -182,17 +182,9 @@ func (this *Secondary) waitTransaction(index int, txid string) {
 	}
 }
 
-func (this *Secondary) SendTransaction(index int) error {
-	var tx *transaction = &this.transactions[index]
-	var now time.Time
+func (this *Secondary) sendTransaction(index int, tx *transaction) error {
 	var txid string
 	var err error
-
-	now = time.Now()
-	this.notifySubmit <- submitEvent{
-		index:  index,
-		when:   now,
-	}
 
 	txid, err = this.blockchain.SendTransaction(tx.endpoint, tx.raw)
 	if err != nil {
@@ -200,8 +192,23 @@ func (this *Secondary) SendTransaction(index int) error {
 	}
 
 	if this.pollBlocks == false {
-		go this.waitTransaction(index, txid)
+		this.waitTransaction(index, txid)
 	}
+
+	return nil
+}
+
+func (this *Secondary) SendTransaction(index int) error {
+	var tx *transaction = &this.transactions[index]
+	var now time.Time
+
+	now = time.Now()
+	this.notifySubmit <- submitEvent{
+		index:  index,
+		when:   now,
+	}
+
+	go this.sendTransaction(index, tx)
 
 	return nil
 }
