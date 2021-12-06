@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/dfuse-io/logging"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -103,6 +104,7 @@ func prepareLogger(logType string, level zapcore.Level) {
 	fileSync := zapcore.AddSync(file)
 	fileEncoder := zapcore.NewJSONEncoder(fileConfig)
 	fileLevel := zap.NewAtomicLevel()
+	fileLevel.SetLevel(level)
 	fileCore := zapcore.NewCore(fileEncoder, fileSync, fileLevel)
 
 	// Set up both the loggers
@@ -113,6 +115,7 @@ func prepareLogger(logType string, level zapcore.Level) {
 
 	logger := zap.New(cores)
 	zap.ReplaceGlobals(logger)
+	logging.Set(logger)
 }
 
 // Run the primary functions
