@@ -26,10 +26,10 @@ type solanaClient struct {
 }
 
 type SolanaInterface struct {
-	PrimaryNode      *solanaClient          // The primary node connected for this client.
-	SecondaryNodes   []*solanaClient        // The other node information (for secure reads etc.)
-	SubscribeDone    chan bool              // Event channel that will unsub from events
-	TransactionInfo  map[string][]time.Time // Transaction information
+	Connections      []*solanaClient // Active connections to a blockchain node for information
+	NextConnection   uint64
+	SubscribeDone    chan bool                        // Event channel that will unsub from events
+	TransactionInfo  map[solana.Signature][]time.Time // Transaction information
 	bigLock          sync.Mutex
 	HandlersStarted  bool         // Have the handlers been initiated?
 	StartTime        time.Time    // Start time of the benchmark
@@ -39,6 +39,12 @@ type SolanaInterface struct {
 	GenericInterface
 }
 
+func (s *SolanaInterface) ActiveConn() *solanaClient {
+	i := atomic.AddUint64(&s.NextConnection, 1)
+	client := s.Connections[i%uint64(len(s.Connections))]
+	return client
+}
+
 func NewSolanaInterface() *SolanaInterface {
 	return &SolanaInterface{logger: zap.L().Named("SolanaInterface")}
 }
@@ -46,7 +52,7 @@ func NewSolanaInterface() *SolanaInterface {
 func (s *SolanaInterface) Init(chainConfig *configs.ChainConfig) {
 	s.logger.Debug("Init")
 	s.Nodes = chainConfig.Nodes
-	s.TransactionInfo = make(map[string][]time.Time, 0)
+	s.TransactionInfo = make(map[solana.Signature][]time.Time, 0)
 	s.SubscribeDone = make(chan bool)
 	s.HandlersStarted = false
 	s.NumTxDone = 0
@@ -70,7 +76,7 @@ func (s *SolanaInterface) Cleanup() results.Results {
 	success := uint(0)
 	fails := uint(s.Fail)
 
-	for _, v := range s.TransactionInfo {
+	for sig, v := range s.TransactionInfo {
 		if len(v) > 1 {
 			txLatency := v[1].Sub(v[0]).Milliseconds()
 			txLatencies = append(txLatencies, float64(txLatency))
@@ -81,6 +87,13 @@ func (s *SolanaInterface) Cleanup() results.Results {
 
 			success++
 		} else {
+			s.logger.Debug("Missing", zap.String("sig", sig.String()))
+			status, err := s.ActiveConn().rpcClient.GetSignatureStatuses(context.Background(), true, sig)
+			if err != nil {
+				s.logger.Debug("Status", zap.Error(err))
+			} else {
+				s.logger.Debug("Status", zap.Any("status", status.Value))
+			}
 			fails++
 		}
 	}
@@ -172,7 +185,7 @@ func (s *SolanaInterface) parseBlocksForTransactions(slot uint64) {
 	var err error
 	for attempt := 0; attempt < 100; attempt++ {
 		includeRewards := false
-		block, err = s.PrimaryNode.rpcClient.GetBlockWithOpts(
+		block, err = s.ActiveConn().rpcClient.GetBlockWithOpts(
 			context.Background(),
 			slot,
 			&rpc.GetBlockOpts{
@@ -182,12 +195,10 @@ func (s *SolanaInterface) parseBlocksForTransactions(slot uint64) {
 			})
 
 		if err != nil {
-			s.logger.Warn("parseBlocksForTransactions", zap.Error(err), zap.Int("attempt", attempt))
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
 		if block == nil {
-			s.logger.Warn("Empty block", zap.Error(err), zap.Int("attempt", attempt))
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
@@ -199,10 +210,9 @@ func (s *SolanaInterface) parseBlocksForTransactions(slot uint64) {
 
 	s.bigLock.Lock()
 
-	for _, v := range block.Signatures {
-		tHash := v.String()
-		if info, ok := s.TransactionInfo[tHash]; ok && len(info) == 1 {
-			info = append(info, tNow)
+	for _, sig := range block.Signatures {
+		if info, ok := s.TransactionInfo[sig]; ok && len(info) == 1 {
+			s.TransactionInfo[sig] = append(info, tNow)
 			tAdd++
 		}
 	}
@@ -210,12 +220,13 @@ func (s *SolanaInterface) parseBlocksForTransactions(slot uint64) {
 	s.bigLock.Unlock()
 
 	atomic.AddUint64(&s.NumTxDone, tAdd)
+	s.logger.Debug("Stats", zap.Uint64("sent", atomic.LoadUint64(&s.NumTxSent)), zap.Uint64("done", atomic.LoadUint64(&s.NumTxDone)))
 }
 
 // EventHandler subscribes to the blocks and handles the incoming information about the transactions
 func (s *SolanaInterface) EventHandler() {
 	s.logger.Debug("EventHandler")
-	sub, err := s.PrimaryNode.wsClient.RootSubscribe()
+	sub, err := s.ActiveConn().wsClient.RootSubscribe()
 	if err != nil {
 		s.logger.Warn("RootSubscribe", zap.Error(err))
 		return
@@ -228,6 +239,7 @@ func (s *SolanaInterface) EventHandler() {
 		}
 	}()
 
+	var currentSlot uint64 = 0
 	for {
 		got, err := sub.Recv()
 		if err != nil {
@@ -238,6 +250,15 @@ func (s *SolanaInterface) EventHandler() {
 			s.logger.Warn("Empty root")
 			return
 		}
+		if currentSlot == 0 {
+			s.logger.Debug("First slot", zap.Uint64("got", uint64(*got)))
+		} else if uint64(*got) <= currentSlot {
+			s.logger.Debug("Slot skipped", zap.Uint64("got", uint64(*got)), zap.Uint64("current", currentSlot))
+			continue
+		} else if uint64(*got) > currentSlot+1 {
+			s.logger.Fatal("Missing slot update", zap.Uint64("got", uint64(*got)), zap.Uint64("current", currentSlot))
+		}
+		currentSlot = uint64(*got)
 		// Got a head
 		go s.parseBlocksForTransactions(uint64(*got))
 	}
@@ -245,37 +266,7 @@ func (s *SolanaInterface) EventHandler() {
 
 func (s *SolanaInterface) ConnectOne(id int) error {
 	s.logger.Debug("ConnectOne")
-	// If our ID is greater than the nodes we know, there's a problem!
-
-	if id >= len(s.Nodes) {
-		return errors.New("invalid client ID")
-	}
-
-	// Connect to the node
-	conn := rpc.New(fmt.Sprintf("http://%s", s.Nodes[id]))
-
-	ip, portStr, err := net.SplitHostPort(s.Nodes[id])
-	if err != nil {
-		return err
-	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return err
-	}
-
-	sock, err := ws.Connect(context.Background(), fmt.Sprintf("ws://%s", net.JoinHostPort(ip, strconv.Itoa(port+1))))
-	if err != nil {
-		return err
-	}
-
-	s.PrimaryNode = &solanaClient{conn, sock}
-
-	if !s.HandlersStarted {
-		go s.EventHandler()
-		s.HandlersStarted = true
-	}
-
-	return nil
+	return errors.New("do not use")
 }
 
 func (s *SolanaInterface) ConnectAll(primaryID int) error {
@@ -285,34 +276,30 @@ func (s *SolanaInterface) ConnectAll(primaryID int) error {
 		return errors.New("invalid client primary ID")
 	}
 
-	// primary connect
-	err := s.ConnectOne(primaryID)
+	// Connect all the others
+	for _, node := range s.Nodes {
+		conn := rpc.New(fmt.Sprintf("http://%s", node))
 
-	if err != nil {
-		return err
+		ip, portStr, err := net.SplitHostPort(node)
+		if err != nil {
+			return err
+		}
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			return err
+		}
+
+		sock, err := ws.Connect(context.Background(), fmt.Sprintf("ws://%s", net.JoinHostPort(ip, strconv.Itoa(port+1))))
+		if err != nil {
+			return err
+		}
+
+		s.Connections = append(s.Connections, &solanaClient{conn, sock})
 	}
 
-	// Connect all the others
-	for idx, node := range s.Nodes {
-		if idx != primaryID {
-			conn := rpc.New(fmt.Sprintf("http://%s", node))
-
-			ip, portStr, err := net.SplitHostPort(node)
-			if err != nil {
-				return err
-			}
-			port, err := strconv.Atoi(portStr)
-			if err != nil {
-				return err
-			}
-
-			sock, err := ws.Connect(context.Background(), fmt.Sprintf("ws://%s", net.JoinHostPort(ip, strconv.Itoa(port+1))))
-			if err != nil {
-				return err
-			}
-
-			s.SecondaryNodes = append(s.SecondaryNodes, &solanaClient{conn, sock})
-		}
+	if !s.HandlersStarted {
+		go s.EventHandler()
+		s.HandlersStarted = true
 	}
 
 	return nil
@@ -324,12 +311,10 @@ func (s *SolanaInterface) DeploySmartContract(tx interface{}) (interface{}, erro
 }
 
 func (s *SolanaInterface) SendRawTransaction(tx interface{}) error {
-	s.logger.Debug("SendRawTransaction")
-
 	go func() {
 		transaction := tx.(*solana.Transaction)
 
-		_, err := s.PrimaryNode.rpcClient.SendTransactionWithOpts(context.Background(), transaction, false, rpc.CommitmentFinalized)
+		sig, err := s.ActiveConn().rpcClient.SendTransactionWithOpts(context.Background(), transaction, false, rpc.CommitmentFinalized)
 		if err != nil {
 			s.logger.Debug("Err",
 				zap.Error(err),
@@ -339,7 +324,7 @@ func (s *SolanaInterface) SendRawTransaction(tx interface{}) error {
 		}
 
 		s.bigLock.Lock()
-		s.TransactionInfo[transaction.Signatures[0].String()] = []time.Time{time.Now()}
+		s.TransactionInfo[sig] = []time.Time{time.Now()}
 		s.bigLock.Unlock()
 
 		atomic.AddUint64(&s.NumTxSent, 1)
@@ -370,11 +355,8 @@ func (s *SolanaInterface) ParseBlocksForTransactions(startNumber uint64, endNumb
 
 func (s *SolanaInterface) Close() {
 	s.logger.Debug("Close")
-	// Close the main client connection
-	s.PrimaryNode.wsClient.Close()
-
-	// Close all other connections
-	for _, client := range s.SecondaryNodes {
+	// Close all connections
+	for _, client := range s.Connections {
 		client.wsClient.Close()
 	}
 }
