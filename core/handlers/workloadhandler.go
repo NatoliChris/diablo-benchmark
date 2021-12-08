@@ -203,7 +203,7 @@ func (wh *WorkloadHandler) RunBench() error {
 	zap.L().Info("Sending complete, waiting for finish")
 	stopPrinting <- true
 
-	waitingTicker := time.NewTicker(30 * time.Second)
+	waitingTicker := time.NewTicker(1 * time.Second)
 	waitCount := 0
 	td := uint64(0)
 	for {
