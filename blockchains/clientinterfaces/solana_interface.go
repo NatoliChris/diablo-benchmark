@@ -76,7 +76,7 @@ func (s *SolanaInterface) Cleanup() results.Results {
 	success := uint(0)
 	fails := uint(s.Fail)
 
-	for sig, v := range s.TransactionInfo {
+	for _, v := range s.TransactionInfo {
 		if len(v) > 1 {
 			txLatency := v[1].Sub(v[0]).Milliseconds()
 			txLatencies = append(txLatencies, float64(txLatency))
@@ -87,13 +87,6 @@ func (s *SolanaInterface) Cleanup() results.Results {
 
 			success++
 		} else {
-			s.logger.Debug("Missing", zap.String("sig", sig.String()))
-			status, err := s.ActiveConn().rpcClient.GetSignatureStatuses(context.Background(), true, sig)
-			if err != nil {
-				s.logger.Debug("Status", zap.Error(err))
-			} else {
-				s.logger.Debug("Status", zap.Any("status", status.Value))
-			}
 			fails++
 		}
 	}
