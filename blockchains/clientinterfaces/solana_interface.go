@@ -76,7 +76,7 @@ func (s *SolanaInterface) Cleanup() results.Results {
 	success := uint(0)
 	fails := uint(s.Fail)
 
-	for sig, v := range s.TransactionInfo {
+	for _, v := range s.TransactionInfo {
 		if len(v) > 1 {
 			txLatency := v[1].Sub(v[0]).Milliseconds()
 			txLatencies = append(txLatencies, float64(txLatency))
@@ -87,13 +87,6 @@ func (s *SolanaInterface) Cleanup() results.Results {
 
 			success++
 		} else {
-			s.logger.Debug("Missing", zap.String("sig", sig.String()))
-			status, err := s.ActiveConn().rpcClient.GetSignatureStatuses(context.Background(), true, sig)
-			if err != nil {
-				s.logger.Debug("Status", zap.Error(err))
-			} else {
-				s.logger.Debug("Status", zap.Any("status", status.Value))
-			}
 			fails++
 		}
 	}
@@ -205,6 +198,11 @@ func (s *SolanaInterface) parseBlocksForTransactions(slot uint64) {
 		break
 	}
 
+	if block == nil {
+		s.logger.Warn("Empty block", zap.Uint64("slot", slot))
+		return
+	}
+
 	tNow := time.Now()
 	var tAdd uint64
 
@@ -250,17 +248,22 @@ func (s *SolanaInterface) EventHandler() {
 			s.logger.Warn("Empty root")
 			return
 		}
+		newSlot := uint64(*got)
 		if currentSlot == 0 {
-			s.logger.Debug("First slot", zap.Uint64("got", uint64(*got)))
-		} else if uint64(*got) <= currentSlot {
-			s.logger.Debug("Slot skipped", zap.Uint64("got", uint64(*got)), zap.Uint64("current", currentSlot))
+			s.logger.Debug("First slot", zap.Uint64("got", newSlot))
+		} else if newSlot <= currentSlot {
+			s.logger.Debug("Slot skipped", zap.Uint64("got", newSlot), zap.Uint64("current", currentSlot))
 			continue
-		} else if uint64(*got) > currentSlot+1 {
-			s.logger.Fatal("Missing slot update", zap.Uint64("got", uint64(*got)), zap.Uint64("current", currentSlot))
+		} else if newSlot > currentSlot+1 {
+			s.logger.Debug("Missing slot update, requesting missing slots", zap.Uint64("got", newSlot), zap.Uint64("current", currentSlot))
+			for currentSlot+1 < newSlot {
+				currentSlot++
+				go s.parseBlocksForTransactions(currentSlot)
+			}
 		}
-		currentSlot = uint64(*got)
+		currentSlot = newSlot
 		// Got a head
-		go s.parseBlocksForTransactions(uint64(*got))
+		go s.parseBlocksForTransactions(currentSlot)
 	}
 }
 

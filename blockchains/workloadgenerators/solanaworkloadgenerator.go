@@ -255,7 +255,7 @@ func (s *SolanaWorkloadGenerator) createInitializeNonceTx(fromWallet *SolanaWall
 		).Build()).SetFeePayer(fromWallet.PublicKey)
 }
 
-func (s *SolanaWorkloadGenerator) parseBlocksForTransactions(slot uint64) []solana.Signature {
+func (s *SolanaWorkloadGenerator) parseBlocksForTransactions(slot uint64, sigs map[solana.Signature]struct{}) {
 	s.logger.Debug("parseBlocksForTransactions", zap.Uint64("slot", slot))
 
 	var block *rpc.GetBlockResult
@@ -283,10 +283,15 @@ func (s *SolanaWorkloadGenerator) parseBlocksForTransactions(slot uint64) []sola
 	}
 
 	if block == nil {
-		return []solana.Signature{}
+		s.logger.Warn("Empty block", zap.Uint64("slot", slot))
+		return
 	}
 
-	return block.Signatures
+	for _, sig := range block.Signatures {
+		delete(sigs, sig)
+	}
+
+	s.logger.Debug("Signatures left", zap.Int("len", len(sigs)))
 }
 
 func (s *SolanaWorkloadGenerator) sendTransactionsAndWait(transactionBuilders []*solana.TransactionBuilder) error {
@@ -338,23 +343,28 @@ func (s *SolanaWorkloadGenerator) sendTransactionsAndWait(transactionBuilders []
 			s.logger.Warn("Empty root")
 			return nil
 		}
+		newSlot := uint64(*got)
 		if currentSlot == 0 {
-			s.logger.Debug("First slot", zap.Uint64("got", uint64(*got)))
-		} else if uint64(*got) <= currentSlot {
-			s.logger.Debug("Slot skipped", zap.Uint64("got", uint64(*got)), zap.Uint64("current", currentSlot))
+			s.logger.Debug("First slot", zap.Uint64("got", newSlot))
+		} else if newSlot <= currentSlot {
+			s.logger.Debug("Slot skipped", zap.Uint64("got", newSlot), zap.Uint64("current", currentSlot))
 			continue
-		} else if uint64(*got) > currentSlot+1 {
-			s.logger.Fatal("Missing slot update", zap.Uint64("got", uint64(*got)), zap.Uint64("current", currentSlot))
+		} else if newSlot > currentSlot+1 {
+			s.logger.Debug("Missing slot update, requesting missing slots", zap.Uint64("got", newSlot), zap.Uint64("current", currentSlot))
+			for currentSlot+1 < newSlot {
+				currentSlot++
+				s.parseBlocksForTransactions(currentSlot, sigs)
+				if len(sigs) == 0 {
+					return nil
+				}
+			}
 		}
-		currentSlot = uint64(*got)
+		currentSlot = newSlot
 		// Got a head
-		for _, sig := range s.parseBlocksForTransactions(uint64(*got)) {
-			delete(sigs, sig)
-		}
+		s.parseBlocksForTransactions(currentSlot, sigs)
 		if len(sigs) == 0 {
 			return nil
 		}
-		s.logger.Debug("Signatures left", zap.Int("len", len(sigs)))
 	}
 }
 
