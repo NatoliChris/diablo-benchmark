@@ -78,6 +78,11 @@ func (this *Secondary) ParseWorkload(workload [][]byte) error {
 			return err
 		}
 
+		// Quick fix for deadline of 2021-12-14
+		// Purpose: force per-region access
+		// Remove me
+		this.transactions[i].endpoint = this.transactions[i].endpoint % this.blockchain.Population()
+
 		this.uidmap[this.transactions[i].uid] = i
 	}
 
