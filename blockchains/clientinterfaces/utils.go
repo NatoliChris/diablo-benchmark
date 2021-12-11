@@ -2,6 +2,7 @@ package clientinterfaces
 
 import (
 	"diablo-benchmark/blockchains/algorand"
+	"diablo-benchmark/blockchains/diem"
 	"diablo-benchmark/core/configs"
 	"fmt"
 )
@@ -12,6 +13,9 @@ func GetBlockchainInterface(config *configs.ChainConfig) (BlockchainInterface, e
 	switch config.Name {
 	case "algorand":
 		bci := NewWorkerBridge(algorand.NewWorker())
+		return bci, nil
+	case "diem":
+		bci := NewWorkerBridge(diem.NewWorker())
 		return bci, nil
 	case "ethereum":
 		bci := EthereumInterface{}
