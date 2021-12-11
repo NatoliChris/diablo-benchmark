@@ -272,8 +272,10 @@ func (e *EthereumInterface) ConnectOne(id int) error {
 // ConnectAll connects to all nodes given in the hosts
 func (e *EthereumInterface) ConnectAll(primaryID int) error {
 	// If our ID is greater than the nodes we know, there's a problem!
+	// OSDI22 fix: there is no problem, keep going...
 	if primaryID >= len(e.Nodes) {
-		return errors.New("invalid client primary ID")
+		// return errors.New("invalid client primary ID")
+		primaryID = primaryID % len(e.Nodes)
 	}
 
 	// primary connect
