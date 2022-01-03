@@ -72,9 +72,16 @@ func (e *EthereumWorkloadGenerator) BlockchainSetup() error {
 	return nil
 }
 
+type noncePair struct {
+	account  string
+	nonce    uint64
+}
+
 // InitParams sets initial aspects such as the suggested gas price and sets up a small connection to get information from the blockchain.
 func (e *EthereumWorkloadGenerator) InitParams() error {
 	// Connect to the blockchain
+	zap.L().Debug("dial node[0]",
+		zap.String("address", e.ChainConfig.Nodes[0]))
 	c, err := ethclient.Dial(fmt.Sprintf("ws://%s", e.ChainConfig.Nodes[0]))
 
 	if err != nil {
@@ -84,6 +91,7 @@ func (e *EthereumWorkloadGenerator) InitParams() error {
 	e.ActiveConn = c
 
 	// Get the suggested gas price from the network using a client connected
+	zap.L().Debug("get gas price")
 	e.SuggestedGasPrice, err = e.ActiveConn.SuggestGasPrice(context.Background())
 
 	if err != nil {
@@ -100,13 +108,31 @@ func (e *EthereumWorkloadGenerator) InitParams() error {
 	// nonces
 	e.Nonces = make(map[string]uint64, 0)
 
+	nonceChan := make(chan *noncePair, 100)
+
 	for _, key := range e.KnownAccounts {
-		v, err := e.ActiveConn.PendingNonceAt(context.Background(), common.HexToAddress(key.Address))
-		if err != nil {
-			return err
+		if len(nonceChan) >= cap(nonceChan) {
+			pair := <-nonceChan
+			e.Nonces[pair.account] = pair.nonce
 		}
 
-		e.Nonces[strings.ToLower(key.Address)] = v
+		zap.L().Debug("get pending nonce",
+			zap.String("account", fmt.Sprintf("%v", key.Address)))
+
+		go func(account string) {
+			v, err := e.ActiveConn.PendingNonceAt(context.Background(), common.HexToAddress(account))
+
+			if err != nil {
+				panic(err)
+			}
+
+			nonceChan <- &noncePair{account: account, nonce: v}
+		}(key.Address)
+	}
+
+	for len(nonceChan) > 0 {
+		pair := <-nonceChan
+		e.Nonces[pair.account] = pair.nonce
 	}
 
 	zap.L().Info("Blockchain client contacted and got params",

@@ -32,6 +32,10 @@ type EthereumInterface struct {
 	StartTime        time.Time              // Start time of the benchmark
 	ThroughputTicker *time.Ticker           // Ticker for throughput (1s)
 	Throughputs      []float64              // Throughput over time with 1 second intervals
+
+	// Quick fix for OSDI22
+	rrEndpoint       int
+
 	GenericInterface
 }
 
@@ -42,6 +46,7 @@ func (e *EthereumInterface) Init(chainConfig *configs.ChainConfig) {
 	e.SubscribeDone = make(chan bool)
 	e.HandlersStarted = false
 	e.NumTxDone = 0
+	e.rrEndpoint = 0
 }
 
 // Cleanup formats results and unsubscribes from the blockchain
@@ -267,8 +272,10 @@ func (e *EthereumInterface) ConnectOne(id int) error {
 // ConnectAll connects to all nodes given in the hosts
 func (e *EthereumInterface) ConnectAll(primaryID int) error {
 	// If our ID is greater than the nodes we know, there's a problem!
+	// OSDI22 fix: there is no problem, keep going...
 	if primaryID >= len(e.Nodes) {
-		return errors.New("invalid client primary ID")
+		// return errors.New("invalid client primary ID")
+		primaryID = primaryID % len(e.Nodes)
 	}
 
 	// primary connect
@@ -315,10 +322,18 @@ func (e *EthereumInterface) DeploySmartContract(tx interface{}) (interface{}, er
 	return r.ContractAddress, nil
 }
 
-func (e *EthereumInterface) _sendTx(txSigned ethtypes.Transaction) {
+func (e *EthereumInterface) _sendTx(endpoint int, txSigned ethtypes.Transaction) {
 	// timoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
 
-	err := e.PrimaryNode.SendTransaction(context.Background(), &txSigned)
+	var client *ethclient.Client
+
+	if endpoint == 0 {
+		client = e.PrimaryNode
+	} else {
+		client = e.SecondaryNodes[endpoint-1]
+	}
+
+	err := client.SendTransaction(context.Background(), &txSigned)
 
 	// The transaction failed - this could be if it was reproposed, or, just failed.
 	// We need to make sure that if it was re-proposed it doesn't count as a "success" on this node.
@@ -343,7 +358,11 @@ func (e *EthereumInterface) _sendTx(txSigned ethtypes.Transaction) {
 func (e *EthereumInterface) SendRawTransaction(tx interface{}) error {
 	// NOTE: type conversion might be slow, there might be a better way to send this.
 	txSigned := tx.(*ethtypes.Transaction)
-	go e._sendTx(*txSigned)
+	var endpoint = e.rrEndpoint
+
+	e.rrEndpoint = (e.rrEndpoint + 1) % (len(e.SecondaryNodes) + 1)
+
+	go e._sendTx(endpoint, *txSigned)
 
 	return nil
 }

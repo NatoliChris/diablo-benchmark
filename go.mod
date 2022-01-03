@@ -3,7 +3,7 @@ module diablo-benchmark
 go 1.14
 
 require (
-	github.com/algorand/go-algorand-sdk v1.11.0
+	github.com/algorand/go-algorand-sdk v1.6.0
 	github.com/ethereum/go-ethereum v1.9.15
 	github.com/gagliardetto/binary v0.5.0
 	github.com/gagliardetto/solana-go v1.0.2
