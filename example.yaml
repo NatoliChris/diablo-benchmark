@@ -1,0 +1,46 @@
+# Three areas: Asia Pacific, Europe and United States
+# With 100 clients per area
+# Each client accesses the blockchain through the endpoints of its own area
+# Each client sends 1 stake every second to 2 other clients in the same area
+# Each client sends 1 stake every 5 seconds to 1 other client in another area
+
+let:
+
+  # Capture endpoints of each area in a dedicated variable.
+  - &endpoint_ap { sample: !endpoint [ "ap-*" ], random: !normal }
+  - &endpoint_eu { sample: !endpoint [ "eu-*" ], random: !normal }
+  - &endpoint_us { sample: !endpoint [ "us-*" ], random: !normal }
+
+  # Capture client locations of each area in a dedicated variable.
+  - &location_ap { sample: !location [ "ap-*" ] }
+  - &location_eu { sample: !location [ "eu-*" ] }
+  - &location_us { sample: !location [ "us-*" ] }
+
+  # Create 100 accounts with initial stake for each region
+  - &account_ap { sample: !balance { number: 100, stake: 1000000000 } }
+  - &account_eu { sample: !balance { number: 100, stake: 1000000000 } }
+  - &account_us { sample: !balance { number: 100, stake: 1000000000 } }
+
+workloads:
+
+  - number: 100
+    let:
+      - !iter &froms { copy: *account_ap }
+      - &remote { compose: !union [ *account_eu, *account_us ] }
+    client:
+      endpoint: *endpoint_ap
+      location: *location_ap
+      let:
+        - &from { compose: !pick { from: *froms } }
+        - &local { compose: !exclude { base: *account_ap, diff: *from } }
+      behavior:
+        - load: { 0: 2, 60: 0 }
+          interaction: !transfer
+            stake: 1
+            from: *from
+            to: *local
+        - load: { 0: 0.2, 60: 0 }
+          interaction: !transfer
+            stake: 1
+            from: *from
+            to: *remote

@@ -1,0 +1,40 @@
+let:
+
+  - &europe
+    sample: !endpoint [ "ap-.*" ]
+
+  - !loop &europe_loc
+    sample: !location [ "ap-.*" ]
+
+  - &account { sample: !balance { number: 10, stake: 1000000000 } }
+
+  - &offset
+    sample: !float { from: 0, to: 0.999 }
+
+workloads:
+
+  - number: 6
+    client:
+      location: *europe_loc
+      view: *europe
+      behavior:
+        - interaction: !transfer { from: *account, to: *account }
+          load:
+            *offset:  1
+            5:        2
+            7:        0
+        - interaction: !transfer { stake: 10, from: *account, to: *account }
+          load:
+            *offset:  1
+            10:       0
+
+  - client:
+      location: *europe_loc
+      view: *europe
+      behavior:
+        - load: { 0: 0.2, 10: 0 }
+          interaction: !transfer
+            let:
+              - !iter &iaccount { copy: *account }
+            from: *iaccount
+            to: *iaccount

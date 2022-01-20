@@ -24,6 +24,7 @@ import (
 	"diablo-benchmark/core/configs/parsers"
 	"fmt"
 	"os"
+	"time"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -199,9 +200,21 @@ func main() {
 	args := core.DefineArguments()
 
 	if len(os.Args) < 2 {
-		// This is going to be a primary
-		fmt.Fprintf(os.Stderr, "No subcommand given (primary/secondary), exiting!")
-		os.Exit(1)
+		var blockchain core.TestBlockchainInterface
+		var system *core.Core
+		var setup core.Setup
+		var err error
+
+		setup, err = core.ParseSetupYamlPath("setup.yaml")
+		if err != nil {
+			panic(err)
+		}
+
+		system = core.New(time.Now().Unix(), setup, &blockchain)
+		err = core.ParseBenchmarkYamlPath("benchmark.yaml", system)
+		if err != nil {
+			panic(err)
+		}
 	} else {
 		switch os.Args[1] {
 		case "primary":
