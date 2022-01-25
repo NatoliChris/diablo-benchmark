@@ -28,7 +28,7 @@ const (
 
 // DefaultTimeout is the default timeout for the benchmark if not provided
 // or overwritten by the args
-const DefaultTimeout int = 0
+const DefaultTimeout int = 20
 
 // TPSIntervals defines the "Transactions Per Second" send rate intervals
 type TPSIntervals map[int]int

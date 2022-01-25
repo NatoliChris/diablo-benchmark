@@ -1,6 +1,8 @@
 package clientinterfaces
 
 import (
+	"bufio"
+	"compress/gzip"
 	"context"
 	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/core/configs"
@@ -9,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -20,9 +23,63 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	DEFAULT_MS_PER_SLOT int = 400
+)
+
 type solanaClient struct {
-	rpcClient *rpc.Client
-	wsClient  *ws.Client
+	rpcClient            *rpc.Client
+	wsClient             *ws.Client
+	blockhashRequestTime time.Time
+	blockhash            solana.Hash
+	blockhashLock        sync.RWMutex
+	exitSignal           uint32
+}
+
+func (c *solanaClient) Blockhash() solana.Hash {
+	c.blockhashLock.RLock()
+	defer c.blockhashLock.RUnlock()
+	return c.blockhash
+}
+
+func (c *solanaClient) PollBlockhash() {
+	for {
+		now := time.Now()
+		blockhash, err := c.rpcClient.GetRecentBlockhash(
+			context.Background(),
+			rpc.CommitmentFinalized)
+		if err != nil {
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+		if blockhash.Value.Blockhash != c.Blockhash() {
+			c.blockhashLock.Lock()
+			c.blockhash = blockhash.Value.Blockhash
+			c.blockhashRequestTime = now
+			c.blockhashLock.Unlock()
+		}
+		if atomic.LoadUint32(&c.exitSignal) == 1 {
+			break
+		}
+		time.Sleep(time.Duration(DEFAULT_MS_PER_SLOT/2) * time.Millisecond)
+	}
+}
+
+func (c *solanaClient) Stop() {
+	atomic.StoreUint32(&c.exitSignal, 1)
+}
+
+type SolanaWallet struct {
+	PrivateKey solana.PrivateKey
+	PublicKey  solana.PublicKey
+}
+
+func NewSolanaWallet(priv solana.PrivateKey) *SolanaWallet {
+	return &SolanaWallet{PrivateKey: priv, PublicKey: priv.PublicKey()}
+}
+
+func NewSolanaWalletWithPublic(priv solana.PrivateKey, pub string) *SolanaWallet {
+	return &SolanaWallet{PrivateKey: priv, PublicKey: solana.MustPublicKeyFromBase58(pub)}
 }
 
 type SolanaInterface struct {
@@ -31,10 +88,12 @@ type SolanaInterface struct {
 	SubscribeDone    chan bool                        // Event channel that will unsub from events
 	TransactionInfo  map[solana.Signature][]time.Time // Transaction information
 	bigLock          sync.Mutex
-	HandlersStarted  bool         // Have the handlers been initiated?
-	StartTime        time.Time    // Start time of the benchmark
-	ThroughputTicker *time.Ticker // Ticker for throughput (1s)
-	Throughputs      []float64    // Throughput over time with 1 second intervals
+	HandlersStarted  bool            // Have the handlers been initiated?
+	StartTime        time.Time       // Start time of the benchmark
+	ThroughputTicker *time.Ticker    // Ticker for throughput (1s)
+	Throughputs      []float64       // Throughput over time with 1 second intervals
+	KnownAccounts    []*SolanaWallet // Known accounds, public:private key pair
+	PrivateKeys      map[solana.PublicKey]*solana.PrivateKey
 	logger           *zap.Logger
 	GenericInterface
 }
@@ -56,6 +115,48 @@ func (s *SolanaInterface) Init(chainConfig *configs.ChainConfig) {
 	s.SubscribeDone = make(chan bool)
 	s.HandlersStarted = false
 	s.NumTxDone = 0
+
+	if len(chainConfig.Keys) > 0 {
+		s.KnownAccounts = make([]*SolanaWallet, 0, len(chainConfig.Keys))
+		for _, key := range chainConfig.Keys {
+			wallet := NewSolanaWalletWithPublic(key.PrivateKey, key.Address)
+			s.KnownAccounts = append(s.KnownAccounts, wallet)
+		}
+	}
+	if len(chainConfig.Extra) > 0 {
+		numKeys := chainConfig.Extra[0].(int)
+		gzfile, err := os.Open(chainConfig.Extra[1].(string))
+		if err != nil {
+			s.logger.Fatal("Failed to open accounts file", zap.Error(err))
+		}
+		accountFileKeys := make([]*SolanaWallet, 0, numKeys)
+		s.logger.Debug("Unmarshal accounts yaml")
+		file, err := gzip.NewReader(gzfile)
+		if err != nil {
+			s.logger.Fatal("Failed to create gzip reader", zap.Error(err))
+		}
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := scanner.Bytes()
+			if line[1] == '[' {
+				var priv solana.PrivateKey
+				err := json.Unmarshal(line[1:len(line)-2], &priv)
+				if err != nil {
+					s.logger.Fatal("Failed to unmarshal private key", zap.Error(err))
+				}
+
+				wallet := NewSolanaWallet(priv)
+				accountFileKeys = append(accountFileKeys, wallet)
+			}
+		}
+		s.KnownAccounts = append(s.KnownAccounts, accountFileKeys...)
+		s.logger.Debug("Unmarshal accounts yaml done")
+	}
+
+	s.PrivateKeys = make(map[solana.PublicKey]*solana.PrivateKey, len(s.KnownAccounts)*2+2)
+	for _, acc := range s.KnownAccounts {
+		s.PrivateKeys[acc.PublicKey] = &acc.PrivateKey
+	}
 }
 
 func (s *SolanaInterface) Cleanup() results.Results {
@@ -66,6 +167,10 @@ func (s *SolanaInterface) Cleanup() results.Results {
 	// clean up connections and format results
 	if s.HandlersStarted {
 		s.SubscribeDone <- true
+	}
+
+	for _, connection := range s.Connections {
+		connection.Stop()
 	}
 
 	txLatencies := make([]float64, 0)
@@ -154,13 +259,13 @@ func (s *SolanaInterface) ParseWorkload(workload workloadgenerators.WorkerThread
 	for _, v := range workload {
 		intervalTxs := make([]interface{}, 0)
 		for _, txBytes := range v {
-			t := solana.Transaction{}
+			var t *solana.Transaction
 			err := json.Unmarshal(txBytes, &t)
 			if err != nil {
 				return nil, err
 			}
 
-			intervalTxs = append(intervalTxs, &t)
+			intervalTxs = append(intervalTxs, t)
 		}
 		parsedWorkload = append(parsedWorkload, intervalTxs)
 	}
@@ -297,7 +402,17 @@ func (s *SolanaInterface) ConnectAll(primaryID int) error {
 			return err
 		}
 
-		s.Connections = append(s.Connections, &solanaClient{conn, sock})
+		now := time.Now()
+		blockhash, err := conn.GetRecentBlockhash(
+			context.Background(),
+			rpc.CommitmentFinalized)
+		if err != nil {
+			return err
+		}
+
+		s.Connections = append(s.Connections, &solanaClient{rpcClient: conn, wsClient: sock, blockhashRequestTime: now, blockhash: blockhash.Value.Blockhash})
+
+		go s.Connections[len(s.Connections)-1].PollBlockhash()
 	}
 
 	if !s.HandlersStarted {
@@ -313,17 +428,36 @@ func (s *SolanaInterface) DeploySmartContract(tx interface{}) (interface{}, erro
 	return nil, errors.New("not implemented")
 }
 
+func (s *SolanaInterface) getPrivateKey(key solana.PublicKey) *solana.PrivateKey {
+	return s.PrivateKeys[key]
+}
+
 func (s *SolanaInterface) SendRawTransaction(tx interface{}) error {
 	go func() {
-		transaction := tx.(*solana.Transaction)
-
-		sig, err := s.ActiveConn().rpcClient.SendTransactionWithOpts(context.Background(), transaction, false, rpc.CommitmentFinalized)
-		if err != nil {
+		handleError := func(err error) {
 			s.logger.Debug("Err",
 				zap.Error(err),
 			)
 			atomic.AddUint64(&s.Fail, 1)
 			atomic.AddUint64(&s.NumTxDone, 1)
+			atomic.AddUint64(&s.NumTxSent, 1)
+		}
+
+		transaction := tx.(*solana.Transaction)
+
+		conn := s.ActiveConn()
+		transaction.Message.RecentBlockhash = conn.Blockhash()
+
+		_, err := transaction.Sign(s.getPrivateKey)
+		if err != nil {
+			handleError(err)
+			return
+		}
+
+		sig, err := conn.rpcClient.SendTransactionWithOpts(context.Background(), transaction, false, rpc.CommitmentFinalized)
+		if err != nil {
+			handleError(err)
+			return
 		}
 
 		s.bigLock.Lock()

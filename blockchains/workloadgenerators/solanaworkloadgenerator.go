@@ -25,7 +25,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -34,56 +33,8 @@ import (
 )
 
 const (
-	PACKET_DATA_SIZE int    = 1280 - 40 - 8
-	NonceAccountSize uint64 = 80
+	PACKET_DATA_SIZE int = 1280 - 40 - 8
 )
-
-type NonceAccount struct {
-	Version          uint32
-	State            uint32
-	AuthorizedPubkey solana.PublicKey
-	Nonce            solana.PublicKey
-	FeeCalculator    FeeCalculator
-}
-
-type FeeCalculator struct {
-	LamportsPerSignature uint64
-}
-
-func (obj *NonceAccount) UnmarshalWithDecoder(decoder *bin.Decoder) (err error) {
-	{
-		obj.Version, err = decoder.ReadUint32(binary.LittleEndian)
-		if err != nil {
-			return err
-		}
-	}
-	{
-		obj.State, err = decoder.ReadUint32(binary.LittleEndian)
-		if err != nil {
-			return err
-		}
-	}
-	{
-		buf, err := decoder.ReadNBytes(32)
-		if err != nil {
-			return err
-		}
-		obj.AuthorizedPubkey = solana.PublicKeyFromBytes(buf)
-	}
-	{
-		buf, err := decoder.ReadNBytes(32)
-		if err != nil {
-			return err
-		}
-		obj.Nonce = solana.PublicKeyFromBytes(buf)
-	}
-	return obj.FeeCalculator.UnmarshalWithDecoder(decoder)
-}
-
-func (obj *FeeCalculator) UnmarshalWithDecoder(decoder *bin.Decoder) (err error) {
-	obj.LamportsPerSignature, err = decoder.ReadUint64(binary.LittleEndian)
-	return err
-}
 
 func calculateMaxChunkSize(
 	createTransaction func(offset int, data []byte) (*solana.Transaction, error),
@@ -150,21 +101,14 @@ func NewSolanaWalletWithPublic(priv solana.PrivateKey, pub string) *SolanaWallet
 	return &SolanaWallet{PrivateKey: priv, PublicKey: solana.MustPublicKeyFromBase58(pub)}
 }
 
-type NonceAccountEntry struct {
-	Account *SolanaWallet
-	Nonce   solana.Hash
-	// TODO partially generate workload?
-	Used bool
-}
-
 // SolanaWorkloadGenerator is the workload generator implementation for the Solana blockchain
 type SolanaWorkloadGenerator struct {
 	// SuggestedGasPrice *big.Int             // Suggested gas price on the network
 	Connections    []*solanaClient // Active connections to a blockchain node for information
 	NextConnection uint64
-	BenchConfig    *configs.BenchConfig                    // Benchmark configuration for workload intervals / type
-	ChainConfig    *configs.ChainConfig                    // Chain configuration to get number of transactions to make
-	NonceAccounts  map[solana.PublicKey]*NonceAccountEntry // Nonce of the known accounts
+	BenchConfig    *configs.BenchConfig // Benchmark configuration for workload intervals / type
+	ChainConfig    *configs.ChainConfig // Chain configuration to get number of transactions to make
+	// NonceAccounts  map[solana.PublicKey]*NonceAccountEntry // Nonce of the known accounts
 	// ChainID           *big.Int             // ChainID for transactions, provided through the ethereum API
 	KnownAccounts    []*SolanaWallet         // Known accounds, public:private key pair
 	CompiledContract *SolangDeployedContract // Compiled contract bytecode for the contract used in complex workloads
@@ -238,23 +182,6 @@ func (s *SolanaWorkloadGenerator) BlockchainSetup() error {
 	return nil
 }
 
-func (s *SolanaWorkloadGenerator) createInitializeNonceTx(fromWallet *SolanaWallet, nonceWallet *SolanaWallet, lamports uint64) *solana.TransactionBuilder {
-	return solana.NewTransactionBuilder().
-		AddInstruction(system.NewCreateAccountInstruction(
-			lamports,
-			NonceAccountSize,
-			solana.SystemProgramID,
-			fromWallet.PublicKey,
-			nonceWallet.PublicKey,
-		).Build()).
-		AddInstruction(system.NewInitializeNonceAccountInstruction(
-			fromWallet.PublicKey,
-			nonceWallet.PublicKey,
-			solana.SysVarRecentBlockHashesPubkey,
-			solana.SysVarRentPubkey,
-		).Build()).SetFeePayer(fromWallet.PublicKey)
-}
-
 func (s *SolanaWorkloadGenerator) parseBlocksForTransactions(slot uint64, sigs map[solana.Signature]struct{}) {
 	s.logger.Debug("parseBlocksForTransactions", zap.Uint64("slot", slot))
 
@@ -294,18 +221,18 @@ func (s *SolanaWorkloadGenerator) parseBlocksForTransactions(slot uint64, sigs m
 	s.logger.Debug("Signatures left", zap.Int("len", len(sigs)))
 }
 
-func (s *SolanaWorkloadGenerator) sendTransactionsAndWait(transactionBuilders []*solana.TransactionBuilder) error {
+func (s *SolanaWorkloadGenerator) sendTransactionsAndWait(transactions []*solana.Transaction) error {
 	sub, err := s.ActiveConn().wsClient.RootSubscribe()
 	if err != nil {
 		s.logger.Warn("RootSubscribe", zap.Error(err))
 		return err
 	}
 	defer sub.Unsubscribe()
-	sigs := make(map[solana.Signature]struct{}, len(transactionBuilders))
+	sigs := make(map[solana.Signature]struct{}, len(transactions))
 
 	statsTime := time.Now()
 
-	for _, txBuilder := range transactionBuilders {
+	for _, tx := range transactions {
 		tNow := time.Now()
 		if time.Since(statsTime) > 5*time.Second {
 			s.logger.Debug("Sent", zap.Int("sigs", len(sigs)))
@@ -318,10 +245,7 @@ func (s *SolanaWorkloadGenerator) sendTransactionsAndWait(transactionBuilders []
 		if err != nil {
 			return err
 		}
-		tx, err := txBuilder.SetRecentBlockHash(blockhash.Value.Blockhash).Build()
-		if err != nil {
-			return err
-		}
+		tx.Message.RecentBlockhash = blockhash.Value.Blockhash
 		_, err = tx.Sign(s.getPrivateKey)
 		if err != nil {
 			return err
@@ -389,54 +313,6 @@ func (s *SolanaWorkloadGenerator) InitParams() error {
 
 		s.Connections = append(s.Connections, &solanaClient{conn, sock})
 	}
-
-	// nonces
-	s.NonceAccounts = make(map[solana.PublicKey]*NonceAccountEntry, len(s.KnownAccounts))
-
-	for _, acc := range s.KnownAccounts {
-		entry := &NonceAccountEntry{}
-		entry.Account = NewSolanaWallet(solana.NewWallet().PrivateKey)
-		s.NonceAccounts[acc.PublicKey] = entry
-		s.PrivateKeys[entry.Account.PublicKey] = &entry.Account.PrivateKey
-	}
-
-	lamports, err := s.ActiveConn().rpcClient.GetMinimumBalanceForRentExemption(
-		context.Background(),
-		NonceAccountSize,
-		rpc.CommitmentFinalized)
-	if err != nil {
-		return err
-	}
-
-	transactionBuilders := make([]*solana.TransactionBuilder, 0, len(s.KnownAccounts))
-	s.logger.Debug("Generate nonce txs")
-	for _, acc := range s.KnownAccounts {
-		transactionBuilder := s.createInitializeNonceTx(acc, s.NonceAccounts[acc.PublicKey].Account, lamports)
-		transactionBuilders = append(transactionBuilders, transactionBuilder)
-	}
-	s.logger.Debug("Generate nonce txs done")
-	err = s.sendTransactionsAndWait(transactionBuilders)
-	if err != nil {
-		return err
-	}
-	for _, acc := range s.NonceAccounts {
-		accountInfo, err := s.ActiveConn().rpcClient.GetAccountInfo(context.Background(), acc.Account.PublicKey)
-		if err != nil {
-			return err
-		}
-		if accountInfo == nil {
-			return errors.New("empty nonce account")
-		}
-		nonceAccount := new(NonceAccount)
-		err = nonceAccount.UnmarshalWithDecoder(bin.NewBinDecoder(accountInfo.Value.Data.GetBinary()))
-		if err != nil {
-			return err
-		}
-
-		acc.Nonce = solana.Hash(nonceAccount.Nonce)
-		acc.Used = false
-	}
-
 	return nil
 }
 
@@ -451,7 +327,7 @@ func (s *SolanaWorkloadGenerator) DeployContract(fromPrivKey []byte, contractPat
 		return "", err
 	}
 
-	var txBatches [][]*solana.TransactionBuilder
+	var txBatches [][]*solana.Transaction
 	err = json.Unmarshal(txBatchesBytes, &txBatches)
 	if err != nil {
 		return "", err
@@ -631,19 +507,27 @@ func (s *SolanaWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, con
 		// 2 - call loader writes
 		// 3 - call loader finalize
 		// 4 - create storage account and call contract constructor
-		transactionBuilderBatches := make([][]*solana.TransactionBuilder, 4)
+		transactionBatches := make([][]*solana.Transaction, 4)
 
-		transactionBuilder := solana.NewTransactionBuilder().
-			SetFeePayer(priv.PublicKey).
-			AddInstruction(
-				system.NewCreateAccountInstruction(
-					lamports,
-					uint64(len(contract.Data)),
-					solana.BPFLoaderProgramID,
-					priv.PublicKey,
-					programAccount.PublicKey,
-				).Build())
-		transactionBuilderBatches[0] = append(transactionBuilderBatches[0], transactionBuilder)
+		createTransaction := func(instructions ...solana.Instruction) (*solana.Transaction, error) {
+			return solana.NewTransaction(
+				instructions,
+				solana.Hash{},
+				solana.TransactionPayer(priv.PublicKey))
+		}
+
+		transaction, err := createTransaction(
+			system.NewCreateAccountInstruction(
+				lamports,
+				uint64(len(contract.Data)),
+				solana.BPFLoaderProgramID,
+				priv.PublicKey,
+				programAccount.PublicKey,
+			).Build())
+		if err != nil {
+			return nil, err
+		}
+		transactionBatches[0] = append(transactionBatches[0], transaction)
 
 		createInstruction := func(offset int, chunk []byte) *solana.GenericInstruction {
 			data := make([]byte, len(chunk)+16)
@@ -676,25 +560,27 @@ func (s *SolanaWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, con
 			if end > len(contract.Data) {
 				end = len(contract.Data)
 			}
-			transactionBuilder = solana.NewTransactionBuilder().
-				SetFeePayer(priv.PublicKey).
-				AddInstruction(createInstruction(i, contract.Data[i:end]))
-			transactionBuilderBatches[1] = append(transactionBuilderBatches[1], transactionBuilder)
+			transaction, err = createTransaction(createInstruction(i, contract.Data[i:end]))
+			if err != nil {
+				return nil, err
+			}
+			transactionBatches[1] = append(transactionBatches[1], transaction)
 		}
 
 		{
 			data := make([]byte, 4)
 			binary.LittleEndian.PutUint32(data[0:], 1)
-			transactionBuilder = solana.NewTransactionBuilder().
-				SetFeePayer(priv.PublicKey).
-				AddInstruction(solana.NewInstruction(
-					solana.BPFLoaderProgramID,
-					solana.AccountMetaSlice{
-						solana.NewAccountMeta(programAccount.PublicKey, true, true),
-					},
-					data,
-				))
-			transactionBuilderBatches[2] = append(transactionBuilderBatches[2], transactionBuilder)
+			transaction, err = createTransaction(solana.NewInstruction(
+				solana.BPFLoaderProgramID,
+				solana.AccountMetaSlice{
+					solana.NewAccountMeta(programAccount.PublicKey, true, true),
+				},
+				data,
+			))
+			if err != nil {
+				return nil, err
+			}
+			transactionBatches[2] = append(transactionBatches[2], transaction)
 		}
 
 		lamports, err = s.ActiveConn().rpcClient.GetMinimumBalanceForRentExemption(
@@ -725,30 +611,30 @@ func (s *SolanaWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, con
 			data = append(data, encodeSeeds()...)
 			data = append(data, input...)
 
-			transactionBuilder = solana.NewTransactionBuilder().
-				SetFeePayer(priv.PublicKey).
-				AddInstruction(
-					system.NewCreateAccountInstruction(
-						lamports,
-						contract.RequiredSpace,
-						programAccount.PublicKey,
-						priv.PublicKey,
-						storageAccount.PublicKey).Build()).
-				AddInstruction(
-					solana.NewInstruction(
-						programAccount.PublicKey,
-						[]*solana.AccountMeta{
-							solana.NewAccountMeta(
-								storageAccount.PublicKey,
-								true,
-								false),
-						}, data))
-			transactionBuilderBatches[3] = append(transactionBuilderBatches[3], transactionBuilder)
+			transaction, err = createTransaction(
+				system.NewCreateAccountInstruction(
+					lamports,
+					contract.RequiredSpace,
+					programAccount.PublicKey,
+					priv.PublicKey,
+					storageAccount.PublicKey).Build(),
+				solana.NewInstruction(
+					programAccount.PublicKey,
+					[]*solana.AccountMeta{
+						solana.NewAccountMeta(
+							storageAccount.PublicKey,
+							true,
+							false),
+					}, data))
+			if err != nil {
+				return nil, err
+			}
+			transactionBatches[3] = append(transactionBatches[3], transaction)
 		}
 
 		s.CompiledContract = &SolangDeployedContract{Contract: contract, ProgramAccount: programAccount, StorageAccount: storageAccount}
 
-		return json.Marshal(transactionBuilderBatches)
+		return json.Marshal(transactionBatches)
 	} else if os.IsNotExist(err) {
 		// Path doesn't exist - return an error
 		return []byte{}, fmt.Errorf("contract does not exist: %s", contractPath)
@@ -926,12 +812,6 @@ func (s *SolanaWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, contra
 		return nil, fmt.Errorf("contract does not exist in known generator")
 	}
 
-	// If there are empty params, warn - just because this isn't super common
-	if len(contractParams) < 1 {
-		// empty
-		zap.L().Warn(fmt.Sprintf("empty contract params for %s", functionName))
-	}
-
 	// next - get the function hash
 	var payloadBytes []byte
 
@@ -1107,26 +987,10 @@ func (s *SolanaWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, to
 			solana.MustPublicKeyFromBase58(toAddress)).Build()
 	}
 
-	nonceAccount := s.NonceAccounts[priv.PublicKey]
-	if nonceAccount.Used {
-		return nil, errors.New("cannot use account more than once")
-	}
 	tx, err := solana.NewTransaction(
-		[]solana.Instruction{
-			system.NewAdvanceNonceAccountInstruction(
-				nonceAccount.Account.PublicKey,
-				solana.SysVarRecentBlockHashesPubkey,
-				priv.PublicKey,
-			).Build(),
-			instruction,
-		},
-		nonceAccount.Nonce,
+		[]solana.Instruction{instruction},
+		solana.Hash{},
 		solana.TransactionPayer(priv.PublicKey))
-	if err != nil {
-		return nil, err
-	}
-	nonceAccount.Used = true
-	_, err = tx.Sign(s.getPrivateKey)
 	if err != nil {
 		return nil, err
 	}
