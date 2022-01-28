@@ -28,13 +28,13 @@ type EthereumInterface struct {
 	SubscribeDone    chan bool              // Event channel that will unsub from events
 	TransactionInfo  map[string][]time.Time // Transaction information
 	bigLock          sync.Mutex
-	HandlersStarted  bool                   // Have the handlers been initiated?
-	StartTime        time.Time              // Start time of the benchmark
-	ThroughputTicker *time.Ticker           // Ticker for throughput (1s)
-	Throughputs      []float64              // Throughput over time with 1 second intervals
+	HandlersStarted  bool         // Have the handlers been initiated?
+	StartTime        time.Time    // Start time of the benchmark
+	ThroughputTicker *time.Ticker // Ticker for throughput (1s)
+	Throughputs      []float64    // Throughput over time with 1 second intervals
 
 	// Quick fix for OSDI22
-	rrEndpoint       int
+	rrEndpoint int
 
 	GenericInterface
 }
@@ -341,7 +341,7 @@ func (e *EthereumInterface) _sendTx(endpoint int, txSigned ethtypes.Transaction)
 		zap.L().Debug("Err",
 			zap.Error(err),
 		)
-		atomic.AddUint64(&e.Fail, 1)
+		// atomic.AddUint64(&e.Fail, 1)
 		atomic.AddUint64(&e.NumTxDone, 1)
 	}
 

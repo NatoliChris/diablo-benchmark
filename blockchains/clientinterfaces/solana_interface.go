@@ -438,7 +438,7 @@ func (s *SolanaInterface) SendRawTransaction(tx interface{}) error {
 			s.logger.Debug("Err",
 				zap.Error(err),
 			)
-			atomic.AddUint64(&s.Fail, 1)
+			// atomic.AddUint64(&s.Fail, 1)
 			atomic.AddUint64(&s.NumTxDone, 1)
 			atomic.AddUint64(&s.NumTxSent, 1)
 		}
@@ -459,6 +459,7 @@ func (s *SolanaInterface) SendRawTransaction(tx interface{}) error {
 			handleError(err)
 			return
 		}
+		s.logger.Debug("Sending tx", zap.String("sig", sig.String()), zap.String("now", time.Now().String()))
 
 		s.bigLock.Lock()
 		s.TransactionInfo[sig] = []time.Time{time.Now()}
