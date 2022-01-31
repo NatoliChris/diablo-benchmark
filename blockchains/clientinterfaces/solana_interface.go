@@ -459,7 +459,6 @@ func (s *SolanaInterface) SendRawTransaction(tx interface{}) error {
 			handleError(err)
 			return
 		}
-		s.logger.Debug("Sending tx", zap.String("sig", sig.String()), zap.String("now", time.Now().String()))
 
 		s.bigLock.Lock()
 		s.TransactionInfo[sig] = []time.Time{time.Now()}
