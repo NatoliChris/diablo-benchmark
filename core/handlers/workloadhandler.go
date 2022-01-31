@@ -115,11 +115,14 @@ func (wh *WorkloadHandler) workloadProducer(workload [][]interface{}, workerChan
 	<-ready
 	// Set up the timer
 	ticker := time.NewTicker(1 * time.Second)
-	batchSize := 10
+	batchSize := func(x int) int {
+		return x
+	}
 	for i := 0; i < len(workload); _, i = <-ticker.C, i+1 {
-		innerTicker := time.NewTicker(1 * time.Second / (time.Duration(len(workload[i])) / time.Duration(batchSize)))
+		currentBatchSize := batchSize(len(workload[i]))
+		innerTicker := time.NewTicker(1 * time.Second / (time.Duration(len(workload[i])) / time.Duration(currentBatchSize)))
 		for j := 0; j < len(workload[i]); <-innerTicker.C {
-			for k := 0; j < len(workload[i]) && k < batchSize; j, k = j+1, k+1 {
+			for k := 0; j < len(workload[i]) && k < currentBatchSize; j, k = j+1, k+1 {
 				workerChan <- workload[i][j]
 			}
 		}
