@@ -89,7 +89,6 @@ type SolanaInterface struct {
 	TransactionInfo  map[solana.Signature][]time.Time // Transaction information
 	bigLock          sync.Mutex
 	HandlersStarted  bool            // Have the handlers been initiated?
-	StartTime        time.Time       // Start time of the benchmark
 	ThroughputTicker *time.Ticker    // Ticker for throughput (1s)
 	Throughputs      []float64       // Throughput over time with 1 second intervals
 	KnownAccounts    []*SolanaWallet // Known accounds, public:private key pair
@@ -176,13 +175,20 @@ func (s *SolanaInterface) Cleanup() results.Results {
 	txLatencies := make([]float64, 0)
 	var avgLatency float64
 
-	var endTime time.Time
+	var startTime, endTime time.Time
+	startTime = time.Now()
 
 	success := uint(0)
 	fails := uint(s.Fail)
 
 	for _, v := range s.TransactionInfo {
 		if len(v) > 1 {
+			if v[0].Before(startTime) {
+				startTime = v[0]
+			}
+			if v[0] == v[1] {
+				continue
+			}
 			txLatency := v[1].Sub(v[0]).Milliseconds()
 			txLatencies = append(txLatencies, float64(txLatency))
 			avgLatency += float64(txLatency)
@@ -203,7 +209,7 @@ func (s *SolanaInterface) Cleanup() results.Results {
 	// Calculate the throughput and latencies
 	var throughput float64
 	if len(txLatencies) > 0 {
-		throughput = (float64(s.NumTxDone) - float64(s.Fail)) / (endTime.Sub(s.StartTime).Seconds())
+		throughput = (float64(s.NumTxDone) - float64(s.Fail)) / (endTime.Sub(startTime).Seconds())
 		avgLatency = avgLatency / float64(len(txLatencies))
 	} else {
 		avgLatency = 0
@@ -248,7 +254,6 @@ func (s *SolanaInterface) throughputSeconds() {
 
 func (s *SolanaInterface) Start() {
 	s.logger.Debug("Start")
-	s.StartTime = time.Now()
 	go s.throughputSeconds()
 }
 
@@ -434,15 +439,6 @@ func (s *SolanaInterface) getPrivateKey(key solana.PublicKey) *solana.PrivateKey
 
 func (s *SolanaInterface) SendRawTransaction(tx interface{}) error {
 	go func() {
-		handleError := func(err error) {
-			s.logger.Debug("Err",
-				zap.Error(err),
-			)
-			// atomic.AddUint64(&s.Fail, 1)
-			atomic.AddUint64(&s.NumTxDone, 1)
-			atomic.AddUint64(&s.NumTxSent, 1)
-		}
-
 		transaction := tx.(*solana.Transaction)
 
 		conn := s.ActiveConn()
@@ -450,18 +446,23 @@ func (s *SolanaInterface) SendRawTransaction(tx interface{}) error {
 
 		_, err := transaction.Sign(s.getPrivateKey)
 		if err != nil {
-			handleError(err)
-			return
+			s.logger.Fatal("Failed to sign transaction", zap.Error(err))
 		}
 
+		sendTime := time.Now()
+		transactionInfo := []time.Time{sendTime}
 		sig, err := conn.rpcClient.SendTransactionWithOpts(context.Background(), transaction, false, rpc.CommitmentFinalized)
 		if err != nil {
-			handleError(err)
-			return
+			s.logger.Debug("Err",
+				zap.Error(err),
+			)
+			atomic.AddUint64(&s.Fail, 1)
+			atomic.AddUint64(&s.NumTxDone, 1)
+			transactionInfo = append(transactionInfo, sendTime)
 		}
 
 		s.bigLock.Lock()
-		s.TransactionInfo[sig] = []time.Time{time.Now()}
+		s.TransactionInfo[sig] = transactionInfo
 		s.bigLock.Unlock()
 
 		atomic.AddUint64(&s.NumTxSent, 1)

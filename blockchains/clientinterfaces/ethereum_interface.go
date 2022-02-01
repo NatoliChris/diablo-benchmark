@@ -29,7 +29,6 @@ type EthereumInterface struct {
 	TransactionInfo  map[string][]time.Time // Transaction information
 	bigLock          sync.Mutex
 	HandlersStarted  bool         // Have the handlers been initiated?
-	StartTime        time.Time    // Start time of the benchmark
 	ThroughputTicker *time.Ticker // Ticker for throughput (1s)
 	Throughputs      []float64    // Throughput over time with 1 second intervals
 
@@ -62,13 +61,20 @@ func (e *EthereumInterface) Cleanup() results.Results {
 	txLatencies := make([]float64, 0)
 	var avgLatency float64
 
-	var endTime time.Time
+	var startTime, endTime time.Time
+	startTime = time.Now()
 
 	success := uint(0)
 	fails := uint(e.Fail)
 
 	for _, v := range e.TransactionInfo {
 		if len(v) > 1 {
+			if v[0].Before(startTime) {
+				startTime = v[0]
+			}
+			if v[0] == v[1] {
+				continue
+			}
 			txLatency := v[1].Sub(v[0]).Milliseconds()
 			txLatencies = append(txLatencies, float64(txLatency))
 			avgLatency += float64(txLatency)
@@ -89,7 +95,7 @@ func (e *EthereumInterface) Cleanup() results.Results {
 	// Calculate the throughput and latencies
 	var throughput float64
 	if len(txLatencies) > 0 {
-		throughput = (float64(e.NumTxDone) - float64(e.Fail)) / (endTime.Sub(e.StartTime).Seconds())
+		throughput = (float64(e.NumTxDone) - float64(e.Fail)) / (endTime.Sub(startTime).Seconds())
 		avgLatency = avgLatency / float64(len(txLatencies))
 	} else {
 		avgLatency = 0
@@ -139,7 +145,6 @@ func (e *EthereumInterface) throughputSeconds() {
 // Start sets up the start time and starts the periodic checking of the
 // throughput.
 func (e *EthereumInterface) Start() {
-	e.StartTime = time.Now()
 	go e.throughputSeconds()
 }
 
@@ -333,6 +338,8 @@ func (e *EthereumInterface) _sendTx(endpoint int, txSigned ethtypes.Transaction)
 		client = e.SecondaryNodes[endpoint-1]
 	}
 
+	sendTime := time.Now()
+	transactionInfo := []time.Time{sendTime}
 	err := client.SendTransaction(context.Background(), &txSigned)
 
 	// The transaction failed - this could be if it was reproposed, or, just failed.
@@ -341,12 +348,13 @@ func (e *EthereumInterface) _sendTx(endpoint int, txSigned ethtypes.Transaction)
 		zap.L().Debug("Err",
 			zap.Error(err),
 		)
-		// atomic.AddUint64(&e.Fail, 1)
+		atomic.AddUint64(&e.Fail, 1)
 		atomic.AddUint64(&e.NumTxDone, 1)
+		transactionInfo = append(transactionInfo, sendTime)
 	}
 
 	e.bigLock.Lock()
-	e.TransactionInfo[txSigned.Hash().String()] = []time.Time{time.Now()}
+	e.TransactionInfo[txSigned.Hash().String()] = transactionInfo
 	e.bigLock.Unlock()
 
 	atomic.AddUint64(&e.NumTxSent, 1)
