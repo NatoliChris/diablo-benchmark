@@ -202,6 +202,8 @@ func (s *SolanaInterface) Cleanup() results.Results {
 		}
 	}
 
+	s.logger.Debug("TransactionInfo", zap.Int("len", len(s.TransactionInfo)))
+
 	s.logger.Debug("Statistics being returned",
 		zap.Uint("success", success),
 		zap.Uint("fail", fails))
