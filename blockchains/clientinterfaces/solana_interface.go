@@ -464,6 +464,9 @@ func (s *SolanaInterface) SendRawTransaction(tx interface{}) error {
 		}
 
 		s.bigLock.Lock()
+		if _, ok := s.TransactionInfo[sig]; ok {
+			s.logger.Debug("Duplicate transaction", zap.Any("signature", sig))
+		}
 		s.TransactionInfo[sig] = transactionInfo
 		s.bigLock.Unlock()
 
