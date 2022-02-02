@@ -12,7 +12,7 @@ import (
 type benchmarkContext interface {
 	// Return the core providing used supplied parsing and instanciation.
 	//
-	core() *Core
+	system() *system
 
 	// Return a string description of the benchmark configuration.
 	// The source of an expression is the same as the source of its
@@ -134,11 +134,12 @@ type BenchmarkExpression interface {
 	Float() (FloatVariable, error)
 	GetFloat() (float64, error)
 
+	String() (StringVariable, error)
 	GetString() (string, error)
 }
 
 
-func ParseBenchmarkYamlPath(path string, core *Core) error {
+func parseBenchmarkYamlPath(path string, sys *system) error {
 	var benchmark benchmarkExpression
 	var context parsingContext
 	var decoder *yaml.Decoder
@@ -156,7 +157,7 @@ func ParseBenchmarkYamlPath(path string, core *Core) error {
 	decoder = yaml.NewDecoder(file)
 
 	implicit.init(nil)
-	context.init(path, core, &implicit)
+	context.init(path, sys, &implicit)
 	benchmark.init(&context)
 
 	err = decoder.Decode(&benchmark)
@@ -170,18 +171,18 @@ func ParseBenchmarkYamlPath(path string, core *Core) error {
 
 type parsingContext struct {
 	path  string
-	c     *Core
+	sys   *system
 	top   scope
 }
 
-func (this *parsingContext) init(path string, core *Core, top scope) {
+func (this *parsingContext) init(path string, sys *system, top scope) {
 	this.path = path
-	this.c = core
+	this.sys = sys
 	this.top = top
 }
 
-func (this *parsingContext) core() *Core {
-	return this.c
+func (this *parsingContext) system() *system {
+	return this.sys
 }
 
 func (this *parsingContext) Source() string {
@@ -258,11 +259,11 @@ func (this *workloadExpression) parse(expr BenchmarkExpression) error {
 	var field, cfield BenchmarkExpression
 	var behaviors []BenchmarkExpression
 	var element interface{}
-	var client remoteClient
-	var location string
 	var view []string
 	var i, number int
+	var loc location
 	var local scope
+	var cli client
 	var err error
 
 	field, err = expr.TryField("let")
@@ -298,16 +299,16 @@ func (this *workloadExpression) parse(expr BenchmarkExpression) error {
 			return err
 		}
 
-		location = element.(*node).address
+		loc = element.(location)
 
-		client, err = expr.core().createClient(location, view)
+		cli, err = loc.createClient(cfield.FullPosition(), view)
 		if err != nil {
 			return err
 		}
 
 		behaviors = cfield.Field("behavior").Slice()
 		for _, field = range behaviors {
-			err = parseLoadExpression(field, client)
+			err = parseLoadExpression(field, cli)
 			if err != nil {
 				return err
 			}
@@ -319,19 +320,19 @@ func (this *workloadExpression) parse(expr BenchmarkExpression) error {
 
 func (this *workloadExpression) parseView(client BenchmarkExpression) ([]string, error) {
  	var vfield, sfield BenchmarkExpression
-	var view []string = make([]string, 0)
+	var addrs []string = make([]string, 0)
 	var element interface{}
-	var endpoint Variable
+	var view Variable
 	var seed64 int64
 	var err error
 	var seed int
 
 	vfield = client.Field("view")
-	endpoint, err = vfield.Resource("endpoint")
+	view, err = vfield.Resource("endpoint")
 	if err == nil {
-		seed64 = client.core().seed()
+		seed64 = client.system().seed()
 	} else {
-		endpoint, err = vfield.Field("endpoint").Resource("endpoint")
+		view, err = vfield.Field("endpoint").Resource("endpoint")
 		if err != nil {
 			return nil, err
 		}
@@ -346,31 +347,31 @@ func (this *workloadExpression) parseView(client BenchmarkExpression) ([]string,
 
 			seed64 = int64(seed)
 		} else {
-			seed64 = client.core().seed()
+			seed64 = client.system().seed()
 		}
 	}
 
-	endpoint = copyVariable(endpoint, seed64, TypeOnce)
+	view = copyVariable(view, seed64, TypeOnce)
 
 	for {
-		element = endpoint.Get()
+		element = view.Get()
 		if element == nil {
 			break
 		}
 
-		view = append(view, element.(*node).address)
+		addrs = append(addrs, element.(endpoint).address())
 	}
 
-	if len(view) == 0 {
+	if len(addrs) == 0 {
 		return nil, fmt.Errorf("%s: variable exhausted",
 			vfield.FullPosition())
 	}
 
-	return view, nil
+	return addrs, nil
 }
 
 
-func parseLoadExpression(expr BenchmarkExpression, client remoteClient) error {
+func parseLoadExpression(expr BenchmarkExpression, cli client) error {
 	var timeload timeloadExpression
 	var btype string
 	var err error
@@ -381,7 +382,7 @@ func parseLoadExpression(expr BenchmarkExpression, client remoteClient) error {
 	}
 
 	if btype == "timeload" {
-		return timeload.parse(expr, client)
+		return timeload.parse(expr, cli)
 	}
 
 	return fmt.Errorf("%s: unknown behavior '%s'",
@@ -392,10 +393,10 @@ func parseLoadExpression(expr BenchmarkExpression, client remoteClient) error {
 type timeloadExpression struct {
 }
 
-func (this *timeloadExpression) parse(expr BenchmarkExpression, client remoteClient) error {
+func (this *timeloadExpression) parse(expr BenchmarkExpression, cli client) error {
 	var loads map[float64]float64 = make(map[float64]float64, 0)
 	var load, interaction BenchmarkExpression
-	var factory interactionFactory
+	var factory InteractionFactory
 	var flatload []float64
 	var bytes []byte
 	var itype string
@@ -409,7 +410,7 @@ func (this *timeloadExpression) parse(expr BenchmarkExpression, client remoteCli
 		return err
 	}
 
-	factory, ok = interaction.core().interactionFactory(itype)
+	factory, ok = interaction.system().interactionFactory(itype)
 	if !ok {
 		return fmt.Errorf("%s: unknown interaction type '%s'",
 			interaction.FullPosition(), itype)
@@ -440,7 +441,8 @@ func (this *timeloadExpression) parse(expr BenchmarkExpression, client remoteCli
 			return err
 		}
 
-		err = client.sendInteraction(time, bytes)
+		err = cli.sendInteraction(interaction.FullPosition(), time,
+			bytes)
 		if err != nil {
 			return err
 		}
@@ -510,8 +512,8 @@ func newErrorExpression(parent benchmarkContext, position string, err error) Ben
 	return &this
 }
 
-func (this *errorExpression) core() *Core {
-	return this.parent.core()
+func (this *errorExpression) system() *system {
+	return this.parent.system()
 }
 
 func (this *errorExpression) Source() string {
@@ -621,6 +623,10 @@ func (this *errorExpression) GetFloat() (float64, error) {
 	return 0, this.err
 }
 
+func (this *errorExpression) String() (StringVariable, error) {
+	return nil, this.err
+}
+
 func (this *errorExpression) GetString() (string, error) {
 	return "", this.err
 }
@@ -664,8 +670,8 @@ func (this *benchmarkYamlNode) init(parent benchmarkContext, node *yaml.Node) {
 	this.nexpl = false
 }
 
-func (this *benchmarkYamlNode) core() *Core {
-	return this.parent.core()
+func (this *benchmarkYamlNode) system() *system {
+	return this.parent.system()
 }
 
 func (this *benchmarkYamlNode) Source() string {
@@ -805,6 +811,10 @@ func (this *benchmarkYamlNode) Float() (FloatVariable, error) {
 
 func (this *benchmarkYamlNode) GetFloat() (float64, error) {
 	return 0, fmt.Errorf("%s: must be a float", this.FullPosition())
+}
+
+func (this *benchmarkYamlNode) String() (StringVariable, error) {
+	return nil, fmt.Errorf("%s: must be a string", this.FullPosition())
 }
 
 func (this *benchmarkYamlNode) GetString() (string, error) {
@@ -1039,6 +1049,18 @@ func (this *benchmarkYamlScalar) GetInt() (int, error) {
 }
 
 func (this *benchmarkYamlScalar) Float() (FloatVariable, error) {
+	var value float64
+	var err error
+
+	value, err = this.GetFloat()
+	if err != nil {
+		return nil, err
+	}
+
+	return newFloatImmediate(value), nil
+}
+
+func (this *benchmarkYamlScalar) GetFloat() (float64, error) {
 	var opaque interface{}
 	var fval float64
 	var err error
@@ -1046,36 +1068,44 @@ func (this *benchmarkYamlScalar) Float() (FloatVariable, error) {
 	var ok bool
 
 	if (this.node.Style & yaml.DoubleQuotedStyle) != 0 {
-		return nil, fmt.Errorf("%s: must be a float",
+		return 0, fmt.Errorf("%s: must be a float",
 			this.FullPosition())
 	}
 
 	if (this.node.Style & yaml.SingleQuotedStyle) != 0 {
-		return nil, fmt.Errorf("%s: must be a float",
+		return 0, fmt.Errorf("%s: must be a float",
 			this.FullPosition())
 	}
 
 	err = this.node.Decode(&opaque)
 	if err != nil {
-		return nil, fmt.Errorf("%s: must be a float",
+		return 0, fmt.Errorf("%s: must be a float",
 			this.FullPosition())
 	}
 
 	fval, ok = opaque.(float64)
 	if ok {
-		return newFloatImmediate(fval), nil
+		return fval, nil
 	}
 
 	ival, ok = opaque.(int)
 	if ok {
-		return newFloatImmediate(float64(ival)), nil
+		return float64(ival), nil
 	}
 
-	return nil, fmt.Errorf("%s: must be a float", this.FullPosition())
+	return 0, fmt.Errorf("%s: must be a float", this.FullPosition())
 }
 
-func (this *benchmarkYamlScalar) GetFloat() (float64, error) {
-	return getFloat(this)
+func (this *benchmarkYamlScalar) String() (StringVariable, error) {
+	var value string
+	var err error
+
+	value, err = this.GetString()
+	if err != nil {
+		return nil, err
+	}
+
+	return newStringImmediate(value), nil
 }
 
 func (this *benchmarkYamlScalar) GetString() (string, error) {
@@ -1181,7 +1211,23 @@ func (this *benchmarkYamlAlias) Int() (IntVariable, error) {
 }
 
 func (this *benchmarkYamlAlias) GetInt() (int, error) {
-	return getInt(this)
+	var v IntVariable
+	var err error
+	var ok bool
+	var i int
+
+	v, err = this.Int()
+	if err != nil {
+		return 0, err
+	}
+
+	i, ok = v.TryGetInt()
+	if !ok {
+		return 0, fmt.Errorf("%s: variable exhausted",
+			this.FullPosition())
+	}
+
+	return i, nil
 }
 
 func (this *benchmarkYamlAlias) Float() (FloatVariable, error) {
@@ -1214,37 +1260,12 @@ func (this *benchmarkYamlAlias) Float() (FloatVariable, error) {
 }
 
 func (this *benchmarkYamlAlias) GetFloat() (float64, error) {
-	return getFloat(this)
-}
-
-
-func getInt(expr BenchmarkExpression) (int, error) {
-	var v IntVariable
-	var err error
-	var ok bool
-	var i int
-
-	v, err = expr.Int()
-	if err != nil {
-		return 0, err
-	}
-
-	i, ok = v.TryGetInt()
-	if !ok {
-		return 0, fmt.Errorf("%s: variable exhausted",
-			expr.FullPosition())
-	}
-
-	return i, nil
-}
-
-func getFloat(expr BenchmarkExpression) (float64, error) {
 	var v FloatVariable
 	var err error
 	var f float64
 	var ok bool
 
-	v, err = expr.Float()
+	v, err = this.Float()
 	if err != nil {
 		return 0, err
 	}
@@ -1252,8 +1273,53 @@ func getFloat(expr BenchmarkExpression) (float64, error) {
 	f, ok = v.TryGetFloat()
 	if !ok {
 		return 0, fmt.Errorf("%s: variable exhausted",
-			expr.FullPosition())
+			this.FullPosition())
 	}
 
 	return f, nil
+}
+
+func (this *benchmarkYamlAlias) String() (StringVariable, error) {
+	var name, domain string
+	var variable Variable
+	var err error
+	var ok bool
+
+	name, err = this.target()
+	if err != nil {
+		return nil, err
+	}
+
+	variable, domain, ok = this.current().get(name)
+	if !ok {
+		return nil, fmt.Errorf("%s: unknown variable '%s'",
+			this.FullPosition(), name)
+	}
+
+	if domain == "string" {
+		return newStringVariable(variable), nil
+	}
+
+	return nil, fmt.Errorf("%s: cannot convert '%s' to string",
+		this.FullPosition(), domain)
+}
+
+func (this *benchmarkYamlAlias) GetString() (string, error) {
+	var v StringVariable
+	var err error
+	var s string
+	var ok bool
+
+	v, err = this.String()
+	if err != nil {
+		return "", err
+	}
+
+	s, ok = v.TryGetString()
+	if !ok {
+		return "", fmt.Errorf("%s: variable exhausted",
+			this.FullPosition())
+	}
+
+	return s, nil
 }

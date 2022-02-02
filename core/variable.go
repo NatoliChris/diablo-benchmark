@@ -256,7 +256,7 @@ func newIntVariable(inner Variable) IntVariable {
 
 func newIntImmediate(value int) IntVariable {
 	return newIntVariable(newVariable("integer",
-		NewIntSample(value, value),
+		newIntSample(value, value),
 		newUniformDistribution(1, 0, TypeRegular)))
 }
 
@@ -297,6 +297,58 @@ func (this *intVariableWrapper) GetFloat(defaultValue float64) float64 {
 	var ok bool
 
 	ret, ok = this.TryGetFloat()
+
+	if ok {
+		return ret
+	} else {
+		return defaultValue
+	}
+}
+
+
+type StringVariable interface {
+	TryGetString() (string, bool)
+
+	GetString(string) string
+}
+
+type stringVariableWrapper struct {
+	variableWrapper
+}
+
+func newStringVariable(inner Variable) StringVariable {
+	var this stringVariableWrapper
+
+	this.init(inner)
+
+	return &this
+}
+
+func newStringImmediate(value string) StringVariable {
+	var elements []interface{} = make([]interface{}, 1)
+
+	elements[0] = value
+
+	return newStringVariable(newVariable("string", 
+		newElementSample(elements), 
+		newUniformDistribution(1, 0, TypeRegular)))
+}
+
+func (this *stringVariableWrapper) TryGetString() (string, bool) {
+	var opaque interface{} = this.Get()
+
+	if opaque == nil {
+		return "", false
+	}
+
+	return opaque.(string), true
+}
+
+func (this *stringVariableWrapper) GetString(defaultValue string) string {
+	var ret string
+	var ok bool
+
+	ret, ok = this.TryGetString()
 
 	if ok {
 		return ret
@@ -348,7 +400,7 @@ func parseVariable(expr BenchmarkExpression) (Variable, string, string, error) {
 			return nil, "", "", err
 		}
 	} else {
-		def.seed = expr.core().seed()
+		def.seed = expr.system().seed()
 	}
 
 	def.expr = expr
@@ -407,6 +459,7 @@ func parseSeed(expr BenchmarkExpression) (int64, error) {
 
 func parseSampleVariable(def *variableBaseDefinition) (Variable, string, string, error) {
 	var sampleFactory SampleFactory
+	var randomFactory randomFactory
 	var field BenchmarkExpression
 	var domain, rtype string
 	var distrib Distribution
@@ -422,7 +475,7 @@ func parseSampleVariable(def *variableBaseDefinition) (Variable, string, string,
 		return nil, "", "", err
 	}
 
-	sampleFactory, ok = def.expr.core().sampleFactory(domain)
+	sampleFactory, ok = def.expr.system().sampleFactory(domain)
 	if !ok {
 		return nil, "", "", fmt.Errorf("%s: unknown domain '%s'",
 			def.expr.FullPosition(), domain)
@@ -440,13 +493,25 @@ func parseSampleVariable(def *variableBaseDefinition) (Variable, string, string,
 			return nil, "", "", err
 		}
 
-		random, err = def.expr.core().random(rtype, field)
+		randomFactory, ok = def.expr.system().randomFactory(rtype)
+		if !ok {
+			return nil, "", "", fmt.Errorf("%s: unknown random " +
+				"type '%s'", def.expr.FullPosition(), rtype)
+		}
+
+		random, err = randomFactory.instance(field)
 		if err != nil {
 			return nil, "", "", fmt.Errorf("%s: %s",
 				def.expr.FullPosition(), err.Error())
 		}
 	} else {
-		random, err = def.expr.core().random("uniform", nil)
+		randomFactory, ok = def.expr.system().randomFactory("uniform")
+		if !ok {
+			return nil, "", "", fmt.Errorf("%s: unknown random " +
+				"type '%s'", def.expr.FullPosition(), rtype)
+		}
+
+		random, err = randomFactory.instance(nil)
 		if err != nil {
 			return nil, "", "", fmt.Errorf("%s: %s",
 				def.expr.FullPosition(), err.Error())
@@ -454,6 +519,8 @@ func parseSampleVariable(def *variableBaseDefinition) (Variable, string, string,
 	}
 
 	distrib = random.Instance(sample.Size(), def.seed, def.vtype)
+
+	Tracef("create variable '%s' (%d elements)", def.name, sample.Size())
 
 	return newVariable(domain, sample, distrib), def.name, domain, nil
 }
