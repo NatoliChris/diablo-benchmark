@@ -982,7 +982,7 @@ func (s *SolanaWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, to
 			}, instructionData)
 	} else {
 		instruction = system.NewTransferInstruction(
-			1,
+			value.Uint64(),
 			priv.PublicKey,
 			solana.MustPublicKeyFromBase58(toAddress)).Build()
 	}
@@ -1005,6 +1005,7 @@ func (s *SolanaWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 
 	// 1. Set up the accounts into buckets for each
 	accountDistribution := make([][]*SolanaWallet, s.BenchConfig.Secondaries*s.BenchConfig.Threads)
+	amounts := make(map[*SolanaWallet]map[*SolanaWallet]uint64)
 
 	accountCount := 0
 	for {
@@ -1051,16 +1052,18 @@ func (s *SolanaWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 				intervalWorkload := make([][]byte, 0)
 				for txIt := 0; txIt < txnum; txIt++ {
 
-					// Initial assumption: there's as many accounts as transactions
-					// TODO allow for more intricate transaction generation, such as A->B, A->C, etc.
-					txVal, ok := big.NewInt(0).SetString("1000000", 10)
-					if !ok {
-						return nil, errors.New("failed to set TX value")
-					}
-
 					// accFrom := secondaryID + thread + (secondaryID * s.BenchConfig.Threads)
 					accFrom := accountsChoices[txID%len(accountsChoices)]
 					accTo := accountsChoices[(txID+1)%len(accountsChoices)]
+
+					// Initial assumption: there's as many accounts as transactions
+					// TODO allow for more intricate transaction generation, such as A->B, A->C, etc.
+					if _, ok := amounts[accFrom]; !ok {
+						amounts[accFrom] = make(map[*SolanaWallet]uint64)
+					}
+					amounts[accFrom][accTo]++
+					amount := amounts[accFrom][accTo]
+					txVal := big.NewInt(0).SetUint64(amount)
 
 					tx, txerr := s.CreateSignedTransaction(
 						accFrom.PrivateKey,
