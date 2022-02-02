@@ -1,0 +1,38 @@
+let:
+
+  - &any_location
+    sample: !location
+      - ".*"
+
+  - &all_endpoints
+    sample: !endpoint
+      - ".*"
+
+  - &my_contract
+    sample: !contract
+      name: "twitter.push"
+
+  - &accounts
+    sample: !account
+      number: 10
+      stake: 1000000000
+
+  - !loop &offset
+    sample: !float
+      from: 0
+      to: 0.999
+      precision: 0.333
+
+workloads:
+
+  - number: 3
+    client:
+      location: *any_location
+      view: *all_endpoints
+      behavior:
+        - interaction: !invoke
+            from: *accounts
+            contract: *my_contract
+          load:
+            *offset: 1
+            3: 0
