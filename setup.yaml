@@ -1,3 +1,13 @@
+interface: "mock"
+
+
+parameters:
+
+  delay: 0.01
+
+  pre-sign: true
+
+
 endpoints:
 
   - addresses:
@@ -14,11 +24,3 @@ endpoints:
     tags:
       - eu-north-1
       - c5.9xlarge
-
-locations:
-
-  - addresses: [ 1.1.1.1:2000, 1.1.1.1:2001, 1.1.1.1:2002 ]
-    tags: [ ap-southeast-2 ]
-
-  - addresses: [ 8.8.8.8:2000 ]
-    tags: [ eu-north-1 ]
