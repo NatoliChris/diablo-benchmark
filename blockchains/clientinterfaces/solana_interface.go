@@ -89,6 +89,7 @@ type SolanaInterface struct {
 	TransactionInfo  map[solana.Signature][]time.Time // Transaction information
 	bigLock          sync.Mutex
 	HandlersStarted  bool            // Have the handlers been initiated?
+	StartTime        time.Time       // Start time of the benchmark
 	ThroughputTicker *time.Ticker    // Ticker for throughput (1s)
 	Throughputs      []float64       // Throughput over time with 1 second intervals
 	KnownAccounts    []*SolanaWallet // Known accounds, public:private key pair
@@ -175,17 +176,15 @@ func (s *SolanaInterface) Cleanup() results.Results {
 	txLatencies := make([]float64, 0)
 	var avgLatency float64
 
-	var startTime, endTime time.Time
-	startTime = time.Now()
+	var endTime time.Time
 
 	success := uint(0)
 	fails := uint(s.Fail)
 
+	s.logger.Debug("Fail", zap.Uint64("count", s.Fail))
+
 	for _, v := range s.TransactionInfo {
 		if len(v) > 1 {
-			if v[0].Before(startTime) {
-				startTime = v[0]
-			}
 			if v[0] == v[1] {
 				continue
 			}
@@ -211,7 +210,7 @@ func (s *SolanaInterface) Cleanup() results.Results {
 	// Calculate the throughput and latencies
 	var throughput float64
 	if len(txLatencies) > 0 {
-		throughput = (float64(s.NumTxDone) - float64(s.Fail)) / (endTime.Sub(startTime).Seconds())
+		throughput = (float64(s.NumTxDone) - float64(s.Fail)) / (endTime.Sub(s.StartTime).Seconds())
 		avgLatency = avgLatency / float64(len(txLatencies))
 	} else {
 		avgLatency = 0
@@ -256,6 +255,7 @@ func (s *SolanaInterface) throughputSeconds() {
 
 func (s *SolanaInterface) Start() {
 	s.logger.Debug("Start")
+	s.StartTime = time.Now()
 	go s.throughputSeconds()
 }
 
@@ -464,9 +464,6 @@ func (s *SolanaInterface) SendRawTransaction(tx interface{}) error {
 		}
 
 		s.bigLock.Lock()
-		if _, ok := s.TransactionInfo[sig]; ok {
-			s.logger.Debug("Duplicate transaction", zap.Any("signature", sig))
-		}
 		s.TransactionInfo[sig] = transactionInfo
 		s.bigLock.Unlock()
 
