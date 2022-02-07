@@ -386,11 +386,6 @@ func (s *SolanaInterface) ConnectOne(id int) error {
 
 func (s *SolanaInterface) ConnectAll(primaryID int) error {
 	s.logger.Debug("ConnectAll")
-	// If our ID is greater than the nodes we know, there's a problem!
-	if primaryID >= len(s.Nodes) {
-		return errors.New("invalid client primary ID")
-	}
-
 	// Connect all the others
 	for _, node := range s.Nodes {
 		conn := rpc.New(fmt.Sprintf("http://%s", node))
