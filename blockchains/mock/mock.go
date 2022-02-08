@@ -137,7 +137,7 @@ func (this *BlockchainBuilder) EncodeTransfer(stake int, from, to interface{}) (
 	return buf, nil
 }
 
-func (this *BlockchainBuilder) EncodeInvoke(from, contract interface{}) ([]byte, error) {
+func (this *BlockchainBuilder) EncodeInvoke(from, contract interface{}, function string) ([]byte, error) {
 	var buf []byte = make([]byte, 16)
 	var fromAccount, contractId int
 

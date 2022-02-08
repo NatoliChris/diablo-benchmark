@@ -57,7 +57,7 @@ type BlockchainBuilder interface {
 	//
 	EncodeTransfer(int, interface{}, interface{}) ([]byte, error)
 
-	EncodeInvoke(interface{}, interface{}) ([]byte, error)
+	EncodeInvoke(interface{}, interface{}, string) ([]byte, error)
 
 	EncodeInteraction(itype string) (InteractionFactory, bool)
 }
@@ -240,6 +240,7 @@ func newInvokeInteractionFactory(builder BlockchainBuilder) *invokeInteractionFa
 func (this *invokeInteractionFactory) Instance(expr BenchmarkExpression) ([]byte, error) {
 	var from, contract interface{}
         var field BenchmarkExpression
+	var function string
 	var local scope
 	var err error
 
@@ -264,5 +265,10 @@ func (this *invokeInteractionFactory) Instance(expr BenchmarkExpression) ([]byte
 		return nil, err
 	}
 
-	return this.builder.EncodeInvoke(from, contract)
+	function, err = expr.Field("function").GetString()
+	if err != nil {
+		return nil, err
+	}
+
+	return this.builder.EncodeInvoke(from, contract, function)
 }

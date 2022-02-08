@@ -10,11 +10,12 @@ let:
 
   - &my_contract
     sample: !contract
-      name: "twitter.push"
+      number: 3
+      name: "twitter"
 
   - &accounts
     sample: !account
-      number: 10
+      number: 4
       stake: 1000000000
 
   - !loop &offset
@@ -33,6 +34,7 @@ workloads:
         - interaction: !invoke
             from: *accounts
             contract: *my_contract
+            function: "push()"
           load:
             *offset: 1
-            3: 0
+            25: 0
