@@ -7,7 +7,7 @@ GOPATH=$(PWD)/.go
 export GOPATH
 
 default: diablo
-	./diablo
+	./diablo primary --verbose=trace --stat --env=accounts=algorand-accounts.yaml --env=contracts=teal-contracts 1 setup.yaml benchmark.yaml
 
 all: lint diablo
 

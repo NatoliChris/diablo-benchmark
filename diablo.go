@@ -4,6 +4,7 @@ package main
 import (
 	"diablo-benchmark/core"
 	"diablo-benchmark/blockchains/mock"
+	"diablo-benchmark/blockchains/nalgorand"
 	"compress/gzip"
 	"fmt"
 	"encoding/json"
@@ -36,6 +37,7 @@ const (
 
 func buildSystemMap() map[string]core.BlockchainInterface {
 	return map[string]core.BlockchainInterface{
+		"algorand": &nalgorand.BlockchainInterface{},
 		"mock": &mock.BlockchainInterface{},
 	}
 }

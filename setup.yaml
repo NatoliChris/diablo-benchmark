@@ -1,26 +1,16 @@
-interface: "mock"
-
+interface: "algorand"
 
 parameters:
-
-  delay: 0.01
-
-  pre-sign: true
-
+  confirm: polltx
+  prepare: signature
 
 endpoints:
 
   - addresses:
-      - 1.1.1.1:3000
-      - 1.1.1.1:3001
-      - 2.3.4.5:7000
+      - 3.123.142.156:9000
+      - 3.68.91.45:9000
+      - 18.196.7.217:9000
+      - 3.65.20.31:9000
     tags:
       - ap-southeast-2
       - c5.xlarge
-
-  - addresses:
-      - 127.0.0.1:5000
-      - 192.168.1.1:5001
-    tags:
-      - eu-north-1
-      - c5.9xlarge

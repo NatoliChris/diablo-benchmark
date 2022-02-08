@@ -6,7 +6,7 @@ let:
   - !loop &europe_loc
     sample: !location [ "ap-.*" ]
 
-  - &account { sample: !account { number: 10, stake: 1000000000 } }
+  - &account { sample: !account { number: 4, stake: 1000000000 } }
 
   - &offset
     sample: !float { from: 0, to: 0.999 }
@@ -22,17 +22,17 @@ workloads:
           load:
             *offset:  1
             5:        2
-            7:        0
+            17:       0
         - interaction: !transfer { stake: 10, from: *account, to: *account }
           load:
             *offset:  1
-            10:       0
+            20:       0
 
   - client:
       location: *europe_loc
       view: *europe
       behavior:
-        - load: { 0: 0.2, 10: 0 }
+        - load: { 0: 0.2, 20: 0 }
           interaction: !transfer
             let:
               - !iter &iaccount { copy: *account }

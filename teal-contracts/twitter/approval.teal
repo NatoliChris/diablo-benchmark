@@ -1,0 +1,63 @@
+#pragma version 5
+txn ApplicationID
+int 0
+==
+bnz main_l10
+txn OnCompletion
+int NoOp
+==
+bnz main_l3
+err
+main_l3:
+global GroupSize
+int 1
+==
+txna ApplicationArgs 0
+byte "Add"
+==
+&&
+bnz main_l9
+global GroupSize
+int 1
+==
+txna ApplicationArgs 0
+byte "Sub"
+==
+&&
+bnz main_l6
+err
+main_l6:
+byte "Count"
+app_global_get
+store 0
+load 0
+int 0
+>
+bnz main_l8
+main_l7:
+int 1
+return
+main_l8:
+byte "Count"
+load 0
+int 1
+-
+app_global_put
+b main_l7
+main_l9:
+byte "Count"
+app_global_get
+store 0
+byte "Count"
+load 0
+int 1
++
+app_global_put
+int 1
+return
+main_l10:
+byte "Count"
+int 0
+app_global_put
+int 1
+return
