@@ -56,7 +56,9 @@ func printStat(result *core.Result) {
 	var secondary *core.SecondaryResult
 	var iact *core.InteractionResult
 	var client *core.ClientResult
+	var numSubmitted int
 
+	numSubmitted = 0
 	sumLatencies = 0
 	lastTime = 0
 
@@ -75,7 +77,11 @@ func printStat(result *core.Result) {
 
 				if iact.SubmitTime < 0 {
 					continue
-				} else if iact.CommitTime < 0 {
+				}
+
+				numSubmitted += 1
+
+				if iact.CommitTime < 0 {
 					continue
 				} else if iact.AbortTime >= 0 {
 					continue
@@ -90,10 +96,17 @@ func printStat(result *core.Result) {
 		}
 	}
 
+	if lastTime <= 0 {
+		fmt.Printf("average load: -\n")
+	} else {
+		fmt.Printf("average load: %.1f tx/s\n",
+			float64(numSubmitted) / lastTime)
+	}
+
 	if (len(latencies) == 0) || (lastTime <= 0) {
 		fmt.Printf("average throughput: -\n")
-		fmt.Printf("average latency: -")
-		fmt.Printf("median latency: -")
+		fmt.Printf("average latency: -\n")
+		fmt.Printf("median latency: -\n")
 		return
 	}
 
