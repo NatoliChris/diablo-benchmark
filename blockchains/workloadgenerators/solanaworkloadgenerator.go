@@ -585,7 +585,7 @@ func (s *SolanaWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, con
 
 		lamports, err = s.ActiveConn().rpcClient.GetMinimumBalanceForRentExemption(
 			context.Background(),
-			contract.RequiredSpace,
+			8192,
 			rpc.CommitmentFinalized)
 		if err != nil {
 			return nil, err
@@ -614,7 +614,7 @@ func (s *SolanaWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, con
 			transaction, err = createTransaction(
 				system.NewCreateAccountInstruction(
 					lamports,
-					contract.RequiredSpace,
+					8192,
 					programAccount.PublicKey,
 					priv.PublicKey,
 					storageAccount.PublicKey).Build(),
