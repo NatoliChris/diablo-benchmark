@@ -20,6 +20,9 @@ func GetBlockchainInterface(config *configs.ChainConfig) (BlockchainInterface, e
 	case "ethereum":
 		bci := EthereumInterface{}
 		return &bci, nil
+	case "ethereumdynamic":
+		bci := EthereumDynamicInterface{}
+		return &bci, nil
 	case "fabric":
 		bci := FabricInterface{}
 		return &bci, nil

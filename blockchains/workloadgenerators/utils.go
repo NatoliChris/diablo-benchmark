@@ -28,6 +28,8 @@ func GetWorkloadGenerator(config *configs.ChainConfig) (WorkloadGenerator, error
 		// Return the ethereum workload generator
 		// TODO get the type of the ethereum workload generator
 		wg = &EthereumWorkloadGenerator{}
+	case "ethereumdynamic":
+		wg = &EthereumDynamicWorkloadGenerator{}
 	case "fabric":
 		wg = &FabricWorkloadGenerator{}
 	case "solana":
