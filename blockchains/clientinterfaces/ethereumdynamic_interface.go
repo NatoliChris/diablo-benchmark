@@ -28,21 +28,24 @@ type EthereumGasCaps struct {
 	GasFeeCap *big.Int
 }
 
-func (c EthereumGasCaps) Equal(o EthereumGasCaps) bool {
-	return c.GasTipCap.Cmp(o.GasTipCap) == 0 && c.GasFeeCap.Cmp(o.GasFeeCap) == 0
+func (c EthereumGasCaps) Cmp(o EthereumGasCaps) int {
+	return c.GasFeeCap.Cmp(o.GasFeeCap)
 }
 
 type ethereumClient struct {
+	address     string
 	gasCaps     EthereumGasCaps
 	gasCapsLock sync.RWMutex
+	gasCapsTime time.Time
 	exitSignal  uint32
 
 	*ethclient.Client
 }
 
-func NewEthereumClient(c *ethclient.Client) *ethereumClient {
+func NewEthereumClient(c *ethclient.Client, address string) *ethereumClient {
 	return &ethereumClient{
-		Client: c,
+		Client:  c,
+		address: address,
 		gasCaps: EthereumGasCaps{
 			GasTipCap: big.NewInt(0),
 			GasFeeCap: big.NewInt(0),
@@ -56,7 +59,19 @@ func (c *ethereumClient) GasCaps() EthereumGasCaps {
 	return c.gasCaps
 }
 
+func (c *ethereumClient) CompareAndSetGasCaps(newGasCaps EthereumGasCaps, newTime time.Time) bool {
+	c.gasCapsLock.Lock()
+	defer c.gasCapsLock.Unlock()
+	if c.gasCaps.Cmp(newGasCaps) < 0 && c.gasCapsTime.Before(newTime) {
+		c.gasCaps = newGasCaps
+		c.gasCapsTime = newTime
+		return true
+	}
+	return false
+}
+
 func (c *ethereumClient) UpdateGasCaps() error {
+	time := time.Now()
 	header, err := c.HeaderByNumber(context.Background(), nil)
 	if err != nil {
 		return err
@@ -76,10 +91,9 @@ func (c *ethereumClient) UpdateGasCaps() error {
 		),
 	}
 
-	if !newGasCaps.Equal(c.GasCaps()) {
-		c.gasCapsLock.Lock()
-		c.gasCaps = newGasCaps
-		c.gasCapsLock.Unlock()
+	updated := c.CompareAndSetGasCaps(newGasCaps, time)
+	if updated {
+		zap.L().Debug("Updated gas gaps from polling", zap.Any("newGasCaps", newGasCaps), zap.String("address", c.address))
 	}
 	return nil
 }
@@ -308,6 +322,34 @@ func (e *EthereumDynamicInterface) EventHandler() {
 		case header := <-eventCh:
 			// Got a head
 			go e.parseBlocksForTransactions(header.Number)
+			go func(header *ethtypes.Header) {
+				time := time.Now()
+				baseFee := misc.CalcBaseFee(&params.ChainConfig{LondonBlock: big.NewInt(0)}, header)
+
+				gasTipCap, err := e.PrimaryNode.SuggestGasTipCap(context.Background())
+				if err != nil {
+					zap.L().Debug("failed to get gas tip cap", zap.Error(err))
+					return
+				}
+
+				newGasCaps := EthereumGasCaps{
+					GasTipCap: gasTipCap,
+					GasFeeCap: new(big.Int).Add(
+						gasTipCap,
+						new(big.Int).Mul(baseFee, big.NewInt(2)),
+					),
+				}
+				updated := e.PrimaryNode.CompareAndSetGasCaps(newGasCaps, time)
+				if updated {
+					zap.L().Debug("Updated gas gaps from head event", zap.Any("newGasCaps", newGasCaps), zap.String("address", e.PrimaryNode.address))
+				}
+				for _, node := range e.SecondaryNodes {
+					updated = node.CompareAndSetGasCaps(newGasCaps, time)
+					if updated {
+						zap.L().Debug("Updated gas gaps from head event", zap.Any("newGasCaps", newGasCaps), zap.String("address", node.address))
+					}
+				}
+			}(header)
 		case err := <-sub.Err():
 			zap.L().Warn(err.Error())
 		}
@@ -356,7 +398,7 @@ func (e *EthereumDynamicInterface) ConnectOne(id int) error {
 		return err
 	}
 
-	e.PrimaryNode = NewEthereumClient(c)
+	e.PrimaryNode = NewEthereumClient(c, e.Nodes[id])
 	e.PrimaryNode.UpdateGasCaps()
 	go e.PrimaryNode.PollGasCaps()
 
@@ -400,7 +442,7 @@ func (e *EthereumDynamicInterface) ConnectAll(primaryID int) error {
 				return err
 			}
 
-			ec := NewEthereumClient(c)
+			ec := NewEthereumClient(c, node)
 			ec.UpdateGasCaps()
 			go ec.PollGasCaps()
 			e.SecondaryNodes = append(e.SecondaryNodes, ec)
@@ -429,6 +471,21 @@ func (e *EthereumDynamicInterface) _sendTx(endpoint int, parsedTx types.Ethereum
 	gasCaps := client.GasCaps()
 	parsedTx.Tx.GasTipCap = gasCaps.GasTipCap
 	parsedTx.Tx.GasFeeCap = gasCaps.GasFeeCap
+
+	// gas, err := client.EstimateGas(context.Background(), ethereum.CallMsg{
+	// 	From:      crypto.PubkeyToAddress(parsedTx.Priv.PublicKey),
+	// 	To:        parsedTx.Tx.To,
+	// 	Gas:       8_000_000,
+	// 	GasFeeCap: parsedTx.Tx.GasFeeCap,
+	// 	GasTipCap: parsedTx.Tx.GasTipCap,
+	// 	Value:     parsedTx.Tx.Value,
+	// 	Data:      parsedTx.Tx.Data,
+	// })
+	// if err != nil {
+	// 	zap.L().Fatal("failed to estimate gas", zap.Error(err))
+	// }
+	// parsedTx.Tx.Gas = gas
+
 	txSigned, err := ethtypes.SignNewTx(parsedTx.Priv, e.Signer, parsedTx.Tx)
 	if err != nil {
 		zap.L().Fatal("failed to sign tx", zap.Error(err))
@@ -441,8 +498,16 @@ func (e *EthereumDynamicInterface) _sendTx(endpoint int, parsedTx types.Ethereum
 	// The transaction failed - this could be if it was reproposed, or, just failed.
 	// We need to make sure that if it was re-proposed it doesn't count as a "success" on this node.
 	if err != nil {
+		sender, nerr := e.Signer.Sender(txSigned)
+		if nerr != nil {
+			zap.L().Debug("failed to get sender", zap.Error(err))
+		}
 		zap.L().Debug("Err",
 			zap.Error(err),
+			zap.Any("gasCaps", gasCaps),
+			zap.Any("sender", sender),
+			zap.String("sendTime", sendTime.String()),
+			// zap.Any("gas", gas),
 		)
 		atomic.AddUint64(&e.Fail, 1)
 		atomic.AddUint64(&e.NumTxDone, 1)

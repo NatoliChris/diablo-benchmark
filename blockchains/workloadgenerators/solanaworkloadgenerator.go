@@ -585,7 +585,7 @@ func (s *SolanaWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, con
 
 		lamports, err = s.ActiveConn().rpcClient.GetMinimumBalanceForRentExemption(
 			context.Background(),
-			8192,
+			8192*8,
 			rpc.CommitmentFinalized)
 		if err != nil {
 			return nil, err
@@ -614,7 +614,7 @@ func (s *SolanaWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, con
 			transaction, err = createTransaction(
 				system.NewCreateAccountInstruction(
 					lamports,
-					8192,
+					8192*8,
 					programAccount.PublicKey,
 					priv.PublicKey,
 					storageAccount.PublicKey).Build(),
@@ -1169,9 +1169,9 @@ func (s *SolanaWorkloadGenerator) generateContractWorkload() (Workload, error) {
 					// function to create
 					accFrom := accountsChoices[txIndex%len(accountsChoices)]
 					funcToCreate := s.BenchConfig.ContractInfo.Functions[functionsToCreatePerThread[txCount]]
-					s.logger.Debug(fmt.Sprintf("tx %d for func %s", txCount, funcToCreate.Name),
-						zap.Int("secondary", secondaryID),
-						zap.Int("thread", threadID))
+					// s.logger.Debug(fmt.Sprintf("tx %d for func %s", txCount, funcToCreate.Name),
+					// 	zap.Int("secondary", secondaryID),
+					// 	zap.Int("thread", threadID))
 					var functionParamSigs []string
 					var functionFinal string
 

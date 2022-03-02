@@ -73,8 +73,8 @@ func (e *EthereumWorkloadGenerator) BlockchainSetup() error {
 }
 
 type noncePair struct {
-	account  string
-	nonce    uint64
+	account string
+	nonce   uint64
 }
 
 // InitParams sets initial aspects such as the suggested gas price and sets up a small connection to get information from the blockchain.
@@ -787,7 +787,7 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 	for idx, funcInfo := range e.BenchConfig.ContractInfo.Functions {
 		// add index to functionsToCreate
 		var funcRatio int
-		if idx == len(e.BenchConfig.ContractInfo.Functions) - 1 {
+		if idx == len(e.BenchConfig.ContractInfo.Functions)-1 {
 			funcRatio = numberOfTransactions - len(functionsToCreatePerThread)
 		} else {
 			funcRatio = (funcInfo.Ratio * numberOfTransactions) / 100
@@ -841,9 +841,9 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 					// function to create
 					accFrom := accountsChoices[txIndex%len(accountsChoices)]
 					funcToCreate := e.BenchConfig.ContractInfo.Functions[functionsToCreatePerThread[txCount]]
-					zap.L().Debug(fmt.Sprintf("tx %d for func %s", txCount, funcToCreate.Name),
-						zap.Int("secondary", secondaryID),
-						zap.Int("thread", threadID))
+					// zap.L().Debug(fmt.Sprintf("tx %d for func %s", txCount, funcToCreate.Name),
+					// zap.Int("secondary", secondaryID),
+					// zap.Int("thread", threadID))
 					var functionParamSigs []string
 					var functionFinal string
 					if len(funcToCreate.Params) > 0 {

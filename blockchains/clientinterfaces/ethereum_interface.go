@@ -349,6 +349,7 @@ func (e *EthereumInterface) _sendTx(endpoint int, txSigned ethtypes.Transaction)
 	if err != nil {
 		zap.L().Debug("Err",
 			zap.Error(err),
+			zap.String("sendTime", sendTime.String()),
 		)
 		atomic.AddUint64(&e.Fail, 1)
 		atomic.AddUint64(&e.NumTxDone, 1)

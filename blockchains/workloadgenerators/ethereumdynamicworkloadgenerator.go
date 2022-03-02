@@ -822,9 +822,9 @@ func (e *EthereumDynamicWorkloadGenerator) generateContractWorkload() (Workload,
 					// function to create
 					accFrom := accountsChoices[txIndex%len(accountsChoices)]
 					funcToCreate := e.BenchConfig.ContractInfo.Functions[functionsToCreatePerThread[txCount]]
-					zap.L().Debug(fmt.Sprintf("tx %d for func %s", txCount, funcToCreate.Name),
-						zap.Int("secondary", secondaryID),
-						zap.Int("thread", threadID))
+					// zap.L().Debug(fmt.Sprintf("tx %d for func %s", txCount, funcToCreate.Name),
+					// 	zap.Int("secondary", secondaryID),
+					// 	zap.Int("thread", threadID))
 					var functionParamSigs []string
 					var functionFinal string
 					if len(funcToCreate.Params) > 0 {

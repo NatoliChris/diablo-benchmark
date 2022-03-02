@@ -34,6 +34,15 @@ type solanaClient struct {
 	blockhash            solana.Hash
 	blockhashLock        sync.RWMutex
 	exitSignal           uint32
+	logger               *zap.Logger
+}
+
+func NewSolanaClient(conn *rpc.Client, sock *ws.Client, logger *zap.Logger) *solanaClient {
+	return &solanaClient{
+		rpcClient: conn,
+		wsClient:  sock,
+		logger:    logger,
+	}
 }
 
 func (c *solanaClient) Blockhash() solana.Hash {
@@ -42,21 +51,37 @@ func (c *solanaClient) Blockhash() solana.Hash {
 	return c.blockhash
 }
 
+func (c *solanaClient) CompareAndSetBlockhash(newBlockhash solana.Hash, newTime time.Time) bool {
+	c.blockhashLock.Lock()
+	defer c.blockhashLock.Unlock()
+	if c.blockhash != newBlockhash && c.blockhashRequestTime.Before(newTime) {
+		c.blockhash = newBlockhash
+		c.blockhashRequestTime = newTime
+		return true
+	}
+	return false
+}
+
+func (c *solanaClient) UpdateBlockhash() error {
+	now := time.Now()
+	blockhash, err := c.rpcClient.GetRecentBlockhash(
+		context.Background(),
+		rpc.CommitmentFinalized)
+	if err != nil {
+		return err
+	}
+	updated := c.CompareAndSetBlockhash(blockhash.Value.Blockhash, now)
+	if updated {
+		c.logger.Debug("Updated blockhash from polling")
+	}
+	return nil
+}
+
 func (c *solanaClient) PollBlockhash() {
 	for {
-		now := time.Now()
-		blockhash, err := c.rpcClient.GetRecentBlockhash(
-			context.Background(),
-			rpc.CommitmentFinalized)
-		if err != nil {
+		if err := c.UpdateBlockhash(); err != nil {
 			time.Sleep(50 * time.Millisecond)
 			continue
-		}
-		if blockhash.Value.Blockhash != c.Blockhash() {
-			c.blockhashLock.Lock()
-			c.blockhash = blockhash.Value.Blockhash
-			c.blockhashRequestTime = now
-			c.blockhashLock.Unlock()
 		}
 		if atomic.LoadUint32(&c.exitSignal) == 1 {
 			break
@@ -404,15 +429,10 @@ func (s *SolanaInterface) ConnectAll(primaryID int) error {
 			return err
 		}
 
-		now := time.Now()
-		blockhash, err := conn.GetRecentBlockhash(
-			context.Background(),
-			rpc.CommitmentFinalized)
-		if err != nil {
-			return err
-		}
+		sc := NewSolanaClient(conn, sock, s.logger.Named(node))
+		sc.UpdateBlockhash()
 
-		s.Connections = append(s.Connections, &solanaClient{rpcClient: conn, wsClient: sock, blockhashRequestTime: now, blockhash: blockhash.Value.Blockhash})
+		s.Connections = append(s.Connections, sc)
 
 		go s.Connections[len(s.Connections)-1].PollBlockhash()
 	}
