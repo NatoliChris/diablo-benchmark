@@ -5,6 +5,8 @@ import (
 	"diablo-benchmark/core"
 	"diablo-benchmark/blockchains/mock"
 	"diablo-benchmark/blockchains/nalgorand"
+	"diablo-benchmark/blockchains/ndiem"
+	"diablo-benchmark/blockchains/nethereum"
 	"compress/gzip"
 	"fmt"
 	"encoding/json"
@@ -38,6 +40,8 @@ const (
 func buildSystemMap() map[string]core.BlockchainInterface {
 	return map[string]core.BlockchainInterface{
 		"algorand": &nalgorand.BlockchainInterface{},
+		"diem": &ndiem.BlockchainInterface{},
+		"ethereum": &nethereum.BlockchainInterface{},
 		"mock": &mock.BlockchainInterface{},
 	}
 }
@@ -57,10 +61,11 @@ func printStat(result *core.Result) {
 	var latency, sumLatencies, lastTime float64
 	var secondary *core.SecondaryResult
 	var iact *core.InteractionResult
+	var numSubmitted, numAborted int
 	var client *core.ClientResult
-	var numSubmitted int
 
 	numSubmitted = 0
+	numAborted = 0
 	sumLatencies = 0
 	lastTime = 0
 
@@ -86,6 +91,7 @@ func printStat(result *core.Result) {
 				if iact.CommitTime < 0 {
 					continue
 				} else if iact.AbortTime >= 0 {
+					numAborted += 1
 					continue
 				} else if iact.CommitTime < iact.SubmitTime {
 					continue
@@ -97,6 +103,10 @@ func printStat(result *core.Result) {
 			}
 		}
 	}
+
+	fmt.Printf("submit number: %d tx\n", numSubmitted)
+	fmt.Printf("commit number: %d tx\n", len(latencies))
+	fmt.Printf("abort number: %d tx\n", numAborted)
 
 	if lastTime <= 0 {
 		fmt.Printf("average load: -\n")
