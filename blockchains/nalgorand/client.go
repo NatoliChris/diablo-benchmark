@@ -68,12 +68,13 @@ func (this *BlockchainClient) TriggerInteraction(iact core.Interaction) error {
 
 	this.logger.Tracef("submit transaction %d", tx.getUid())
 
+	iact.ReportSubmit()
+
 	txid,err = this.client.SendRawTransaction(raw).Do(context.Background())
 	if err != nil {
+		iact.ReportAbort()
 		return err
 	}
-
-	iact.ReportSubmit()
 
 	return this.confirmer.confirm(iact, txid)
 }

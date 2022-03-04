@@ -2,9 +2,11 @@ package nalgorand
 
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"diablo-benchmark/core"
+	"diablo-benchmark/util"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -41,6 +43,8 @@ func newTealCompiler(logger core.Logger, base string, client *algod.Client, ctx 
 func (this *tealCompiler) compile(name string) (*application, error) {
 	var local, global *types.StateSchema
 	var approvalCode, clearCode []byte
+	var parser *util.ServiceProcess
+	var path string
 	var err error
 
 	this.logger.Debugf("compile contract '%s'", name)
@@ -79,14 +83,24 @@ func (this *tealCompiler) compile(name string) (*application, error) {
 	this.logger.Debugf("  global.ints  = %d", global.NumUint)
 	this.logger.Debugf("  global.bytes = %d", global.NumByteSlice)
 
+	path = this.base + "/" + name + "/arguments"
+	if !strings.HasPrefix(path, "/") {
+		path = "./" + path
+	}
+
+	parser, err = util.StartServiceProcess(path)
+	if err != nil {
+		return nil, err
+	}
+
 	return &application{
 		logger: this.logger,
 		approvalCode: approvalCode,
 		clearCode: clearCode,
 		localSchema: *local,
 		globalSchema: *global,
-		base: this.base,
-		name: name,
+		parser: parser,
+		scanner: bufio.NewScanner(parser),
 	}, nil
 }
 
@@ -255,59 +269,33 @@ type application struct {
 	clearCode     []byte
 	localSchema   types.StateSchema
 	globalSchema  types.StateSchema
-	base          string
-	name          string
+	parser        *util.ServiceProcess
+	scanner       *bufio.Scanner
 }
 
 func (this *application) arguments(function string) ([][]byte, error) {
-	var args [][]byte
-	var path string
-	var err error
-
-	this.logger.Tracef("get arguments for '%s'.'%s'", this.name, function)
-
-	path = this.base + "/" + this.name + "/arguments.py"
-	this.logger.Tracef("try parse function with '%s'", path)
-	args, err = this.parseArguments(path, function)
-	if err == nil {
-		return args, nil
-	} else if !os.IsNotExist(err) {
-		return nil, err
-	}
-
-	return nil, fmt.Errorf("cannot find arguments for '%s'.'%s' in '%s'",
-		this.name, function, this.base)
-}
-
-func (this *application) parseArguments(path, function string) ([][]byte, error) {
-	var buffer bytes.Buffer
-	var output []string
-	var args [][]byte
-	var cmd *exec.Cmd
+	var args [][]byte = make([][]byte, 0)
 	var line string
+	var arg []byte
 	var err error
-	var i int
 
-	if !strings.HasPrefix(path, "/") {
-		path = "./" + path
-	}
-
-	cmd = exec.Command(path, function)
-	cmd.Stdout = &buffer
-
-	err = cmd.Run()
+	_, err = io.WriteString(this.parser, function + "\n")
 	if err != nil {
 		return nil, err
 	}
 
-	output = strings.Split(buffer.String(), "\n")
-	args = make([][]byte, len(output))
+	for this.scanner.Scan() {
+		line = this.scanner.Text()
+		if line == "" {
+			break
+		}
 
-	for i, line = range output {
-		args[i], err = base64.StdEncoding.DecodeString(line)
+		arg, err = base64.StdEncoding.DecodeString(line)
 		if err != nil {
 			return nil, err
 		}
+
+		args = append(args, arg)
 	}
 
 	return args, nil

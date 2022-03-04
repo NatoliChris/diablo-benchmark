@@ -3,6 +3,7 @@ package nalgorand
 
 import (
 	"context"
+	"diablo-benchmark/util"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -70,22 +71,22 @@ func (this *outerTransaction) getUid() uint64 {
 }
 
 func decodeTransaction(src io.Reader, provider parameterProvider) (transaction, error) {
-	var buf []byte = make([]byte, 1)
 	var inner virtualTransaction
+	var txtype uint8
 	var err error
 
-	_, err = io.ReadFull(src, buf)
+	err = util.NewMonadInputReader(src).ReadUint8(&txtype).Error()
 	if err != nil {
 		return nil, err
 	}
 
-	switch (buf[0]) {
+	switch (txtype) {
 	case transaction_type_transfer:
 		inner, err = decodeTransferTransaction(src, provider)
 	case transaction_type_invoke:
 		inner, err = decodeInvokeTransaction(src, provider)
 	default:
-		return nil, fmt.Errorf("unknown transaction type %d", buf[0])
+		return nil, fmt.Errorf("unknown transaction type %v", txtype)
 	}
 
 	if err != nil {
@@ -187,47 +188,23 @@ func newTransferTransaction(uid, amount uint64, from, to string, key ed25519.Pri
 }
 
 func decodeTransferTransaction(src io.Reader, provider parameterProvider) (*transferTransaction, error) {
-	var buf []byte = make([]byte, 255)
 	var key ed25519.PrivateKey
 	var lenfrom, lento int
 	var uid, amount uint64
 	var from, to string
+	var buf []byte
 	var err error
 
-	_, err = io.ReadFull(src, buf[:2])
-	if err != nil {
-		return nil, err
-	}
-
-	lenfrom = int(buf[0])
-	lento = int(buf[1])
-
-	err = binary.Read(src, binary.LittleEndian, &uid)
-	if err != nil {
-		return nil, err
-	}
-
-	err = binary.Read(src, binary.LittleEndian, &amount)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = io.ReadFull(src, buf[:lenfrom])
-	if err != nil {
-		return nil, err
-	}
-
-	from = string(buf[:lenfrom])
-
-	_, err = io.ReadFull(src, buf[:lento])
-	if err != nil {
-		return nil, err
-	}
-
-	to = string(buf[:lento])
-
-	buf = make([]byte, ed25519.SeedSize)
-	_, err = io.ReadFull(src, buf)
+	err = util.NewMonadInputReader(src).
+		SetOrder(binary.LittleEndian).
+		ReadUint8(&lenfrom).
+		ReadUint8(&lento).
+		ReadUint64(&uid).
+		ReadUint64(&amount).
+		ReadString(&from, lenfrom).
+		ReadString(&to, lento).
+		ReadBytes(&buf, ed25519.SeedSize).
+		Error()
 	if err != nil {
 		return nil, err
 	}
@@ -238,9 +215,6 @@ func decodeTransferTransaction(src io.Reader, provider parameterProvider) (*tran
 }
 
 func (this *transferTransaction) encode(dest io.Writer) error {
-	var buf []byte
-	var err error
-
 	if len(this.from) > 255 {
 		return fmt.Errorf("from address too long (%d bytes)",
 			len(this.from))
@@ -251,42 +225,17 @@ func (this *transferTransaction) encode(dest io.Writer) error {
 			len(this.to))
 	}
 
-	buf = make([]byte, 3)
-	buf[0] = transaction_type_transfer
-	buf[1] = uint8(len(this.from))
-	buf[2] = uint8(len(this.to))
-
-	_, err = dest.Write(buf)
-	if err != nil {
-		return err
-	}
-
-	err = binary.Write(dest, binary.LittleEndian, this.getUid())
-	if err != nil {
-		return err
-	}
-
-	err = binary.Write(dest, binary.LittleEndian, this.amount)
-	if err != nil {
-		return err
-	}
-
-	_, err = io.WriteString(dest, this.from)
-	if err != nil {
-		return err
-	}
-
-	_, err = io.WriteString(dest, this.to)
-	if err != nil {
-		return err
-	}
-
-	_, err = dest.Write(this.key.Seed())
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return util.NewMonadOutputWriter(dest).
+		SetOrder(binary.LittleEndian).
+		WriteUint8(transaction_type_transfer).
+		WriteUint8(uint8(len(this.from))).
+		WriteUint8(uint8(len(this.to))).
+		WriteUint64(this.getUid()).
+		WriteUint64(this.amount).
+		WriteString(this.from).
+		WriteString(this.to).
+		WriteBytes(this.key.Seed()).
+		Error()
 }
 
 func (this *transferTransaction) getRaw() (virtualTransaction, []byte, error) {
@@ -385,60 +334,29 @@ func newInvokeTransaction(uid, appid uint64, args [][]byte, from string, key ed2
 func decodeInvokeTransaction(src io.Reader, provider parameterProvider) (*invokeTransaction, error) {
 	var i, lenfrom, lenargs, lenarg int
 	var key ed25519.PrivateKey
-	var lens, buf, arg []byte
+	var input util.MonadInput
 	var uid, appid uint64
 	var args [][]byte
 	var from string
+	var buf []byte
 	var err error
 
-	buf = make([]byte, 255)
+	input = util.NewMonadInputReader(src).
+		SetOrder(binary.LittleEndian).
+		ReadUint8(&lenfrom).
+		ReadUint8(&lenargs).
+		ReadUint64(&uid).
+		ReadUint64(&appid).
+		ReadString(&from, lenfrom).
+		ReadBytes(&buf, ed25519.SeedSize)
 
-	_, err = io.ReadFull(src, buf[:2])
-	if err != nil {
-		return nil, err
-	}
-
-	lenfrom = int(buf[0])
-	lenargs = int(buf[1])
-	lens = make([]byte, lenargs)
 	args = make([][]byte, lenargs)
 
-	_, err = io.ReadFull(src, lens)
-	if err != nil {
-		return nil, err
+	for i = range args {
+		input.ReadUint8(&lenarg).ReadBytes(&args[i], lenarg)
 	}
 
-	err = binary.Read(src, binary.LittleEndian, &uid)
-	if err != nil {
-		return nil, err
-	}
-
-	err = binary.Read(src, binary.LittleEndian, &appid)
-	if err != nil {
-		return nil, err
-	}
-
-	for i = range lens {
-		lenarg = int(lens[i])
-
-		arg = make([]byte, lenarg)
-		_, err = io.ReadFull(src, arg)
-		if err != nil {
-			return nil, err
-		}
-
-		args[i] = arg
-	}
-
-	_, err = io.ReadFull(src, buf[:lenfrom])
-	if err != nil {
-		return nil, err
-	}
-
-	from = string(buf[:lenfrom])
-
-	buf = make([]byte, ed25519.SeedSize)
-	_, err = io.ReadFull(src, buf)
+	err = input.Error()
 	if err != nil {
 		return nil, err
 	}
@@ -449,8 +367,7 @@ func decodeInvokeTransaction(src io.Reader, provider parameterProvider) (*invoke
 }
 
 func (this *invokeTransaction) encode(dest io.Writer) error {
-	var arg, buf []byte
-	var err error
+	var output util.MonadOutput
 	var i int
 
 	if len(this.args) > 255 {
@@ -458,56 +375,31 @@ func (this *invokeTransaction) encode(dest io.Writer) error {
 			len(this.args))
 	}
 
-	for i, arg = range this.args {
-		if len(arg) <= 255 {
+	for i = range this.args {
+		if len(this.args[i]) <= 255 {
 			continue
 		}
 
 		return fmt.Errorf("invoke argument %d too large (%d bytes)",
-			i, len(arg))
+			i, len(this.args[i]))
 	}
 
-	buf = make([]byte, 3 + len(this.args))
-	buf[0] = transaction_type_invoke
-	buf[1] = uint8(len(this.from))
-	buf[2] = uint8(len(this.args))
-	for i, arg = range this.args {
-		buf[3+i] = uint8(len(arg))
+	output = util.NewMonadOutputWriter(dest).
+		SetOrder(binary.LittleEndian).
+		WriteUint8(transaction_type_invoke).
+		WriteUint8(uint8(len(this.from))).
+		WriteUint8(uint8(len(this.args))).
+		WriteUint64(this.getUid()).
+		WriteUint64(this.appid).
+		WriteString(this.from).
+		WriteBytes(this.key.Seed())
+		
+	for i = range this.args {
+		output.WriteUint8(uint8(len(this.args[i]))).
+			WriteBytes(this.args[i])
 	}
 
-	_, err = dest.Write(buf)
-	if err != nil {
-		return err
-	}
-
-	err = binary.Write(dest, binary.LittleEndian, this.getUid())
-	if err != nil {
-		return err
-	}
-
-	err = binary.Write(dest, binary.LittleEndian, this.appid)
-	if err != nil {
-		return err
-	}
-
-	for _, arg = range this.args {
-		_, err = dest.Write(arg)
-		if err != nil {
-			return err
-		}
-	}
-
-	_, err = io.WriteString(dest, this.from)
-	if err != nil {
-		return err
-	}
-
-	_, err = dest.Write(this.key.Seed())
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return output.Error()
 }
 
 func (this *invokeTransaction) getRaw() (virtualTransaction, []byte, error) {

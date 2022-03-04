@@ -59,8 +59,7 @@ func (this *BlockchainBuilder) getLogger() core.Logger {
 	return this.logger
 }
 
-func (this *BlockchainBuilder) addAccount(address string,
-	key ed25519.PrivateKey) {
+func (this *BlockchainBuilder) addAccount(address string, key ed25519.PrivateKey) {
 	this.premadeAccounts = append(this.premadeAccounts, account{
 		address: address,
 		key: key,
@@ -239,7 +238,7 @@ func (this *BlockchainBuilder) CreateResource(domain string) (core.SampleFactory
 	return nil, false
 }
 
-func (this *BlockchainBuilder) EncodeTransfer(amount int, from, to interface{}) ([]byte, error) {
+func (this *BlockchainBuilder) EncodeTransfer(amount int, from, to interface{}, info core.InteractionInfo) ([]byte, error) {
 	var tx *transferTransaction
 	var buffer bytes.Buffer
 	var err error
@@ -259,7 +258,7 @@ func (this *BlockchainBuilder) EncodeTransfer(amount int, from, to interface{}) 
 }
 
 
-func (this *BlockchainBuilder) EncodeInvoke(from, to interface{}, function string) ([]byte, error) {
+func (this *BlockchainBuilder) EncodeInvoke(from, to interface{}, function string, info core.InteractionInfo) ([]byte, error) {
 	var tx *invokeTransaction
 	var buffer bytes.Buffer
 	var cont *contract
@@ -286,6 +285,6 @@ func (this *BlockchainBuilder) EncodeInvoke(from, to interface{}, function strin
 	return buffer.Bytes(), nil
 }
 
-func (this *BlockchainBuilder) EncodeInteraction(itype string) (core.InteractionFactory, bool) {
-	return nil, false
+func (this *BlockchainBuilder) EncodeInteraction(itype string, expr core.BenchmarkExpression, info core.InteractionInfo) ([]byte, error) {
+	return nil, fmt.Errorf("unknown interaction type '%s'", itype)
 }
