@@ -140,10 +140,10 @@ type BenchmarkExpression interface {
 
 
 func parseBenchmarkYamlPath(path string, sys *system) error {
-	var benchmark benchmarkExpression
 	var context parsingContext
 	var decoder *yaml.Decoder
 	var implicit basicScope
+	var bench benchmark
 	var file *os.File
 	var err error
 
@@ -158,9 +158,9 @@ func parseBenchmarkYamlPath(path string, sys *system) error {
 
 	implicit.init(nil)
 	context.init(path, sys, &implicit)
-	benchmark.init(&context)
+	bench.init(&context)
 
-	err = decoder.Decode(&benchmark)
+	err = decoder.Decode(&bench)
 	if err != nil {
 		return err
 	}
@@ -202,15 +202,16 @@ func (this *parsingContext) specialize(top scope) {
 }
 
 
-type benchmarkExpression struct {
-	context   benchmarkContext
+type benchmark struct {
+	context    benchmarkContext
+	workloads  []interactionGenerator
 }
 
-func (this *benchmarkExpression) init(context benchmarkContext) {
+func (this *benchmark) init(context benchmarkContext) {
 	this.context = context
 }
 
-func (this *benchmarkExpression) UnmarshalYAML(node *yaml.Node) error {
+func (this *benchmark) UnmarshalYAML(node *yaml.Node) error {
 	var expr BenchmarkExpression
 	var err error
 
@@ -222,12 +223,12 @@ func (this *benchmarkExpression) UnmarshalYAML(node *yaml.Node) error {
 	return this.parse(expr)
 }
 
-func (this *benchmarkExpression) parse(expr BenchmarkExpression) error {
+func (this *benchmark) parse(expr BenchmarkExpression) error {
 	var fields []BenchmarkExpression
-	var workload workloadExpression
 	var field BenchmarkExpression
 	var global scope
 	var err error
+	var i int
 
 	field, err = expr.TryField("let")
 	if err == nil {
@@ -241,36 +242,166 @@ func (this *benchmarkExpression) parse(expr BenchmarkExpression) error {
 
 	fields = expr.Field("workloads").Slice()
 
-	for _, field = range fields {
-		err = workload.parse(field)
+	this.workloads = make([]interactionGenerator, len(fields))
+
+	for i, field = range fields {
+		this.workloads[i], err = parseWorkload(field)
 		if err != nil {
 			return err
 		}
+	}
+
+	return this.instantiate()
+}
+
+func (this *benchmark) generate() <-chan *benchmarkInteraction {
+	var out chan *benchmarkInteraction = make(chan *benchmarkInteraction)
+	var ins []<-chan *benchmarkInteraction
+	var load interactionGenerator
+	var i int
+
+	ins = make([]<-chan *benchmarkInteraction, len(this.workloads))
+
+	for i, load = range this.workloads {
+		ins[i] = load.generate()
+	}
+
+	go fuseGenerators(out, ins)
+
+	return out
+}
+
+func (this *benchmark) instantiate() error {
+	var iact *benchmarkInteraction
+	var globalIndex int
+	var encoded []byte
+	var err error
+
+	globalIndex = 0
+
+	for iact = range this.generate() {
+		iact.source.specialize(iact.current)
+
+		encoded, err = iact.factory.Instance(iact.source,
+			&interactionInformation{
+				globalIndex: globalIndex,
+				scheduleTime: iact.scheduleTime,
+			})
+
+		iact.source.specialize(nil)
+
+		if err != nil {
+			return err
+		}
+
+		err = iact.sendingClient.sendInteraction(
+			iact.source.FullPosition(), iact.scheduleTime, encoded)
+		if err != nil {
+			return err
+		}
+
+		globalIndex += 1
 	}
 
 	return nil
 }
 
 
-type workloadExpression struct {
+type benchmarkInteraction struct {
+	scheduleTime   float64
+	sendingClient  client
+	factory        InteractionFactory
+	source         BenchmarkExpression
+	current        scope
 }
 
-func (this *workloadExpression) parse(expr BenchmarkExpression) error {
-	var field, cfield BenchmarkExpression
-	var behaviors []BenchmarkExpression
-	var element interface{}
-	var view []string
+type interactionInformation struct {
+	globalIndex   int
+	clientIndex   int
+	localIndex    int
+	scheduleTime  float64
+}
+
+func (this *interactionInformation) TotalOrder() int {
+	return this.globalIndex
+}
+
+func (this *interactionInformation) ClientOrder() int {
+	return this.localIndex
+}
+
+func (this *interactionInformation) Timestamp() float64 {
+	return this.scheduleTime
+}
+
+func (this *interactionInformation) ClientId() int {
+	return this.clientIndex
+}
+
+type interactionGenerator interface {
+	generate() <-chan *benchmarkInteraction
+}
+
+func fuseGenerators(out chan<- *benchmarkInteraction, ins []<-chan *benchmarkInteraction) {
+	var elements []*benchmarkInteraction
+	var element *benchmarkInteraction
+	var i, min int
+
+	elements = make([]*benchmarkInteraction, len(ins))
+
+	for i = range ins {
+		elements[i], _ = <- ins[i]
+	}
+
+	for {
+		min = 0
+
+		for i, element = range elements {
+			if element == nil {
+				continue
+			}
+
+			if elements[min] == nil {
+				min = i
+				continue
+			}
+
+			if element.scheduleTime < elements[min].scheduleTime {
+				min = i
+				continue
+			}
+		}
+
+		if elements[min] == nil {
+			break
+		}
+
+		out <- elements[min]
+
+		elements[min] = <- ins[min]
+	}
+
+	close(out)
+}
+
+
+
+type workloadGenerator struct {
+	clientLoads  []interactionGenerator
+}
+
+func parseWorkload(expr BenchmarkExpression) (*workloadGenerator, error) {
+	var field BenchmarkExpression
+	var this workloadGenerator
 	var i, number int
-	var loc location
 	var local scope
-	var cli client
 	var err error
 
 	field, err = expr.TryField("let")
 	if err == nil {
 		local, err = field.scope()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		expr.specialize(local)
@@ -280,45 +411,103 @@ func (this *workloadExpression) parse(expr BenchmarkExpression) error {
 	if err == nil {
 		number, err = field.GetInt()
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		number = 1
 	}
 
+	this.clientLoads = make([]interactionGenerator, number)
+
 	for i = 0; i < number; i++ {
-		cfield = expr.Field("client")
-
-		view, err = this.parseView(cfield)
+		this.clientLoads[i], err = parseClient(expr.Field("client"))
 		if err != nil {
-			return err
-		}
-
-		element, err = cfield.Field("location").GetResource("location")
-		if err != nil {
-			return err
-		}
-
-		loc = element.(location)
-
-		cli, err = loc.createClient(cfield.FullPosition(), view)
-		if err != nil {
-			return err
-		}
-
-		behaviors = cfield.Field("behavior").Slice()
-		for _, field = range behaviors {
-			err = parseLoadExpression(field, cli)
-			if err != nil {
-				return err
-			}
+			return nil, err
 		}
 	}
 
-	return nil
+	return &this, nil
 }
 
-func (this *workloadExpression) parseView(client BenchmarkExpression) ([]string, error) {
+func (this *workloadGenerator) generate() <-chan *benchmarkInteraction {
+	var out chan *benchmarkInteraction = make(chan *benchmarkInteraction)
+	var ins []<-chan *benchmarkInteraction
+	var load interactionGenerator
+	var i int
+
+	ins = make([]<-chan *benchmarkInteraction, len(this.clientLoads))
+
+	for i, load = range this.clientLoads {
+		ins[i] = load.generate()
+	}
+
+	go fuseGenerators(out, ins)
+
+	return out
+}
+
+
+type clientLoadGenerator struct {
+	target  client
+	loads   []interactionGenerator
+}
+
+func parseClient(expr BenchmarkExpression) (*clientLoadGenerator, error) {
+	var behaviors []BenchmarkExpression
+	var field BenchmarkExpression
+	var this clientLoadGenerator
+	var element interface{}
+	var view []string
+	var loc location
+	var local scope
+	var err error
+	var i int
+
+	field, err = expr.TryField("let")
+	if err == nil {
+		local, err = field.scope()
+		if err != nil {
+			return nil, err
+		}
+
+		expr.specialize(local)
+		defer expr.specialize(nil)
+	}
+
+	view, err = parseView(expr)
+	if err != nil {
+		return nil, err
+	}
+
+	element, err = expr.Field("location").GetResource("location")
+	if err != nil {
+		return nil, err
+	}
+
+	loc = element.(location)
+
+	this.target, err = loc.createClient(expr.FullPosition(), view)
+	if err != nil {
+		return nil, err
+	}
+
+	behaviors = expr.Field("behavior").Slice()
+
+	this.loads = make([]interactionGenerator, len(behaviors))
+
+	for i, field = range behaviors {
+		this.loads[i], err = parseLoad(field, this.target)
+		if err != nil {
+			return nil, err
+		}
+
+		
+	}
+
+	return &this, nil
+}
+
+func parseView(client BenchmarkExpression) ([]string, error) {
  	var vfield, sfield BenchmarkExpression
 	var addrs []string = make([]string, 0)
 	var element interface{}
@@ -370,9 +559,25 @@ func (this *workloadExpression) parseView(client BenchmarkExpression) ([]string,
 	return addrs, nil
 }
 
+func (this *clientLoadGenerator) generate() <-chan *benchmarkInteraction {
+	var out chan *benchmarkInteraction = make(chan *benchmarkInteraction)
+	var ins []<-chan *benchmarkInteraction
+	var load interactionGenerator
+	var i int
 
-func parseLoadExpression(expr BenchmarkExpression, cli client) error {
-	var timeload timeloadExpression
+	ins = make([]<-chan *benchmarkInteraction, len(this.loads))
+
+	for i, load = range this.loads {
+		ins[i] = load.generate()
+	}
+
+	go fuseGenerators(out, ins)
+
+	return out
+}
+
+
+func parseLoad(expr BenchmarkExpression, sender client) (interactionGenerator, error) {
 	var btype string
 	var err error
 
@@ -382,84 +587,84 @@ func parseLoadExpression(expr BenchmarkExpression, cli client) error {
 	}
 
 	if btype == "timeload" {
-		return timeload.parse(expr, cli)
+		return parseTimeload(expr, sender)
 	}
 
-	return fmt.Errorf("%s: unknown behavior '%s'",
+	return nil, fmt.Errorf("%s: unknown behavior '%s'",
 		expr.FullPosition(), btype)
 }
 
 
-type timeloadExpression struct {
+type timeloadGenerator struct {
+	load     map[float64]float64
+	sender   client
+	factory  InteractionFactory
+	source   BenchmarkExpression
+	current  scope
 }
 
-func (this *timeloadExpression) parse(expr BenchmarkExpression, cli client) error {
-	var loads map[float64]float64 = make(map[float64]float64, 0)
+func parseTimeload(expr BenchmarkExpression, sender client) (*timeloadGenerator, error) {
 	var load, interaction BenchmarkExpression
-	var factory InteractionFactory
-	var flatload []float64
-	var bytes []byte
+	var this timeloadGenerator
 	var itype string
 	var time float64
 	var err error
 	var ok bool
 
+	this.sender = sender
+
 	interaction = expr.Field("interaction")
 	itype, err = interaction.etype()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	factory, ok = interaction.system().interactionFactory(itype)
+	this.source = interaction
+	this.current = interaction.current()
+
+	this.factory, ok = expr.system().interactionFactory(itype)
 	if !ok {
-		return fmt.Errorf("%s: unknown interaction type '%s'",
+		return nil, fmt.Errorf("%s: unknown interaction type '%s'",
 			interaction.FullPosition(), itype)
 	}
 
+	this.load = make(map[float64]float64)
 	for _, load = range expr.Field("load").Map() {
 		time, err = load.Key().GetFloat()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if time < 0 {
-			return fmt.Errorf("%s: must be positive or zero",
+			return nil, fmt.Errorf("%s: must be positive or zero",
 				load.Key().FullPosition())
 		}
 
-		loads[time], err = load.Value().GetFloat()
+		this.load[time], err = load.Value().GetFloat()
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	flatload = flattenLoads(loads)
-
-	for _, time = range flatload {
-		bytes, err = factory.Instance(interaction)
-		if err != nil {
-			return err
-		}
-
-		err = cli.sendInteraction(interaction.FullPosition(), time,
-			bytes)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return &this, nil
 }
 
-func flattenLoads(loads map[float64]float64) []float64 {
+func (this *timeloadGenerator) generate() <-chan *benchmarkInteraction {
+	var ret chan *benchmarkInteraction = make(chan *benchmarkInteraction)
+
+	go this.flatten(ret)
+
+	return ret
+}
+
+func (this *timeloadGenerator) flatten(out chan<- *benchmarkInteraction) {
 	var key, value, tick, done, clock, wait float64
-	var times, flat []float64
+	var times []float64
 	var i int
 
-	times = make([]float64, 0, len(loads))
-	flat = make([]float64, 0)
+	times = make([]float64, 0, len(this.load))
 
-	for key = range loads {
+	for key = range this.load {
 		times = append(times, key)
 	}
 
@@ -479,7 +684,13 @@ func flattenLoads(loads map[float64]float64) []float64 {
 				if (clock + wait) <= times[i] {
 					done = 0
 					clock += wait
-					flat = append(flat, clock)
+					out <- &benchmarkInteraction{
+						scheduleTime: clock,
+						sendingClient: this.sender,
+						factory: this.factory,
+						source: this.source,
+						current: this.current,
+					}
 				} else {
 					done += (times[i] - clock) / tick
 					clock = times[i]
@@ -489,10 +700,10 @@ func flattenLoads(loads map[float64]float64) []float64 {
 		}
 
 		key = times[i]
-		value = loads[key]
+		value = this.load[key]
 	}
 
-	return flat
+	close(out)
 }
 
 

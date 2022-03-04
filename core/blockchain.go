@@ -17,6 +17,14 @@ type Interaction interface {
 }
 
 
+type InteractionInfo interface {
+	// Return the schedule sedning time of the interaction relative to the
+	// beginning of the benchmark.
+	//
+	Timestamp() float64
+}
+
+
 type BlockchainInterface interface {
 	// Create a blockchain initializer.
 	// This initializer receives the given blockchain parameters `params`
@@ -55,11 +63,11 @@ type BlockchainBuilder interface {
 	// A transfer moves a fungible amount of currencies `stake` from an
 	// account `from` to an account `to`.
 	//
-	EncodeTransfer(int, interface{}, interface{}) ([]byte, error)
+	EncodeTransfer(amount int, from, to interface{}, info InteractionInfo) ([]byte, error)
 
-	EncodeInvoke(interface{}, interface{}, string) ([]byte, error)
+	EncodeInvoke(from interface{}, contract interface{}, function string, info InteractionInfo) ([]byte, error)
 
-	EncodeInteraction(itype string) (InteractionFactory, bool)
+	EncodeInteraction(itype string, expr BenchmarkExpression, info InteractionInfo) ([]byte, error)
 }
 
 type BlockchainClient interface {
@@ -185,23 +193,11 @@ func newTransferInteractionFactory(builder BlockchainBuilder) *transferInteracti
 	}
 }
 
-func (this *transferInteractionFactory) Instance(expr BenchmarkExpression) ([]byte, error) {
+func (this *transferInteractionFactory) Instance(expr BenchmarkExpression, info InteractionInfo) ([]byte, error) {
         var field BenchmarkExpression
 	var from, to interface{}
-	var local scope
 	var stake int
 	var err error
-
-	field, err = expr.TryField("let")
-	if err == nil {
-		local, err = field.scope()
-		if err != nil {
-			return nil, err
-		}
-
-		expr.specialize(local)
-		defer expr.specialize(nil)
-	}
 
 	field, err = expr.TryField("stake")
 	if err == nil {
@@ -223,7 +219,7 @@ func (this *transferInteractionFactory) Instance(expr BenchmarkExpression) ([]by
 		return nil, err
 	}
 
-	return this.builder.EncodeTransfer(stake, from, to)
+	return this.builder.EncodeTransfer(stake, from, to, info)
 }
 
 
@@ -237,23 +233,10 @@ func newInvokeInteractionFactory(builder BlockchainBuilder) *invokeInteractionFa
 	}
 }
 
-func (this *invokeInteractionFactory) Instance(expr BenchmarkExpression) ([]byte, error) {
+func (this *invokeInteractionFactory) Instance(expr BenchmarkExpression, info InteractionInfo) ([]byte, error) {
 	var from, contract interface{}
-        var field BenchmarkExpression
 	var function string
-	var local scope
 	var err error
-
-	field, err = expr.TryField("let")
-	if err == nil {
-		local, err = field.scope()
-		if err != nil {
-			return nil, err
-		}
-
-		expr.specialize(local)
-		defer expr.specialize(nil)
-	}
 
 	from, err = expr.Field("from").GetResource("account")
 	if err != nil {
@@ -270,5 +253,22 @@ func (this *invokeInteractionFactory) Instance(expr BenchmarkExpression) ([]byte
 		return nil, err
 	}
 
-	return this.builder.EncodeInvoke(from, contract, function)
+	return this.builder.EncodeInvoke(from, contract, function, info)
+}
+
+
+type proxyInteractionFactory struct {
+	builder  BlockchainBuilder
+	itype    string
+}
+
+func newProxyInteractionFactory(builder BlockchainBuilder, itype string) *proxyInteractionFactory {
+	return &proxyInteractionFactory{
+		builder: builder,
+		itype: itype,
+	}
+}
+
+func (this *proxyInteractionFactory) Instance(expr BenchmarkExpression, info InteractionInfo) ([]byte, error) {
+	return this.builder.EncodeInteraction(this.itype, expr, info)
 }

@@ -6,14 +6,15 @@ import (
 )
 
 
+
+
 type SampleFactory interface {
 	Instance(expr BenchmarkExpression) (Sample, error)
 }
 
 type InteractionFactory interface {
-	Instance(expr BenchmarkExpression) ([]byte, error)
+	Instance(expr BenchmarkExpression, info InteractionInfo) ([]byte,error)
 }
-
 
 type randomFactory interface {
 	instance(expr BenchmarkExpression) (Random, error)
@@ -90,5 +91,5 @@ func (this *system) interactionFactory(itype string) (InteractionFactory, bool) 
 		return ret, ok
 	}
 
-	return this.builder.EncodeInteraction(itype)
+	return newProxyInteractionFactory(this.builder, itype), true
 }
