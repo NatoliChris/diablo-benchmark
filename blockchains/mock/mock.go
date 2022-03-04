@@ -2,7 +2,9 @@ package mock
 
 
 import (
+	"bytes"
 	"diablo-benchmark/core"
+	"diablo-benchmark/util"
 	"encoding/binary"
 	"fmt"
 	"strconv"
@@ -123,35 +125,33 @@ func (this *BlockchainBuilder) CreateResource(domain string) (core.SampleFactory
 	return nil, false
 }
 
-func (this *BlockchainBuilder) EncodeTransfer(stake int, from, to interface{}) ([]byte, error) {
-	var buf []byte = make([]byte, 24)
-	var fromAccount, toAccount int
+func (this *BlockchainBuilder) EncodeTransfer(stake int, from, to interface{}, info core.InteractionInfo) ([]byte, error) {
+	var buf bytes.Buffer
 
-	fromAccount = from.(int)
-	toAccount = to.(int)
+	util.NewMonadOutputWriter(&buf).
+		SetOrder(binary.LittleEndian).
+		Write(uint64(stake)).
+		Write(uint64(from.(int))).
+		Write(uint64(to.(int))).
+		Trust()
 
-	binary.LittleEndian.PutUint64(buf[0:], uint64(stake))
-	binary.LittleEndian.PutUint64(buf[8:], uint64(fromAccount))
-	binary.LittleEndian.PutUint64(buf[16:], uint64(toAccount))
-
-	return buf, nil
+	return buf.Bytes(), nil
 }
 
-func (this *BlockchainBuilder) EncodeInvoke(from, contract interface{}, function string) ([]byte, error) {
-	var buf []byte = make([]byte, 16)
-	var fromAccount, contractId int
+func (this *BlockchainBuilder) EncodeInvoke(from, contract interface{}, function string, info core.InteractionInfo) ([]byte, error) {
+	var buf bytes.Buffer
 
-	fromAccount = from.(int)
-	contractId = contract.(int)
+	util.NewMonadOutputWriter(&buf).
+		SetOrder(binary.LittleEndian).
+		Write(uint64(from.(int))).
+		Write(uint64(contract.(int))).
+		Trust()
 
-	binary.LittleEndian.PutUint64(buf[0:], uint64(fromAccount))
-	binary.LittleEndian.PutUint64(buf[8:], uint64(contractId))
-
-	return buf, nil
+	return buf.Bytes(), nil
 }
 
-func (this *BlockchainBuilder) EncodeInteraction(itype string) (core.InteractionFactory, bool) {
-	return nil, false
+func (this *BlockchainBuilder) EncodeInteraction(itype string, expr core.BenchmarkExpression, info core.InteractionInfo) ([]byte, error) {
+	return nil, fmt.Errorf("unknown interaction type '%s'", itype)
 }
 
 
@@ -161,21 +161,29 @@ type BlockchainClient struct {
 	logger   core.Logger
 }
 
-func (this *BlockchainClient) DecodePayload(bytes []byte) (interface{}, error) {
+func (this *BlockchainClient) DecodePayload(encoded []byte) (interface{}, error) {
+	var buf *bytes.Buffer = bytes.NewBuffer(encoded)
 	var contract, from, to, stake int
 	var tx string
 
-	if len(bytes) == 16 {
-		from = int(binary.LittleEndian.Uint64(bytes[0:]))
-		contract = int(binary.LittleEndian.Uint64(bytes[8:]))
+	if len(encoded) == 16 {
+		util.NewMonadInputReader(buf).
+			SetOrder(binary.LittleEndian).
+			ReadUint64(&from).
+			ReadUint64(&contract).
+			Trust()
 		tx = fmt.Sprintf("invoke(%d -> %d)", from, contract)
-	} else if len(bytes) == 24 {
-		stake = int(binary.LittleEndian.Uint64(bytes[0:]))
-		from = int(binary.LittleEndian.Uint64(bytes[8:]))
-		to = int(binary.LittleEndian.Uint64(bytes[16:]))
+	} else if len(encoded) == 24 {
+		util.NewMonadInputReader(buf).
+			SetOrder(binary.LittleEndian).
+			ReadUint64(&stake).
+			ReadUint64(&from).
+			ReadUint64(&to).
+			Trust()
 		tx = fmt.Sprintf("transfer(%d : %d -> %d)", stake, from, to)
 	} else {
-		return nil, fmt.Errorf("invalid interaction payload %v", bytes)
+		return nil, fmt.Errorf("invalid interaction payload %v",
+			encoded)
 	}
 
 	if this.presign {
