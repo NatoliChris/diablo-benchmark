@@ -109,6 +109,7 @@ func NewSolanaWalletWithPublic(priv solana.PrivateKey, pub string) *SolanaWallet
 
 type SolanaInterface struct {
 	Connections      []*solanaClient // Active connections to a blockchain node for information
+	Primary          *solanaClient
 	NextConnection   uint64
 	SubscribeDone    chan bool                        // Event channel that will unsub from events
 	TransactionInfo  map[solana.Signature][]time.Time // Transaction information
@@ -315,7 +316,7 @@ func (s *SolanaInterface) parseBlocksForTransactions(slot uint64) {
 	var err error
 	for attempt := 0; attempt < 100; attempt++ {
 		includeRewards := false
-		block, err = s.ActiveConn().rpcClient.GetBlockWithOpts(
+		block, err = s.Primary.rpcClient.GetBlockWithOpts(
 			context.Background(),
 			slot,
 			&rpc.GetBlockOpts{
@@ -325,10 +326,12 @@ func (s *SolanaInterface) parseBlocksForTransactions(slot uint64) {
 			})
 
 		if err != nil {
+			s.logger.Warn("GetBlock error", zap.Error(err), zap.Int("attempt", attempt))
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
 		if block == nil {
+			s.logger.Warn("GetBlock empty", zap.Int("attempt", attempt))
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
@@ -361,7 +364,7 @@ func (s *SolanaInterface) parseBlocksForTransactions(slot uint64) {
 // EventHandler subscribes to the blocks and handles the incoming information about the transactions
 func (s *SolanaInterface) EventHandler() {
 	s.logger.Debug("EventHandler")
-	sub, err := s.ActiveConn().wsClient.RootSubscribe()
+	sub, err := s.Primary.wsClient.RootSubscribe()
 	if err != nil {
 		s.logger.Warn("RootSubscribe", zap.Error(err))
 		return
@@ -436,6 +439,8 @@ func (s *SolanaInterface) ConnectAll(primaryID int) error {
 
 		go s.Connections[len(s.Connections)-1].PollBlockhash()
 	}
+
+	s.Primary = s.Connections[primaryID%len(s.Connections)]
 
 	if !s.HandlersStarted {
 		go s.EventHandler()

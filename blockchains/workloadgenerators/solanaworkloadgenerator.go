@@ -19,7 +19,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -104,7 +103,7 @@ func NewSolanaWalletWithPublic(priv solana.PrivateKey, pub string) *SolanaWallet
 // SolanaWorkloadGenerator is the workload generator implementation for the Solana blockchain
 type SolanaWorkloadGenerator struct {
 	// SuggestedGasPrice *big.Int             // Suggested gas price on the network
-	Connections    []*solanaClient // Active connections to a blockchain node for information
+	ActiveConn     *solanaClient // Active connections to a blockchain node for information
 	NextConnection uint64
 	BenchConfig    *configs.BenchConfig // Benchmark configuration for workload intervals / type
 	ChainConfig    *configs.ChainConfig // Chain configuration to get number of transactions to make
@@ -115,12 +114,6 @@ type SolanaWorkloadGenerator struct {
 	PrivateKeys      map[solana.PublicKey]*solana.PrivateKey
 	logger           *zap.Logger
 	GenericWorkloadGenerator
-}
-
-func (s *SolanaWorkloadGenerator) ActiveConn() *solanaClient {
-	i := atomic.AddUint64(&s.NextConnection, 1)
-	client := s.Connections[i%uint64(len(s.Connections))]
-	return client
 }
 
 func NewSolanaWorkloadGenerator() *SolanaWorkloadGenerator {
@@ -189,7 +182,7 @@ func (s *SolanaWorkloadGenerator) parseBlocksForTransactions(slot uint64, sigs m
 	var err error
 	for i := 0; i < 100; i++ {
 		includeRewards := false
-		block, err = s.ActiveConn().rpcClient.GetBlockWithOpts(
+		block, err = s.ActiveConn.rpcClient.GetBlockWithOpts(
 			context.Background(),
 			slot,
 			&rpc.GetBlockOpts{
@@ -222,7 +215,7 @@ func (s *SolanaWorkloadGenerator) parseBlocksForTransactions(slot uint64, sigs m
 }
 
 func (s *SolanaWorkloadGenerator) sendTransactionsAndWait(transactions []*solana.Transaction) error {
-	sub, err := s.ActiveConn().wsClient.RootSubscribe()
+	sub, err := s.ActiveConn.wsClient.RootSubscribe()
 	if err != nil {
 		s.logger.Warn("RootSubscribe", zap.Error(err))
 		return err
@@ -238,8 +231,7 @@ func (s *SolanaWorkloadGenerator) sendTransactionsAndWait(transactions []*solana
 			s.logger.Debug("Sent", zap.Int("sigs", len(sigs)))
 			statsTime = tNow
 		}
-		conn := s.ActiveConn()
-		blockhash, err := conn.rpcClient.GetRecentBlockhash(
+		blockhash, err := s.ActiveConn.rpcClient.GetRecentBlockhash(
 			context.Background(),
 			rpc.CommitmentFinalized)
 		if err != nil {
@@ -250,7 +242,7 @@ func (s *SolanaWorkloadGenerator) sendTransactionsAndWait(transactions []*solana
 		if err != nil {
 			return err
 		}
-		sig, err := conn.rpcClient.SendTransactionWithOpts(context.Background(), tx, false, rpc.CommitmentFinalized)
+		sig, err := s.ActiveConn.rpcClient.SendTransactionWithOpts(context.Background(), tx, false, rpc.CommitmentFinalized)
 		if err != nil {
 			return err
 		}
@@ -294,25 +286,24 @@ func (s *SolanaWorkloadGenerator) sendTransactionsAndWait(transactions []*solana
 
 func (s *SolanaWorkloadGenerator) InitParams() error {
 	s.logger.Debug("InitParams")
-	for _, node := range s.ChainConfig.Nodes {
-		conn := rpc.New(fmt.Sprintf("http://%s", node))
+	node := s.ChainConfig.Nodes[0]
+	conn := rpc.New(fmt.Sprintf("http://%s", node))
 
-		ip, portStr, err := net.SplitHostPort(node)
-		if err != nil {
-			return err
-		}
-		port, err := strconv.Atoi(portStr)
-		if err != nil {
-			return err
-		}
-
-		sock, err := ws.Connect(context.Background(), fmt.Sprintf("ws://%s", net.JoinHostPort(ip, strconv.Itoa(port+1))))
-		if err != nil {
-			return err
-		}
-
-		s.Connections = append(s.Connections, &solanaClient{conn, sock})
+	ip, portStr, err := net.SplitHostPort(node)
+	if err != nil {
+		return err
 	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return err
+	}
+
+	sock, err := ws.Connect(context.Background(), fmt.Sprintf("ws://%s", net.JoinHostPort(ip, strconv.Itoa(port+1))))
+	if err != nil {
+		return err
+	}
+
+	s.ActiveConn = &solanaClient{conn, sock}
 	return nil
 }
 
@@ -495,7 +486,7 @@ func (s *SolanaWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, con
 		s.PrivateKeys[programAccount.PublicKey] = &programAccount.PrivateKey
 		storageAccount := NewSolanaWallet(solana.NewWallet().PrivateKey)
 		s.PrivateKeys[storageAccount.PublicKey] = &storageAccount.PrivateKey
-		lamports, err := s.ActiveConn().rpcClient.GetMinimumBalanceForRentExemption(
+		lamports, err := s.ActiveConn.rpcClient.GetMinimumBalanceForRentExemption(
 			context.Background(),
 			uint64(len(contract.Data)),
 			rpc.CommitmentFinalized)
@@ -583,7 +574,7 @@ func (s *SolanaWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, con
 			transactionBatches[2] = append(transactionBatches[2], transaction)
 		}
 
-		lamports, err = s.ActiveConn().rpcClient.GetMinimumBalanceForRentExemption(
+		lamports, err = s.ActiveConn.rpcClient.GetMinimumBalanceForRentExemption(
 			context.Background(),
 			8192*8,
 			rpc.CommitmentFinalized)
