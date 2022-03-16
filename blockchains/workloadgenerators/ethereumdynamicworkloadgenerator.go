@@ -3,6 +3,7 @@ package workloadgenerators
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"diablo-benchmark/blockchains/types"
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/configs/parsers"
@@ -36,7 +37,8 @@ type EthereumDynamicWorkloadGenerator struct {
 	Nonces           map[string]uint64    // Nonce of the known accounts
 	ChainID          *big.Int             // ChainID for transactions, provided through the ethereum API
 	KnownAccounts    []configs.ChainKey   // Known accounds, public:private key pair
-	CompiledContract *compiler.Contract   // Compiled contract bytecode for the contract used in complex workloads
+	PrivateKeys      map[common.Address]*ecdsa.PrivateKey
+	CompiledContract *compiler.Contract // Compiled contract bytecode for the contract used in complex workloads
 	GenericWorkloadGenerator
 }
 
@@ -60,7 +62,14 @@ func (e *EthereumDynamicWorkloadGenerator) BlockchainSetup() error {
 	// 1 - create N accounts only if we don't have accounts
 	if len(e.ChainConfig.Keys) > 0 {
 		e.KnownAccounts = e.ChainConfig.Keys
-		return nil
+	}
+	e.PrivateKeys = make(map[common.Address]*ecdsa.PrivateKey, len(e.KnownAccounts))
+	for _, acc := range e.KnownAccounts {
+		priv, err := crypto.ToECDSA(acc.PrivateKey)
+		if err != nil {
+			return err
+		}
+		e.PrivateKeys[common.HexToAddress(acc.Address)] = priv
 	}
 	// 2 - fund with genesis block, write to genesis location
 	// 3 - copy genesis to blockchain nodes
@@ -145,7 +154,7 @@ func (e *EthereumDynamicWorkloadGenerator) DeployContract(fromPivKey []byte, con
 	}
 
 	// Convert back to the transaction type
-	var parsedTx types.EthereumTransactionWithPrivateKey
+	var parsedTx types.EthereumTransactionWithPublicKey
 	err = json.Unmarshal(tx, &parsedTx)
 	if err != nil {
 		return "", err
@@ -169,7 +178,7 @@ func (e *EthereumDynamicWorkloadGenerator) DeployContract(fromPivKey []byte, con
 		new(big.Int).Mul(baseFee, big.NewInt(2)),
 	)
 
-	signedTx, err := ethtypes.SignNewTx(parsedTx.Priv, ethtypes.NewLondonSigner(e.ChainID), parsedTx.Tx)
+	signedTx, err := ethtypes.SignNewTx(e.PrivateKeys[crypto.PubkeyToAddress(*parsedTx.Pub)], ethtypes.NewLondonSigner(e.ChainID), parsedTx.Tx)
 	if err != nil {
 		return "", err
 	}
@@ -279,7 +288,7 @@ func (e *EthereumDynamicWorkloadGenerator) CreateContractDeployTX(fromPrivKey []
 		e.Nonces[strings.ToLower(addrFrom.String())]++
 		e.CompiledContract = contract
 
-		return json.Marshal(types.EthereumTransactionWithPrivateKey{tx, priv})
+		return json.Marshal(types.EthereumTransactionWithPublicKey{Tx: tx, Pub: &priv.PublicKey})
 
 	} else if os.IsNotExist(err) {
 		// Path doesn't exist - return an error
@@ -646,7 +655,7 @@ func (e *EthereumDynamicWorkloadGenerator) CreateSignedTransaction(fromPrivKey [
 	e.Nonces[strings.ToLower(addrFrom.String())]++
 
 	// Return the transaction in bytes ready to send to the secondaries and threads.
-	return json.Marshal(types.EthereumTransactionWithPrivateKey{tx, priv})
+	return json.Marshal(types.EthereumTransactionWithPublicKey{Tx: tx, Pub: &priv.PublicKey})
 }
 
 // generateSimpleWorkload generates a simple transaction value transfer workload

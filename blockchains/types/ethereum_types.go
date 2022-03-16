@@ -8,34 +8,34 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-type EthereumTransactionWithPrivateKey struct {
-	Tx   *types.DynamicFeeTx
-	Priv *ecdsa.PrivateKey
+type EthereumTransactionWithPublicKey struct {
+	Tx  *types.DynamicFeeTx
+	Pub *ecdsa.PublicKey
 }
 
-func (tx EthereumTransactionWithPrivateKey) MarshalJSON() ([]byte, error) {
+func (tx EthereumTransactionWithPublicKey) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
-		Tx   *types.DynamicFeeTx
-		Priv []byte
+		Tx  *types.DynamicFeeTx
+		Pub []byte
 	}{
-		Tx:   tx.Tx,
-		Priv: crypto.FromECDSA(tx.Priv),
+		Tx:  tx.Tx,
+		Pub: crypto.CompressPubkey(tx.Pub),
 	})
 }
 
-func (tx *EthereumTransactionWithPrivateKey) UnmarshalJSON(data []byte) error {
+func (tx *EthereumTransactionWithPublicKey) UnmarshalJSON(data []byte) error {
 	aux := &struct {
-		Tx   *types.DynamicFeeTx
-		Priv []byte
+		Tx  *types.DynamicFeeTx
+		Pub []byte
 	}{}
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
-	priv, err := crypto.ToECDSA(aux.Priv)
+	pub, err := crypto.DecompressPubkey(aux.Pub)
 	if err != nil {
 		return err
 	}
 	tx.Tx = aux.Tx
-	tx.Priv = priv
+	tx.Pub = pub
 	return nil
 }

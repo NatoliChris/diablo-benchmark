@@ -5,6 +5,7 @@ package clientinterfaces
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"diablo-benchmark/blockchains/types"
 	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/core/configs"
@@ -16,8 +17,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/params"
 	"go.uber.org/zap"
@@ -124,10 +127,12 @@ type EthereumDynamicInterface struct {
 	SubscribeDone    chan bool              // Event channel that will unsub from events
 	TransactionInfo  map[string][]time.Time // Transaction information
 	bigLock          sync.Mutex
-	HandlersStarted  bool         // Have the handlers been initiated?
-	StartTime        time.Time    // Start time of the benchmark
-	ThroughputTicker *time.Ticker // Ticker for throughput (1s)
-	Throughputs      []float64    // Throughput over time with 1 second intervals
+	HandlersStarted  bool               // Have the handlers been initiated?
+	StartTime        time.Time          // Start time of the benchmark
+	ThroughputTicker *time.Ticker       // Ticker for throughput (1s)
+	Throughputs      []float64          // Throughput over time with 1 second intervals
+	KnownAccounts    []configs.ChainKey // Known accounds, public:private key pair
+	PrivateKeys      map[common.Address]*ecdsa.PrivateKey
 
 	// Quick fix for OSDI22
 	rrEndpoint int
@@ -144,6 +149,17 @@ func (e *EthereumDynamicInterface) Init(chainConfig *configs.ChainConfig) {
 	e.HandlersStarted = false
 	e.NumTxDone = 0
 	e.rrEndpoint = 0
+	if len(chainConfig.Keys) > 0 {
+		e.KnownAccounts = chainConfig.Keys
+	}
+	e.PrivateKeys = make(map[common.Address]*ecdsa.PrivateKey, len(e.KnownAccounts))
+	for _, acc := range e.KnownAccounts {
+		priv, err := crypto.ToECDSA(acc.PrivateKey)
+		if err != nil {
+			zap.L().Fatal("Failed to parse key", zap.Error(err))
+		}
+		e.PrivateKeys[common.HexToAddress(acc.Address)] = priv
+	}
 }
 
 // Cleanup formats results and unsubscribes from the blockchain
@@ -260,7 +276,7 @@ func (e *EthereumDynamicInterface) ParseWorkload(workload workloadgenerators.Wor
 	for _, v := range workload {
 		intervalTxs := make([]interface{}, 0)
 		for _, txBytes := range v {
-			t := types.EthereumTransactionWithPrivateKey{}
+			t := types.EthereumTransactionWithPublicKey{}
 			err := t.UnmarshalJSON(txBytes)
 			if err != nil {
 				return nil, err
@@ -457,7 +473,7 @@ func (e *EthereumDynamicInterface) DeploySmartContract(tx interface{}) (interfac
 	return nil, errors.New("not implemented")
 }
 
-func (e *EthereumDynamicInterface) _sendTx(endpoint int, parsedTx types.EthereumTransactionWithPrivateKey) {
+func (e *EthereumDynamicInterface) _sendTx(endpoint int, parsedTx types.EthereumTransactionWithPublicKey) {
 	// timoutCTX, _ := context.WithTimeout(context.Background(), 5*time.Second)
 
 	var client *ethereumClient
@@ -486,7 +502,7 @@ func (e *EthereumDynamicInterface) _sendTx(endpoint int, parsedTx types.Ethereum
 	// }
 	// parsedTx.Tx.Gas = gas
 
-	txSigned, err := ethtypes.SignNewTx(parsedTx.Priv, e.Signer, parsedTx.Tx)
+	txSigned, err := ethtypes.SignNewTx(e.PrivateKeys[crypto.PubkeyToAddress(*parsedTx.Pub)], e.Signer, parsedTx.Tx)
 	if err != nil {
 		zap.L().Fatal("failed to sign tx", zap.Error(err))
 	}
@@ -526,7 +542,7 @@ func (e *EthereumDynamicInterface) _sendTx(endpoint int, parsedTx types.Ethereum
 // and has already been signed and is ready to send into the network.
 func (e *EthereumDynamicInterface) SendRawTransaction(tx interface{}) error {
 	// NOTE: type conversion might be slow, there might be a better way to send this.
-	parsedTx := tx.(*types.EthereumTransactionWithPrivateKey)
+	parsedTx := tx.(*types.EthereumTransactionWithPublicKey)
 	var endpoint = e.rrEndpoint
 
 	e.rrEndpoint = (e.rrEndpoint + 1) % (len(e.SecondaryNodes) + 1)
