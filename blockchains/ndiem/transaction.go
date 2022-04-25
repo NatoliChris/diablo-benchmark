@@ -18,10 +18,11 @@ import (
 
 const (
 	transaction_type_transfer uint8 = 0
+	transaction_type_invoke   uint8 = 1
 
 	currency = "XUS"
 
-	maximumGasAmount = 1_000_000
+	maximumGasAmount = 4_000_000
 
 	expirationDelay = 86400 * time.Second
 )
@@ -69,6 +70,8 @@ func decodeTransaction(src io.Reader) (*outerTransaction, error) {
 	switch (txtype) {
 	case transaction_type_transfer:
 		inner, err = decodeTransferTransaction(src)
+	case transaction_type_invoke:
+		inner, err = decodeInvokeTransaction(src)
 	default:
 		return nil, fmt.Errorf("unknown transaction type %d", txtype)
 	}
@@ -112,7 +115,7 @@ type unsignedTransaction struct {
 	from            *diemkeys.Keys
 	to              diemtypes.AccountAddress
 	sequence        uint64
-	script          diemtypes.Script
+	payload         diemtypes.TransactionPayload
 	maxGasAmount    uint64
 	gasUnitPrice    uint64
 	expirationTime  uint64
@@ -120,12 +123,12 @@ type unsignedTransaction struct {
 	name            string
 }
 
-func newUnsignedTransaction(from *diemkeys.Keys, to diemtypes.AccountAddress, sequence uint64, script diemtypes.Script, name string) *unsignedTransaction {
+func newUnsignedTransaction(from *diemkeys.Keys, to diemtypes.AccountAddress, sequence uint64, payload diemtypes.TransactionPayload, name string) *unsignedTransaction {
 	return &unsignedTransaction{
 		from: from,
 		to: to,
 		sequence: sequence,
-		script: script,
+		payload: payload,
 		name: name,
 	}
 }
@@ -136,8 +139,9 @@ func (this *unsignedTransaction) getSigned() (virtualTransaction, *diemtypes.Sig
 
 	expiration = uint64(time.Now().Add(expirationDelay).Unix())
 
-	stx = diemsigner.Sign(this.from, this.to, this.sequence, this.script,
-		maximumGasAmount, 0, currency, expiration, chainId)
+	stx = diemsigner.SignTxn(this.from, this.to, this.sequence,
+		this.payload, maximumGasAmount, 0, currency, expiration,
+		chainId)
 
 	return newSignedTransaction(stx, this.name).getSigned()
 }
@@ -228,10 +232,178 @@ func (this *transferTransaction) getSigned() (virtualTransaction, *diemtypes.Sig
 		diemtypes.Currency(currency), this.to, this.amount, nil, nil)
 
 	return newUnsignedTransaction(from, from.AccountAddress(),
-		this.sequence, script, this.getName()).getSigned()
+		this.sequence, &diemtypes.TransactionPayload__Script{script},
+		this.getName()).getSigned()
 }
 
 func (this *transferTransaction) getName() string {
+	var seed []byte = this.from.Seed()
+
+	return fmt.Sprintf("%02x%02x%02x%02x%02x%02x:%d", seed[0], seed[1],
+		seed[2], seed[3], seed[4], seed[5], this.sequence)
+}
+
+
+type deployContractTransaction struct {
+	from      ed25519.PrivateKey
+	code      []byte
+	sequence  uint64
+}
+
+func newDeployContractTransaction(from ed25519.PrivateKey, code []byte, sequence uint64) *deployContractTransaction {
+	return &deployContractTransaction{
+		from: from,
+		code: code,
+		sequence: sequence,
+	}
+}
+
+func (this *deployContractTransaction) getSigned() (virtualTransaction, *diemtypes.SignedTransaction, error) {
+	var from *diemkeys.Keys
+	var module diemtypes.Module
+
+	from = diemkeys.NewKeysFromPublicAndPrivateKeys(
+		diemkeys.NewEd25519PublicKey(this.from.Public().
+			(ed25519.PublicKey)),
+		diemkeys.NewEd25519PrivateKey(this.from))
+
+	module = diemtypes.Module{ this.code }
+
+	return newUnsignedTransaction(from, from.AccountAddress(),
+		this.sequence, &diemtypes.TransactionPayload__Module{module},
+		this.getName()).getSigned()
+}
+
+func (this *deployContractTransaction) getName() string {
+	var seed []byte = this.from.Seed()
+
+	return fmt.Sprintf("%02x%02x%02x%02x%02x%02x:%d", seed[0], seed[1],
+		seed[2], seed[3], seed[4], seed[5], this.sequence)
+}
+
+
+type invokeTransaction struct {
+	from      ed25519.PrivateKey
+	code      []byte
+	args      []diemtypes.TransactionArgument
+	sequence  uint64
+}
+
+func newInvokeTransaction(from ed25519.PrivateKey, code []byte, args []diemtypes.TransactionArgument, sequence uint64) *invokeTransaction {
+	return &invokeTransaction{
+		from: from,
+		code: code,
+		args: args,
+		sequence: sequence,
+	}
+}
+
+func decodeInvokeTransaction(src io.Reader) (*invokeTransaction, error) {
+	var args []diemtypes.TransactionArgument
+	var input util.MonadInput
+	var fromSeed, code []byte
+	var sequence uint64
+	var bargs [][]byte
+	var err error
+	var i, n int
+
+	input = util.NewMonadInputReader(src).
+		SetOrder(binary.LittleEndian).
+		ReadBytes(&fromSeed, ed25519.SeedSize).
+		ReadUint64(&sequence).
+		ReadUint16(&n).
+		ReadBytes(&code, n).
+		ReadUint8(&n)
+
+	bargs = make([][]byte, n)
+
+	for i = range bargs {
+		input.ReadUint16(&n).ReadBytes(&bargs[i], n)
+	}
+
+	err = input.Error()
+	if err != nil {
+		return nil, err
+	}
+
+	args = make([]diemtypes.TransactionArgument, len(bargs))
+
+	for i = range args {
+		args[i], err =
+			diemtypes.BcsDeserializeTransactionArgument(bargs[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return newInvokeTransaction(ed25519.NewKeyFromSeed(fromSeed), code,
+		args, sequence), nil
+}
+
+func (this *invokeTransaction) encode(dest io.Writer) error {
+	var arg diemtypes.TransactionArgument
+	var output util.MonadOutput
+	var bargs [][]byte
+	var err error
+	var i int
+
+	if len(this.code) > 65535 {
+		return fmt.Errorf("code too large (%d bytes)", len(this.code))
+	}
+
+	if len(this.args) > 255 {
+		return fmt.Errorf("too many arguments (%d)", len(this.args))
+	}
+
+	bargs = make([][]byte, len(this.args))
+
+	for i, arg = range this.args {
+		bargs[i], err = arg.BcsSerialize()
+		if err != nil {
+			return err
+		} else if len(bargs[i]) > 65535 {
+			return fmt.Errorf("invoke arguments %d is too long " +
+				"(%d bytes)", len(bargs[i]))
+		}
+	}
+
+	output = util.NewMonadOutputWriter(dest).
+		SetOrder(binary.LittleEndian).
+		WriteUint8(transaction_type_invoke).
+		WriteBytes(this.from.Seed()).
+		WriteUint64(this.sequence).
+		WriteUint16(uint16(len(this.code))).
+		WriteBytes(this.code).
+		WriteUint8(uint8(len(bargs)))
+
+	for i = range bargs {
+		output.WriteUint16(uint16(len(bargs[i]))).WriteBytes(bargs[i])
+	}
+
+	return output.Error()
+}
+
+func (this *invokeTransaction) getSigned() (virtualTransaction, *diemtypes.SignedTransaction, error) {
+	var script diemtypes.Script
+	var from *diemkeys.Keys
+
+	from = diemkeys.NewKeysFromPublicAndPrivateKeys(
+		diemkeys.NewEd25519PublicKey(this.from.Public().
+			(ed25519.PublicKey)),
+		diemkeys.NewEd25519PrivateKey(this.from))
+
+	script = diemtypes.Script{
+		Code: this.code,
+		TyArgs: []diemtypes.TypeTag{},
+		Args: this.args,
+	}
+
+	return newUnsignedTransaction(from, from.AccountAddress(),
+		this.sequence, &diemtypes.TransactionPayload__Script{script},
+		this.getName()).getSigned()
+}
+
+func (this *invokeTransaction) getName() string {
 	var seed []byte = this.from.Seed()
 
 	return fmt.Sprintf("%02x%02x%02x%02x%02x%02x:%d", seed[0], seed[1],

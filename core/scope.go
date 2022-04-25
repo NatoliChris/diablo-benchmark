@@ -41,6 +41,8 @@ func (this *basicScope) parse(expr BenchmarkExpression) error {
 	defer expr.specialize(old)
 
 	for _, child = range expr.Slice() {
+		Tracef("parse scope variable: %s", child.Position())
+
 		variable, name, domain, err = parseVariable(child)
 		if err != nil {
 			return err

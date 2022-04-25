@@ -23,6 +23,10 @@ diablo:
 	$(GOBIN) build $(BUILDFLAGS) -o $@
 
 clean:
-	rm diablo
+	-rm diablo
 
-.PHONY: default clean reqs diablo
+cleanall: clean
+	-chmod -R 700 $(PWD)/.go
+	-rm -rf $(PWD)/.go
+
+.PHONY: default clean cleanall reqs diablo

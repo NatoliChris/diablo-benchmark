@@ -9,6 +9,7 @@ import (
 	"golang.org/x/crypto/ed25519"
 	"gopkg.in/yaml.v3"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/diem/client-sdk-go/diemclient"
@@ -26,8 +27,10 @@ func (this *BlockchainInterface) Builder(params map[string]string, env []string,
 	var envmap map[string][]string
 	var builder *BlockchainBuilder
 	var client diemclient.Client
-	var values []string
+	var values, stdlibs []string
+	var stdlib string
 	var err error
+	var ok bool
 
 	logger.Debugf("new builder")
 
@@ -46,6 +49,30 @@ func (this *BlockchainInterface) Builder(params map[string]string, env []string,
 
 	builder = newBuilder(logger, client, context.Background())
 
+	values, ok = envmap["stdlib"]
+	if ok {
+		if len(values) != 1 {
+			return nil, fmt.Errorf("more than 1 stdlib location")
+		}
+
+		stdlib = values[0]
+	} else {
+		stdlib, err = exec.LookPath("move-build")
+		if err != nil {
+			return nil, fmt.Errorf("cannot find stdlib: %s",
+				err.Error())
+		}
+
+		stdlib = strings.TrimSuffix(stdlib, "/move-build")
+		stdlib = stdlib + "/../../language/move-stdlib/sources"
+	}
+
+	stdlibs, err = listStdlibs(stdlib)
+	if err != nil {
+		return nil, fmt.Errorf("cannot list stdlib files in '%s': %s",
+			stdlib, err.Error())
+	}
+
 	for key, values = range envmap {
 		if key == "accounts" {
 			for _, value = range values {
@@ -55,6 +82,16 @@ func (this *BlockchainInterface) Builder(params map[string]string, env []string,
 				if err != nil {
 					return nil, err
 				}
+			}
+
+			continue
+		}
+
+		if key == "contracts" {
+			for _, value = range values {
+				logger.Debugf("with contracts from '%s'",value)
+
+				builder.addCompiler(value, stdlibs)
 			}
 
 			continue
@@ -92,6 +129,35 @@ func parseEnvmap(env []string) (map[string][]string, error) {
 		values = append(values, value)
 
 		ret[key] = values
+	}
+
+	return ret, nil
+}
+
+func listStdlibs(stdlib string) ([]string, error) {
+	var entries []os.DirEntry
+	var stdlibdir *os.File
+	var entry os.DirEntry
+	var ret []string
+	var err error
+
+	stdlibdir, err = os.Open(stdlib)
+	if err != nil {
+		return nil, err
+	}
+
+	defer stdlibdir.Close()
+
+	entries, err = stdlibdir.ReadDir(0)
+	if err != nil {
+		return nil, err
+	}
+
+	ret = make([]string, 0)
+	for _, entry = range entries {
+		if strings.HasSuffix(entry.Name(), ".move") {
+			ret = append(ret, stdlib + "/" + entry.Name())
+		}
 	}
 
 	return ret, nil

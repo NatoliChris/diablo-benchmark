@@ -166,12 +166,12 @@ func readConvertFromUnsigned(ptr interface{}, val uint64) error {
 	var max uint64
 
 	switch ptr.(type) {
-	case *uint: max = math.MaxUint
+	case *uint: max = math.MaxUint64
 	case *uint8: max = math.MaxUint8
 	case *uint16: max = math.MaxUint16
 	case *uint32: max = math.MaxUint32
 	case *uint64: max = math.MaxUint64
-	case *int: max = math.MaxInt
+	case *int: max = math.MaxInt64
 	case *int8: max = math.MaxInt8
 	case *int16: max = math.MaxInt16
 	case *int32: max = math.MaxInt32

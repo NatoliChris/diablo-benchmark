@@ -216,6 +216,7 @@ func (this *floatVariableWrapper) TryGetFloat() (float64, bool) {
 		return 0, false
 	}
 
+	// TODO: need to cast if opaque is int
 	return opaque.(float64), true
 }
 

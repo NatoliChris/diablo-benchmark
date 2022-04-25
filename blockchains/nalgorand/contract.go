@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -190,7 +191,7 @@ func (this *tealCompiler) getTealSource(path string) ([]byte, error) {
 
 	defer file.Close()
 
-	buffer, err = io.ReadAll(file)
+	buffer, err = ioutil.ReadAll(file)
 	if err != nil {
 		return nil, err
 	}

@@ -232,6 +232,8 @@ func (this *benchmark) parse(expr BenchmarkExpression) error {
 
 	field, err = expr.TryField("let")
 	if err == nil {
+		Tracef("parse benchmark global scope: %s", field.Position())
+
 		global, err = field.scope()
 		if err != nil {
 			return err
@@ -396,6 +398,8 @@ func parseWorkload(expr BenchmarkExpression) (*workloadGenerator, error) {
 	var i, number int
 	var local scope
 	var err error
+
+	Tracef("parse benchmark workload: %s", expr.Position())
 
 	field, err = expr.TryField("let")
 	if err == nil {
