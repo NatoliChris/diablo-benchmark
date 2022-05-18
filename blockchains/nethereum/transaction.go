@@ -1,6 +1,5 @@
 package nethereum
 
-
 import (
 	"context"
 	"crypto/ecdsa"
@@ -18,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-
 const (
 	transaction_type_transfer uint8 = 0
 	transaction_type_invoke   uint8 = 1
@@ -26,13 +24,12 @@ const (
 	transaction_gas_limit uint64 = 2000000
 )
 
-
 type transaction interface {
 	getTx() (*types.Transaction, error)
 }
 
 type outerTransaction struct {
-	inner  virtualTransaction
+	inner virtualTransaction
 }
 
 func (this *outerTransaction) getTx() (*types.Transaction, error) {
@@ -63,7 +60,7 @@ func decodeTransaction(src io.Reader, manager nonceManager, provider parameterPr
 		return nil, err
 	}
 
-	switch (txtype) {
+	switch txtype {
 	case transaction_type_transfer:
 		inner, err = decodeTransferTransaction(src, manager, provider)
 	case transaction_type_invoke:
@@ -76,17 +73,15 @@ func decodeTransaction(src io.Reader, manager nonceManager, provider parameterPr
 		return nil, err
 	}
 
-	return &outerTransaction{ inner }, nil
+	return &outerTransaction{inner}, nil
 }
-
 
 type virtualTransaction interface {
 	getTx() (virtualTransaction, *types.Transaction, error)
 }
 
-
 type signedTransaction struct {
-	tx   *types.Transaction
+	tx *types.Transaction
 }
 
 func newSignedTransaction(tx *types.Transaction) *signedTransaction {
@@ -99,18 +94,17 @@ func (this *signedTransaction) getTx() (virtualTransaction, *types.Transaction, 
 	return this, this.tx, nil
 }
 
-
 type unsignedTransaction struct {
-	chain  *big.Int
-	tx     *types.Transaction
-	from   *ecdsa.PrivateKey
+	chain *big.Int
+	tx    *types.Transaction
+	from  *ecdsa.PrivateKey
 }
 
 func newUnsignedTransaction(chain *big.Int, tx *types.Transaction, from *ecdsa.PrivateKey) *unsignedTransaction {
 	return &unsignedTransaction{
 		chain: chain,
-		tx: tx,
-		from: from,
+		tx:    tx,
+		from:  from,
 	}
 }
 
@@ -127,23 +121,22 @@ func (this *unsignedTransaction) getTx() (virtualTransaction, *types.Transaction
 	return newSignedTransaction(stx).getTx()
 }
 
-
 type transferTransaction struct {
-	nonce     uint64
-	amount    uint64
-	from      *ecdsa.PrivateKey
-	to        common.Address
-	manager   nonceManager
-	provider  parameterProvider
+	nonce    uint64
+	amount   uint64
+	from     *ecdsa.PrivateKey
+	to       common.Address
+	manager  nonceManager
+	provider parameterProvider
 }
 
 func newTransferTransaction(nonce, amount uint64, from *ecdsa.PrivateKey, to common.Address, manager nonceManager, provider parameterProvider) *transferTransaction {
 	return &transferTransaction{
-		nonce: nonce,
-		amount: amount,
-		from: from,
-		to: to,
-		manager: manager,
+		nonce:    nonce,
+		amount:   amount,
+		from:     from,
+		to:       to,
+		manager:  manager,
 		provider: provider,
 	}
 }
@@ -224,21 +217,20 @@ func (this *transferTransaction) getTx() (virtualTransaction, *types.Transaction
 		this.from).getTx()
 }
 
-
 type deployContractTransaction struct {
-	nonce     uint64
-	appli     *application
-	from      *ecdsa.PrivateKey
-	manager   nonceManager
-	provider  parameterProvider
+	nonce    uint64
+	appli    *application
+	from     *ecdsa.PrivateKey
+	manager  nonceManager
+	provider parameterProvider
 }
 
 func newDeployContractTransaction(nonce uint64, appli *application, from *ecdsa.PrivateKey, manager nonceManager, provider parameterProvider) *deployContractTransaction {
 	return &deployContractTransaction{
-		nonce: nonce,
-		appli: appli,
-		from: from,
-		manager: manager,
+		nonce:    nonce,
+		appli:    appli,
+		from:     from,
+		manager:  manager,
 		provider: provider,
 	}
 }
@@ -269,23 +261,22 @@ func (this *deployContractTransaction) getTx() (virtualTransaction, *types.Trans
 		this.from).getTx()
 }
 
-
 type invokeTransaction struct {
-	nonce     uint64
-	from      *ecdsa.PrivateKey
-	appid     common.Address
-	payload   []byte
-	manager   nonceManager
-	provider  parameterProvider
+	nonce    uint64
+	from     *ecdsa.PrivateKey
+	appid    common.Address
+	payload  []byte
+	manager  nonceManager
+	provider parameterProvider
 }
 
 func newInvokeTransaction(nonce uint64, from *ecdsa.PrivateKey, appid common.Address, payload []byte, manager nonceManager, provider parameterProvider) *invokeTransaction {
 	return &invokeTransaction{
-		nonce: nonce,
-		from: from,
-		appid: appid,
-		payload: payload,
-		manager: manager,
+		nonce:    nonce,
+		from:     from,
+		appid:    appid,
+		payload:  payload,
+		manager:  manager,
 		provider: provider,
 	}
 }
@@ -371,31 +362,30 @@ func (this *invokeTransaction) getTx() (virtualTransaction, *types.Transaction, 
 		this.from).getTx()
 }
 
-
 type nonceManager interface {
 	nextNonce(common.Address, uint64) (uint64, error)
 }
 
 type staticNonceManager struct {
-	logger  core.Logger
-	client  *ethclient.Client
-	ctx     context.Context
-	lock    sync.Mutex
-	bases   map[string]*staticNonce
+	logger core.Logger
+	client *ethclient.Client
+	ctx    context.Context
+	lock   sync.Mutex
+	bases  map[string]*staticNonce
 }
 
 type staticNonce struct {
-	lock    sync.Mutex
-	synced  bool
-	base    uint64
+	lock   sync.Mutex
+	synced bool
+	base   uint64
 }
 
 func newStaticNonceManager(logger core.Logger, client *ethclient.Client) *staticNonceManager {
 	return &staticNonceManager{
 		logger: logger,
 		client: client,
-		ctx: context.Background(),
-		bases: make(map[string]*staticNonce),
+		ctx:    context.Background(),
+		bases:  make(map[string]*staticNonce),
 	}
 }
 
@@ -432,7 +422,7 @@ func (this *staticNonceManager) getNonce(from common.Address) (*staticNonce, err
 				ret.base)
 			ret.synced = true
 		} else {
-			this.logger.Errorf("fail to fetch pending nonce " +
+			this.logger.Errorf("fail to fetch pending nonce "+
 				"for '%s': %s", key, err.Error())
 		}
 	}
@@ -457,11 +447,10 @@ func (this *staticNonceManager) nextNonce(from common.Address, offset uint64) (u
 	return base + offset, nil
 }
 
-
 type parameters struct {
-	chainId   *big.Int
-	gasLimit  uint64
-	gasPrice  *big.Int
+	chainId  *big.Int
+	gasLimit uint64
+	gasPrice *big.Int
 }
 
 type parameterProvider interface {
@@ -469,7 +458,7 @@ type parameterProvider interface {
 }
 
 type staticParameterProvider struct {
-	params  parameters
+	params parameters
 }
 
 func newStaticParameterProvider(params *parameters) *staticParameterProvider {
@@ -479,39 +468,27 @@ func newStaticParameterProvider(params *parameters) *staticParameterProvider {
 }
 
 func makeStaticParameterProvider(client *ethclient.Client) (*staticParameterProvider, error) {
-	var ctx context.Context = context.Background()
-	var params parameters
-	var err error
-
-	params.chainId, err = client.NetworkID(ctx)
+	params, err := newDirectParameterProvider(client).getParams()
 	if err != nil {
 		return nil, err
 	}
 
-	params.gasPrice, err = client.SuggestGasPrice(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	params.gasLimit = transaction_gas_limit
-
-	return newStaticParameterProvider(&params), nil
+	return newStaticParameterProvider(params), nil
 }
 
 func (this *staticParameterProvider) getParams() (*parameters, error) {
 	return &this.params, nil
 }
 
-
 type lazyParameterProvider struct {
-	client  *ethclient.Client
-	inner   *staticParameterProvider
+	client *ethclient.Client
+	inner  *staticParameterProvider
 }
 
 func newLazyParameterProvider(client *ethclient.Client) *lazyParameterProvider {
 	return &lazyParameterProvider{
 		client: client,
-		inner: nil,
+		inner:  nil,
 	}
 }
 
@@ -528,9 +505,8 @@ func (this *lazyParameterProvider) getParams() (*parameters, error) {
 	return this.inner.getParams()
 }
 
-
 type directParameterProvider struct {
-	client  *ethclient.Client
+	client *ethclient.Client
 }
 
 func newDirectParameterProvider(client *ethclient.Client) *directParameterProvider {
