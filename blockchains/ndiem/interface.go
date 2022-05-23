@@ -1,23 +1,24 @@
 package ndiem
 
-
 import (
 	"context"
 	"diablo-benchmark/core"
 	"encoding/hex"
 	"fmt"
-	"golang.org/x/crypto/ed25519"
-	"gopkg.in/yaml.v3"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
 
+	"golang.org/x/crypto/ed25519"
+	"gopkg.in/yaml.v3"
+
 	"github.com/diem/client-sdk-go/diemclient"
+	"github.com/diem/client-sdk-go/diemkeys"
+	"github.com/novifinancial/serde-reflection/serde-generate/runtime/golang/bcs"
 )
 
-
 const chainId = 4
-
 
 type BlockchainInterface struct {
 }
@@ -28,7 +29,7 @@ func (this *BlockchainInterface) Builder(params map[string]string, env []string,
 	var builder *BlockchainBuilder
 	var client diemclient.Client
 	var values, stdlibs []string
-	var stdlib string
+	var stdlib, mintkey string
 	var err error
 	var ok bool
 
@@ -45,9 +46,27 @@ func (this *BlockchainInterface) Builder(params map[string]string, env []string,
 	}
 
 	logger.Debugf("use endpoint '%s'", endpoint)
-	client = diemclient.New(chainId, "http://" + endpoint)
+	client = diemclient.New(chainId, "http://"+endpoint)
 
-	builder = newBuilder(logger, client, context.Background())
+	mintkey, ok = params["mintkey"]
+	if !ok {
+		return nil, fmt.Errorf("mintkey path missing")
+	}
+	delete(params, "mintkey")
+	mintKeyBcsBytes, err := os.ReadFile(mintkey)
+	if err != nil {
+		return nil, err
+	}
+	mintKeyBytes, err := bcs.NewDeserializer(mintKeyBcsBytes).DeserializeBytes()
+	if err != nil {
+		return nil, err
+	}
+	mintKey := ed25519.NewKeyFromSeed(mintKeyBytes)
+	mintKeys := diemkeys.NewKeysFromPublicAndPrivateKeys(
+		diemkeys.NewEd25519PublicKey(mintKey.Public().(ed25519.PublicKey)),
+		diemkeys.NewEd25519PrivateKey(mintKey))
+
+	builder = newBuilder(logger, client, mintKeys, context.Background())
 
 	values, ok = envmap["stdlib"]
 	if ok {
@@ -89,7 +108,7 @@ func (this *BlockchainInterface) Builder(params map[string]string, env []string,
 
 		if key == "contracts" {
 			for _, value = range values {
-				logger.Debugf("with contracts from '%s'",value)
+				logger.Debugf("with contracts from '%s'", value)
 
 				builder.addCompiler(value, stdlibs)
 			}
@@ -102,7 +121,6 @@ func (this *BlockchainInterface) Builder(params map[string]string, env []string,
 
 	return builder, nil
 }
-
 
 func parseEnvmap(env []string) (map[string][]string, error) {
 	var ret map[string][]string = make(map[string][]string)
@@ -119,7 +137,7 @@ func parseEnvmap(env []string) (map[string][]string, error) {
 		}
 
 		key = element[:eqindex]
-		value = element[eqindex + 1:]
+		value = element[eqindex+1:]
 
 		values, found = ret[key]
 		if !found {
@@ -156,13 +174,12 @@ func listStdlibs(stdlib string) ([]string, error) {
 	ret = make([]string, 0)
 	for _, entry = range entries {
 		if strings.HasSuffix(entry.Name(), ".move") {
-			ret = append(ret, stdlib + "/" + entry.Name())
+			ret = append(ret, stdlib+"/"+entry.Name())
 		}
 	}
 
 	return ret, nil
 }
-
 
 func addPremadeAccounts(builder *BlockchainBuilder, path string) error {
 	var decoder *yaml.Decoder
@@ -174,7 +191,7 @@ func addPremadeAccounts(builder *BlockchainBuilder, path string) error {
 
 	file, err = os.Open(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("addPremadeAccounts: failed to open file: %v", err)
 	}
 
 	decoder = yaml.NewDecoder(file)
@@ -182,14 +199,17 @@ func addPremadeAccounts(builder *BlockchainBuilder, path string) error {
 
 	file.Close()
 
+	if err == io.EOF {
+		return nil
+	}
 	if err != nil {
-		return err
+		return fmt.Errorf("addPremadeAccounts: failed to decode file: %v", err)
 	}
 
 	for _, key = range keys {
 		seed, err = hex.DecodeString(key)
 		if err != nil {
-			return err
+			return fmt.Errorf("addPremadeAccounts: failed to decode hex key: %v", err)
 		}
 
 		builder.addAccount(ed25519.NewKeyFromSeed(seed))
@@ -197,7 +217,6 @@ func addPremadeAccounts(builder *BlockchainBuilder, path string) error {
 
 	return nil
 }
-
 
 func (this *BlockchainInterface) Client(params map[string]string, env, view []string, logger core.Logger) (core.BlockchainClient, error) {
 	var confirmer transactionConfirmer
@@ -209,7 +228,7 @@ func (this *BlockchainInterface) Client(params map[string]string, env, view []st
 	logger.Tracef("new client")
 
 	logger.Tracef("use endpoint '%s'", view[0])
-	client = diemclient.New(chainId, "http://" + view[0])
+	client = diemclient.New(chainId, "http://"+view[0])
 
 	for key, value = range params {
 		if key == "confirm" {

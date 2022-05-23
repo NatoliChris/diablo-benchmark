@@ -1,6 +1,5 @@
 package ndiem
 
-
 import (
 	"bytes"
 	"diablo-benchmark/core"
@@ -14,19 +13,18 @@ import (
 	"github.com/diem/client-sdk-go/diemtypes"
 )
 
-
 type BlockchainClient struct {
-	logger     core.Logger
-	client     diemclient.Client
-	preparer   transactionPreparer
-	confirmer  transactionConfirmer
+	logger    core.Logger
+	client    diemclient.Client
+	preparer  transactionPreparer
+	confirmer transactionConfirmer
 }
 
 func newClient(logger core.Logger, client diemclient.Client, preparer transactionPreparer, confirmer transactionConfirmer) *BlockchainClient {
 	return &BlockchainClient{
-		logger: logger,
-		client: client,
-		preparer: preparer,
+		logger:    logger,
+		client:    client,
+		preparer:  preparer,
 		confirmer: confirmer,
 	}
 }
@@ -80,7 +78,6 @@ func (this *BlockchainClient) TriggerInteraction(iact core.Interaction) error {
 	return this.confirmer.confirm(iact)
 }
 
-
 type transactionPreparer interface {
 	prepare(transaction) error
 }
@@ -97,7 +94,7 @@ func (this *nothingTransactionPreparer) prepare(transaction) error {
 }
 
 type signatureTransactionPreparer struct {
-	logger  core.Logger
+	logger core.Logger
 }
 
 func newSignatureTransactionPreparer(logger core.Logger) transactionPreparer {
@@ -119,24 +116,22 @@ func (this *signatureTransactionPreparer) prepare(tx transaction) error {
 	return nil
 }
 
-
 type transactionConfirmer interface {
 	prepare(core.Interaction)
 	confirm(core.Interaction) error
 }
 
-
 type polltxTransactionConfirmer struct {
-	logger  core.Logger
-	client  diemclient.Client
-	mwait   time.Duration
+	logger core.Logger
+	client diemclient.Client
+	mwait  time.Duration
 }
 
 func newPolltxTransactionConfirmer(logger core.Logger, client diemclient.Client) *polltxTransactionConfirmer {
 	return &polltxTransactionConfirmer{
 		logger: logger,
 		client: client,
-		mwait: 30 * time.Second,
+		mwait:  30 * time.Second,
 	}
 }
 
@@ -173,23 +168,22 @@ func (this *polltxTransactionConfirmer) confirm(iact core.Interaction) error {
 	return nil
 }
 
-
 type pollblkTransactionConfirmer struct {
-	logger    core.Logger
-	client    diemclient.Client
-	err       error
-	lock      sync.Mutex
-	pendings  map[pollblkTransactionConfirmerKey]*pollblkTransactionConfirmerPending
+	logger   core.Logger
+	client   diemclient.Client
+	err      error
+	lock     sync.Mutex
+	pendings map[pollblkTransactionConfirmerKey]*pollblkTransactionConfirmerPending
 }
 
 type pollblkTransactionConfirmerKey struct {
-	sender    diemtypes.AccountAddress
-	sequence  uint64
+	sender   diemtypes.AccountAddress
+	sequence uint64
 }
 
 type pollblkTransactionConfirmerPending struct {
-	channel  chan error
-	iact     core.Interaction
+	channel chan error
+	iact    core.Interaction
 }
 
 func newPollblkTransactionConfirmer(logger core.Logger, client diemclient.Client) *pollblkTransactionConfirmer {
@@ -217,13 +211,13 @@ func (this *pollblkTransactionConfirmer) prepare(iact core.Interaction) {
 	channel = make(chan error)
 
 	key = pollblkTransactionConfirmerKey{
-		sender: stx.RawTxn.Sender,
+		sender:   stx.RawTxn.Sender,
 		sequence: stx.RawTxn.SequenceNumber,
 	}
 
 	value = &pollblkTransactionConfirmerPending{
 		channel: channel,
-		iact: iact,
+		iact:    iact,
 	}
 
 	this.lock.Lock()
@@ -244,7 +238,7 @@ func (this *pollblkTransactionConfirmer) confirm(iact core.Interaction) error {
 	stx, _ = tx.getSigned()
 
 	key = pollblkTransactionConfirmerKey{
-		sender: stx.RawTxn.Sender,
+		sender:   stx.RawTxn.Sender,
 		sequence: stx.RawTxn.SequenceNumber,
 	}
 
@@ -261,7 +255,7 @@ func (this *pollblkTransactionConfirmer) confirm(iact core.Interaction) error {
 	if value == nil {
 		return this.err
 	} else {
-		return <- value.channel
+		return <-value.channel
 	}
 }
 
@@ -284,7 +278,7 @@ func (this *pollblkTransactionConfirmer) parseTransaction(tx *diemjsonrpctypes.T
 	}
 
 	key = pollblkTransactionConfirmerKey{
-		sender: account,
+		sender:   account,
 		sequence: tx.Transaction.SequenceNumber,
 	}
 
@@ -296,6 +290,10 @@ func (this *pollblkTransactionConfirmer) parseTransaction(tx *diemjsonrpctypes.T
 	}
 
 	this.lock.Unlock()
+
+	if !ok {
+		return
+	}
 
 	pending.iact.ReportCommit()
 
