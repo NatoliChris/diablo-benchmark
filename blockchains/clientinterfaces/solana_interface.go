@@ -2,7 +2,6 @@ package clientinterfaces
 
 import (
 	"bufio"
-	"compress/gzip"
 	"context"
 	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/core/configs"
@@ -151,16 +150,12 @@ func (s *SolanaInterface) Init(chainConfig *configs.ChainConfig) {
 	}
 	if len(chainConfig.Extra) > 0 {
 		numKeys := chainConfig.Extra[0].(int)
-		gzfile, err := os.Open(chainConfig.Extra[1].(string))
+		file, err := os.Open(chainConfig.Extra[1].(string))
 		if err != nil {
 			s.logger.Fatal("Failed to open accounts file", zap.Error(err))
 		}
 		accountFileKeys := make([]*SolanaWallet, 0, numKeys)
 		s.logger.Debug("Unmarshal accounts yaml")
-		file, err := gzip.NewReader(gzfile)
-		if err != nil {
-			s.logger.Fatal("Failed to create gzip reader", zap.Error(err))
-		}
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			line := scanner.Bytes()

@@ -3,7 +3,6 @@ package workloadgenerators
 import (
 	"bufio"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/configs/parsers"
@@ -138,16 +137,12 @@ func (s *SolanaWorkloadGenerator) BlockchainSetup() error {
 	}
 	if len(s.ChainConfig.Extra) > 0 {
 		numKeys := s.ChainConfig.Extra[0].(int)
-		gzfile, err := os.Open(s.ChainConfig.Extra[1].(string))
+		file, err := os.Open(s.ChainConfig.Extra[1].(string))
 		if err != nil {
 			return err
 		}
 		accountFileKeys := make([]*SolanaWallet, 0, numKeys)
 		s.logger.Debug("Unmarshal accounts yaml")
-		file, err := gzip.NewReader(gzfile)
-		if err != nil {
-			return err
-		}
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			line := scanner.Bytes()
