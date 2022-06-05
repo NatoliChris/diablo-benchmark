@@ -1,0 +1,6 @@
+local:
+  ints: 0
+  bytes: 0
+global:
+  ints: 5
+  bytes: 0

@@ -1,0 +1,15 @@
+#!/usr/bin/env python3
+#
+
+import base64
+import random
+import struct
+import sys
+
+for line in sys.stdin:
+    length = 32
+    data = bytes([random.randint(0, 255) for i in range(length)])
+    print ('publish')
+    print (base64.b64encode(struct.pack('<c%ss' % length, b'v',
+                                        data)).decode('ascii'))
+    print ('', flush = True)

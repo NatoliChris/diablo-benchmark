@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+#
+
+import base64
+import struct
+import sys
+
+for line in sys.stdin:
+    print ('find')
+    print (base64.b64encode(struct.pack('<c', b'a')).decode('ascii'))
+    print ('', flush = True)

@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+
+import base64
+import sys
+
+for line in sys.stdin:
+    if line == 'buy()\n':
+        print (base64.b64encode(b'BuyGoogle').decode('ascii'))
+        print ('', flush = True)
+    else:
+        exit(1)
