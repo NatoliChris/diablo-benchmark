@@ -56,7 +56,7 @@ func calculateMaxChunkSize(
 
 var (
 	versionRegexp      = regexp.MustCompile(`([0-9]+)\.([0-9]+)\.([0-9]+)`)
-	contractNameRegexp = regexp.MustCompile(`found contract ‘(.*)’`)
+	contractNameRegexp = regexp.MustCompile(`found contract ['‘](.*)['’]`)
 	dataUsageRegexp    = regexp.MustCompile(`least (.*) bytes`)
 	binaryPathRegexp   = regexp.MustCompile(`binary (.*) for`)
 	abiPathRegexp      = regexp.MustCompile(`ABI (.*) for`)
