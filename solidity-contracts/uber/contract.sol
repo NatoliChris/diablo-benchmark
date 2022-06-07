@@ -34,7 +34,7 @@ contract ContractUber {
     }
 
     function checkDistance() public {
-        uint closer_driver;
+        uint closer_driver = 0;
         uint d;
         uint diff_x;
         uint diff_y;
@@ -47,8 +47,8 @@ contract ContractUber {
             if (y < d) {
                 d = y;
                 closer_driver = i;
-            } 
+            }
 	}
         emit FindDriverEvent(closer_driver);
-    }   
+    }
 }
