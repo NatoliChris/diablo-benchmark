@@ -113,29 +113,23 @@ func (wh *WorkloadHandler) ParseWorkloads(rawWorkload workloadgenerators.Seconda
 func (wh *WorkloadHandler) workloadProducer(workload [][]interface{}, workerChan chan interface{}, ready chan bool, id int) {
 	zap.L().Debug(fmt.Sprintf("producer %d ready", id))
 	<-ready
-	currentIterator := 1
-	for _, v := range workload[0] {
-		workerChan <- v
-	}
-
 	// Set up the timer
 	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			for _, v := range workload[currentIterator] {
-				workerChan <- v
-			}
-			currentIterator++
-			if currentIterator >= len(workload) {
-				close(workerChan)
-				return
+	batchSize := func(x int) int {
+		return x
+	}
+	for i := 0; i < len(workload); _, i = <-ticker.C, i+1 {
+		currentBatchSize := batchSize(len(workload[i]))
+		innerTicker := time.NewTicker(1 * time.Second / (time.Duration(len(workload[i])) / time.Duration(currentBatchSize)))
+		for j := 0; j < len(workload[i]); <-innerTicker.C {
+			for k := 0; j < len(workload[i]) && k < currentBatchSize; j, k = j+1, k+1 {
+				workerChan <- workload[i][j]
 			}
 		}
+		innerTicker.Stop()
 	}
-
+	ticker.Stop()
+	close(workerChan)
 }
 
 // runnerConsumer consumer that runs the workload pulling from the channel

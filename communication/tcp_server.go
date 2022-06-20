@@ -247,7 +247,8 @@ func (s *PrimaryServer) PrepareBenchmarkSecondaries(numThreads uint32) Secondary
 		err := s.SendAndWaitOKSync(payload, c)
 		if err != nil {
 			zap.L().Warn("Got an error from secondary",
-				zap.String("secondary", c.RemoteAddr().String()))
+				zap.String("secondary", c.RemoteAddr().String()),
+				zap.Error(err))
 			errorList = append(errorList, err.Error())
 		}
 	}
@@ -263,14 +264,17 @@ func (s *PrimaryServer) PrepareBenchmarkSecondaries(numThreads uint32) Secondary
 // chosen encoding in helpers.go and will send off the bytes to be read and processed
 // by the secondary.
 func (s *PrimaryServer) SendWorkload(workloads workloadgenerators.Workload) SecondaryReplyErrors {
-	var errorList []error
+	var errorList []string
 
 	for i, c := range s.Secondaries {
 		data := MsgWorkload
 
 		payload, err := EncodeWorkload(workloads[i])
 		if err != nil {
-			errorList = append(errorList, err)
+			zap.L().Warn("Failed to encode workload for secondary",
+				zap.String("secondary", c.RemoteAddr().String()),
+				zap.Error(err))
+			errorList = append(errorList, err.Error())
 			continue
 		}
 
@@ -287,11 +291,18 @@ func (s *PrimaryServer) SendWorkload(workloads workloadgenerators.Workload) Seco
 
 		err = s.SendAndWaitOKSync(data, c)
 		if err != nil {
-			errorList = append(errorList, err)
+			zap.L().Warn("Got an error from secondary",
+				zap.String("secondary", c.RemoteAddr().String()),
+				zap.Error(err))
+			errorList = append(errorList, err.Error())
 		}
 	}
 
-	return nil
+	if len(errorList) == 0 {
+		return nil
+	}
+
+	return errorList
 }
 
 // RunBenchmark sends the message to all secondaries to run the benchmark.

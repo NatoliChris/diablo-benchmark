@@ -3,6 +3,8 @@ package workloadgenerators
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"diablo-benchmark/blockchains/types"
 	"diablo-benchmark/core/configs"
 	"diablo-benchmark/core/configs/parsers"
 	"encoding/binary"
@@ -19,35 +21,30 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/compiler"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/consensus/misc"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/params"
 	"go.uber.org/zap"
 )
 
-// EthereumWorkloadGenerator is the workload generator implementation for the Ethereum blockchain
-type EthereumWorkloadGenerator struct {
-	ActiveConn        *ethclient.Client    // Active connection to a blockchain node for information
-	SuggestedGasPrice *big.Int             // Suggested gas price on the network
-	BenchConfig       *configs.BenchConfig // Benchmark configuration for workload intervals / type
-	ChainConfig       *configs.ChainConfig // Chain configuration to get number of transactions to make
-	Nonces            map[string]uint64    // Nonce of the known accounts
-	ChainID           *big.Int             // ChainID for transactions, provided through the ethereum API
-	KnownAccounts     []configs.ChainKey   // Known accounds, public:private key pair
-	CompiledContract  *compiler.Contract   // Compiled contract bytecode for the contract used in complex workloads
+// EthereumDynamicWorkloadGenerator is the workload generator implementation for the Ethereum blockchain
+type EthereumDynamicWorkloadGenerator struct {
+	ActiveConn       *ethclient.Client    // Active connection to a blockchain node for information
+	BenchConfig      *configs.BenchConfig // Benchmark configuration for workload intervals / type
+	ChainConfig      *configs.ChainConfig // Chain configuration to get number of transactions to make
+	Nonces           map[string]uint64    // Nonce of the known accounts
+	ChainID          *big.Int             // ChainID for transactions, provided through the ethereum API
+	KnownAccounts    []configs.ChainKey   // Known accounds, public:private key pair
+	PrivateKeys      map[common.Address]*ecdsa.PrivateKey
+	CompiledContract *compiler.Contract // Compiled contract bytecode for the contract used in complex workloads
 	GenericWorkloadGenerator
 }
 
-const (
-	// number of bits in a big.Word
-	wordBits = 32 << (uint64(^big.Word(0)) >> 63)
-	// number of bytes in a big.Word
-	wordBytes = wordBits / 8
-)
-
 // NewGenerator returns a new instance of the generator
-func (e *EthereumWorkloadGenerator) NewGenerator(chainConfig *configs.ChainConfig, benchConfig *configs.BenchConfig) WorkloadGenerator {
-	return &EthereumWorkloadGenerator{BenchConfig: benchConfig, ChainConfig: chainConfig}
+func (e *EthereumDynamicWorkloadGenerator) NewGenerator(chainConfig *configs.ChainConfig, benchConfig *configs.BenchConfig) WorkloadGenerator {
+	return &EthereumDynamicWorkloadGenerator{BenchConfig: benchConfig, ChainConfig: chainConfig}
 }
 
 // BlockchainSetup sets up the blockchain nodes with relevant information.
@@ -60,25 +57,27 @@ func (e *EthereumWorkloadGenerator) NewGenerator(chainConfig *configs.ChainConfi
 //
 // The main aspect of the blockchain setup is to provide a step to start the
 // blockchain nodes
-func (e *EthereumWorkloadGenerator) BlockchainSetup() error {
+func (e *EthereumDynamicWorkloadGenerator) BlockchainSetup() error {
 	// TODO implement
 	// 1 - create N accounts only if we don't have accounts
 	if len(e.ChainConfig.Keys) > 0 {
 		e.KnownAccounts = e.ChainConfig.Keys
-		return nil
+	}
+	e.PrivateKeys = make(map[common.Address]*ecdsa.PrivateKey, len(e.KnownAccounts))
+	for _, acc := range e.KnownAccounts {
+		priv, err := crypto.ToECDSA(acc.PrivateKey)
+		if err != nil {
+			return err
+		}
+		e.PrivateKeys[common.HexToAddress(acc.Address)] = priv
 	}
 	// 2 - fund with genesis block, write to genesis location
 	// 3 - copy genesis to blockchain nodes
 	return nil
 }
 
-type noncePair struct {
-	account string
-	nonce   uint64
-}
-
 // InitParams sets initial aspects such as the suggested gas price and sets up a small connection to get information from the blockchain.
-func (e *EthereumWorkloadGenerator) InitParams() error {
+func (e *EthereumDynamicWorkloadGenerator) InitParams() error {
 	// Connect to the blockchain
 	zap.L().Debug("dial node[0]",
 		zap.String("address", e.ChainConfig.Nodes[0]))
@@ -89,14 +88,6 @@ func (e *EthereumWorkloadGenerator) InitParams() error {
 	}
 
 	e.ActiveConn = c
-
-	// Get the suggested gas price from the network using a client connected
-	zap.L().Debug("get gas price")
-	e.SuggestedGasPrice, err = e.ActiveConn.SuggestGasPrice(context.Background())
-
-	if err != nil {
-		return err
-	}
 
 	// Chain ID
 	chainID, err := e.ActiveConn.NetworkID(context.Background())
@@ -136,7 +127,6 @@ func (e *EthereumWorkloadGenerator) InitParams() error {
 	}
 
 	zap.L().Info("Blockchain client contacted and got params",
-		zap.String("gasPrice", e.SuggestedGasPrice.String()),
 		zap.String("chainID", e.ChainID.String()))
 
 	zap.L().Debug("nonces", zap.String("noncemap", fmt.Sprintf("%v", e.Nonces)))
@@ -145,7 +135,7 @@ func (e *EthereumWorkloadGenerator) InitParams() error {
 }
 
 // CreateAccount is used as a generic account creation to return the private key
-func (e *EthereumWorkloadGenerator) CreateAccount() (interface{}, error) {
+func (e *EthereumDynamicWorkloadGenerator) CreateAccount() (interface{}, error) {
 	// Generate a private key
 	privKey, err := crypto.GenerateKey()
 
@@ -157,21 +147,44 @@ func (e *EthereumWorkloadGenerator) CreateAccount() (interface{}, error) {
 }
 
 // DeployContract deploys the contract and returns the address
-func (e *EthereumWorkloadGenerator) DeployContract(fromPivKey []byte, contractPath string) (string, error) {
+func (e *EthereumDynamicWorkloadGenerator) DeployContract(fromPivKey []byte, contractPath string) (string, error) {
 	tx, err := e.CreateContractDeployTX(fromPivKey, contractPath)
 	if err != nil {
 		return "", err
 	}
 
 	// Convert back to the transaction type
-	var parsedTx types.Transaction
+	var parsedTx types.EthereumTransactionWithPublicKey
 	err = json.Unmarshal(tx, &parsedTx)
 	if err != nil {
 		return "", err
 	}
 
+	header, err := e.ActiveConn.HeaderByNumber(context.Background(), nil)
+	if err != nil {
+		return "", err
+	}
+	baseFee := misc.CalcBaseFee(&params.ChainConfig{LondonBlock: big.NewInt(0)}, header)
+
+	gasTipCap, err := e.ActiveConn.SuggestGasTipCap(context.Background())
+	if err != nil {
+		return "", err
+	}
+
+	parsedTx.Tx.GasTipCap = gasTipCap
+
+	parsedTx.Tx.GasFeeCap = new(big.Int).Add(
+		gasTipCap,
+		new(big.Int).Mul(baseFee, big.NewInt(2)),
+	)
+
+	signedTx, err := ethtypes.SignNewTx(e.PrivateKeys[crypto.PubkeyToAddress(*parsedTx.Pub)], ethtypes.NewLondonSigner(e.ChainID), parsedTx.Tx)
+	if err != nil {
+		return "", err
+	}
+
 	// Deploy the transaction
-	err = e.ActiveConn.SendTransaction(context.Background(), &parsedTx)
+	err = e.ActiveConn.SendTransaction(context.Background(), signedTx)
 	if err != nil {
 		return "", err
 	}
@@ -181,7 +194,7 @@ func (e *EthereumWorkloadGenerator) DeployContract(fromPivKey []byte, contractPa
 	for {
 		time.Sleep(1 * time.Second)
 
-		txReceipt, err := e.ActiveConn.TransactionReceipt(context.Background(), parsedTx.Hash())
+		txReceipt, err := e.ActiveConn.TransactionReceipt(context.Background(), signedTx.Hash())
 
 		if err == nil {
 			// No error, return the receipt
@@ -196,7 +209,7 @@ func (e *EthereumWorkloadGenerator) DeployContract(fromPivKey []byte, contractPa
 }
 
 // CreateContractDeployTX creates a transaction to deploy the smart contract
-func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, contractPath string) ([]byte, error) {
+func (e *EthereumDynamicWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, contractPath string) ([]byte, error) {
 
 	// Generate the relevant account information from the private key
 	priv, err := crypto.HexToECDSA(hex.EncodeToString(fromPrivKey))
@@ -263,20 +276,19 @@ func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, c
 			zap.Uint64("Nonce", e.Nonces[strings.ToLower(addrFrom.String())]),
 			zap.Uint64("gaslimit", gasLimit),
 		)
-		tx := types.NewContractCreation(
-			e.Nonces[strings.ToLower(addrFrom.String())],
-			big.NewInt(0),
-			gasLimit,
-			e.SuggestedGasPrice,
-			bytecodeBytes,
-		)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(e.ChainID), priv)
+		tx := &ethtypes.DynamicFeeTx{
+			ChainID: e.ChainID,
+			Nonce:   e.Nonces[strings.ToLower(addrFrom.String())],
+			Gas:     gasLimit,
+			Value:   big.NewInt(0),
+			Data:    bytecodeBytes,
+		}
 
 		// Update nonce
 		e.Nonces[strings.ToLower(addrFrom.String())]++
 		e.CompiledContract = contract
 
-		return signedTx.MarshalJSON()
+		return json.Marshal(types.EthereumTransactionWithPublicKey{Tx: tx, Pub: &priv.PublicKey})
 
 	} else if os.IsNotExist(err) {
 		// Path doesn't exist - return an error
@@ -290,34 +302,9 @@ func (e *EthereumWorkloadGenerator) CreateContractDeployTX(fromPrivKey []byte, c
 	return []byte{}, errors.New("failed to create deploy tx")
 }
 
-// ReadBits encodes the absolute value of bigint as big-endian bytes. Callers must ensure
-// that buf has enough space. If buf is too short the result will be incomplete.
-// This function is taken from: https://github.com/ethereum/go-ethereum/blob/master/common/math/big.go
-func readBits(bigint *big.Int, buf []byte) {
-	i := len(buf)
-	for _, d := range bigint.Bits() {
-		for j := 0; j < wordBytes && i > 0; j++ {
-			i--
-			buf[i] = byte(d)
-			d >>= 8
-		}
-	}
-}
-
-// Converts the uint256 into padded bytes
-func convertU256(i *big.Int) []byte {
-	if i.BitLen()/8 >= 32 {
-		return i.Bytes()
-	}
-
-	ret := make([]byte, 32)
-	readBits(i, ret)
-	return ret
-}
-
 // getCallDataBytes will return the ABI encoded bytes for the variable, or an error
 // if it cannot be converted
-func (e *EthereumWorkloadGenerator) getCallDataBytes(paramType string, val string) ([]byte, error) {
+func (e *EthereumDynamicWorkloadGenerator) getCallDataBytes(paramType string, val string) ([]byte, error) {
 
 	payloadBytes := make([]byte, 0)
 
@@ -490,7 +477,7 @@ func (e *EthereumWorkloadGenerator) getCallDataBytes(paramType string, val strin
 }
 
 // CreateInteractionTX forms a transaction that invokes a smart contract
-func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []configs.ContractParam, value string) ([]byte, error) {
+func (e *EthereumDynamicWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, contractAddress string, functionName string, contractParams []configs.ContractParam, value string) ([]byte, error) {
 	// Check that the contract has been compiled, if nto - then it's difficult to get the hashes from the ABI.
 	if e.CompiledContract == nil {
 		return nil, fmt.Errorf("contract does not exist in known generator")
@@ -638,7 +625,7 @@ func (e *EthereumWorkloadGenerator) CreateInteractionTX(fromPrivKey []byte, cont
 }
 
 // CreateSignedTransaction forms a signed transaction and returns bytes to be sent by the 'SendRawTransaction' call.
-func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, toAddress string, value *big.Int, data []byte) ([]byte, error) {
+func (e *EthereumDynamicWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, toAddress string, value *big.Int, data []byte) ([]byte, error) {
 
 	// Get the private key
 	priv, err := crypto.HexToECDSA(hex.EncodeToString(fromPrivKey))
@@ -655,22 +642,25 @@ func (e *EthereumWorkloadGenerator) CreateSignedTransaction(fromPrivKey []byte, 
 	gasLimit := uint64(300000)
 
 	// Make and sign the transaction
-	tx := types.NewTransaction(e.Nonces[strings.ToLower(addrFrom.String())], toConverted, value, gasLimit, e.SuggestedGasPrice, data)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(e.ChainID), priv)
-	if err != nil {
-		return []byte{}, nil
+	tx := &ethtypes.DynamicFeeTx{
+		ChainID: e.ChainID,
+		Nonce:   e.Nonces[strings.ToLower(addrFrom.String())],
+		Gas:     gasLimit,
+		To:      &toConverted,
+		Value:   value,
+		Data:    data,
 	}
 
 	// Update the nonce (if we are using multiple transactions from the same account)
 	e.Nonces[strings.ToLower(addrFrom.String())]++
 
 	// Return the transaction in bytes ready to send to the secondaries and threads.
-	return signedTx.MarshalJSON()
+	return json.Marshal(types.EthereumTransactionWithPublicKey{Tx: tx, Pub: &priv.PublicKey})
 }
 
 // generateSimpleWorkload generates a simple transaction value transfer workload
 // returns: Workload ([secondary][threads][time][tx]) -> [][][][]byte
-func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
+func (e *EthereumDynamicWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 
 	// get the known accounts
 	var totalWorkload Workload
@@ -763,7 +753,7 @@ func (e *EthereumWorkloadGenerator) generateSimpleWorkload() (Workload, error) {
 // NOTE: Future implementations can have a separation to test both
 // smart contract deployment and interaction in the same benchmark
 // This can simulate a very realistic blockchain trace to replay existing chains?
-func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error) {
+func (e *EthereumDynamicWorkloadGenerator) generateContractWorkload() (Workload, error) {
 	// Get the number of transactions to be created
 	numberOfTransactions, err := parsers.GetTotalNumberOfTransactions(e.BenchConfig)
 	if err != nil {
@@ -842,8 +832,8 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 					accFrom := accountsChoices[txIndex%len(accountsChoices)]
 					funcToCreate := e.BenchConfig.ContractInfo.Functions[functionsToCreatePerThread[txCount]]
 					// zap.L().Debug(fmt.Sprintf("tx %d for func %s", txCount, funcToCreate.Name),
-					// zap.Int("secondary", secondaryID),
-					// zap.Int("thread", threadID))
+					// 	zap.Int("secondary", secondaryID),
+					// 	zap.Int("thread", threadID))
 					var functionParamSigs []string
 					var functionFinal string
 					if len(funcToCreate.Params) > 0 {
@@ -888,7 +878,7 @@ func (e *EthereumWorkloadGenerator) generateContractWorkload() (Workload, error)
 
 // generatePremadeWorkload generates the workload for the "premade" json file that
 // is associated with this workload.
-func (e *EthereumWorkloadGenerator) generatePremadeWorkload() (Workload, error) {
+func (e *EthereumDynamicWorkloadGenerator) generatePremadeWorkload() (Workload, error) {
 	// 1 deploy the contract if it is a contract workload, get the address
 	var contractAddr string
 	if len(e.BenchConfig.ContractInfo.Path) > 0 && len(e.BenchConfig.ContractInfo.Name) > 0 {
@@ -1017,7 +1007,7 @@ func (e *EthereumWorkloadGenerator) generatePremadeWorkload() (Workload, error) 
 }
 
 // GenerateWorkload creates a workload of transactions to be used in the benchmark for all clients.
-func (e *EthereumWorkloadGenerator) GenerateWorkload() (Workload, error) {
+func (e *EthereumDynamicWorkloadGenerator) GenerateWorkload() (Workload, error) {
 	// 1/ work out the total number of secondaries.
 	numberOfWorkers := e.BenchConfig.Secondaries * e.BenchConfig.Threads
 

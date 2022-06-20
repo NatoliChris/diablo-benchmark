@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"diablo-benchmark/blockchains/algorand"
+	"diablo-benchmark/blockchains/diem"
 	"diablo-benchmark/core/configs"
 )
 
@@ -21,10 +22,14 @@ func GetWorkloadGenerator(config *configs.ChainConfig) (WorkloadGenerator, error
 	switch config.Name {
 	case "algorand":
 		wg = NewControllerBridge(algorand.NewController())
+	case "diem":
+		wg = NewControllerBridge(diem.NewController())
 	case "ethereum":
 		// Return the ethereum workload generator
 		// TODO get the type of the ethereum workload generator
 		wg = &EthereumWorkloadGenerator{}
+	case "ethereumdynamic":
+		wg = &EthereumDynamicWorkloadGenerator{}
 	case "fabric":
 		wg = &FabricWorkloadGenerator{}
 	case "solana":

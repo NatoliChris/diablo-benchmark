@@ -27,7 +27,7 @@ type account struct {
 type Blockchain struct {
 	clients   []*algod.Client                  // clients to endpoint nodes
 	accounts  []account                              // blockchain accounts
-	params  types.SuggestedParams                 // transaction parameters
+	params    types.SuggestedParams               // transaction parameters
 }
 
 type ContractValue struct {

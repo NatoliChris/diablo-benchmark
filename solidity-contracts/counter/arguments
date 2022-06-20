@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+#
+# See: https://docs.soliditylang.org/en/v0.8.11/abi-spec.html
+
+import base64
+import struct
+import sys
+
+for line in sys.stdin:
+    print('Add()')
+    print('', flush=True)

@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+#
+# See: https://docs.soliditylang.org/en/v0.8.11/abi-spec.html
+
+import base64
+import struct
+import sys
+
+for line in sys.stdin:
+    print ('push(int256)')
+    print (base64.b64encode(struct.pack('>22sI', b'\x00' * 22, 12)).decode(
+        'ascii'), flush = True)

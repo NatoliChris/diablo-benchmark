@@ -1,6 +1,7 @@
 package clientinterfaces
 
 import (
+	"bufio"
 	"context"
 	"diablo-benchmark/blockchains/workloadgenerators"
 	"diablo-benchmark/core/configs"
@@ -9,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -20,21 +22,103 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	DEFAULT_MS_PER_SLOT int = 400
+)
+
 type solanaClient struct {
-	rpcClient *rpc.Client
-	wsClient  *ws.Client
+	rpcClient            *rpc.Client
+	wsClient             *ws.Client
+	blockhashRequestTime time.Time
+	blockhash            solana.Hash
+	blockhashLock        sync.RWMutex
+	exitSignal           uint32
+	logger               *zap.Logger
+}
+
+func NewSolanaClient(conn *rpc.Client, sock *ws.Client, logger *zap.Logger) *solanaClient {
+	return &solanaClient{
+		rpcClient: conn,
+		wsClient:  sock,
+		logger:    logger,
+	}
+}
+
+func (c *solanaClient) Blockhash() solana.Hash {
+	c.blockhashLock.RLock()
+	defer c.blockhashLock.RUnlock()
+	return c.blockhash
+}
+
+func (c *solanaClient) CompareAndSetBlockhash(newBlockhash solana.Hash, newTime time.Time) bool {
+	c.blockhashLock.Lock()
+	defer c.blockhashLock.Unlock()
+	if c.blockhash != newBlockhash && c.blockhashRequestTime.Before(newTime) {
+		c.blockhash = newBlockhash
+		c.blockhashRequestTime = newTime
+		return true
+	}
+	return false
+}
+
+func (c *solanaClient) UpdateBlockhash() error {
+	now := time.Now()
+	blockhash, err := c.rpcClient.GetRecentBlockhash(
+		context.Background(),
+		rpc.CommitmentFinalized)
+	if err != nil {
+		return err
+	}
+	updated := c.CompareAndSetBlockhash(blockhash.Value.Blockhash, now)
+	if updated {
+		c.logger.Debug("Updated blockhash from polling")
+	}
+	return nil
+}
+
+func (c *solanaClient) PollBlockhash() {
+	for {
+		if err := c.UpdateBlockhash(); err != nil {
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+		if atomic.LoadUint32(&c.exitSignal) == 1 {
+			break
+		}
+		time.Sleep(time.Duration(DEFAULT_MS_PER_SLOT/2) * time.Millisecond)
+	}
+}
+
+func (c *solanaClient) Stop() {
+	atomic.StoreUint32(&c.exitSignal, 1)
+}
+
+type SolanaWallet struct {
+	PrivateKey solana.PrivateKey
+	PublicKey  solana.PublicKey
+}
+
+func NewSolanaWallet(priv solana.PrivateKey) *SolanaWallet {
+	return &SolanaWallet{PrivateKey: priv, PublicKey: priv.PublicKey()}
+}
+
+func NewSolanaWalletWithPublic(priv solana.PrivateKey, pub string) *SolanaWallet {
+	return &SolanaWallet{PrivateKey: priv, PublicKey: solana.MustPublicKeyFromBase58(pub)}
 }
 
 type SolanaInterface struct {
 	Connections      []*solanaClient // Active connections to a blockchain node for information
+	Primary          *solanaClient
 	NextConnection   uint64
 	SubscribeDone    chan bool                        // Event channel that will unsub from events
 	TransactionInfo  map[solana.Signature][]time.Time // Transaction information
 	bigLock          sync.Mutex
-	HandlersStarted  bool         // Have the handlers been initiated?
-	StartTime        time.Time    // Start time of the benchmark
-	ThroughputTicker *time.Ticker // Ticker for throughput (1s)
-	Throughputs      []float64    // Throughput over time with 1 second intervals
+	HandlersStarted  bool            // Have the handlers been initiated?
+	StartTime        time.Time       // Start time of the benchmark
+	ThroughputTicker *time.Ticker    // Ticker for throughput (1s)
+	Throughputs      []float64       // Throughput over time with 1 second intervals
+	KnownAccounts    []*SolanaWallet // Known accounds, public:private key pair
+	PrivateKeys      map[solana.PublicKey]*solana.PrivateKey
 	logger           *zap.Logger
 	GenericInterface
 }
@@ -56,6 +140,44 @@ func (s *SolanaInterface) Init(chainConfig *configs.ChainConfig) {
 	s.SubscribeDone = make(chan bool)
 	s.HandlersStarted = false
 	s.NumTxDone = 0
+
+	if len(chainConfig.Keys) > 0 {
+		s.KnownAccounts = make([]*SolanaWallet, 0, len(chainConfig.Keys))
+		for _, key := range chainConfig.Keys {
+			wallet := NewSolanaWalletWithPublic(key.PrivateKey, key.Address)
+			s.KnownAccounts = append(s.KnownAccounts, wallet)
+		}
+	}
+	if len(chainConfig.Extra) > 0 {
+		numKeys := chainConfig.Extra[0].(int)
+		file, err := os.Open(chainConfig.Extra[1].(string))
+		if err != nil {
+			s.logger.Fatal("Failed to open accounts file", zap.Error(err))
+		}
+		accountFileKeys := make([]*SolanaWallet, 0, numKeys)
+		s.logger.Debug("Unmarshal accounts yaml")
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := scanner.Bytes()
+			if line[1] == '[' {
+				var priv solana.PrivateKey
+				err := json.Unmarshal(line[1:len(line)-2], &priv)
+				if err != nil {
+					s.logger.Fatal("Failed to unmarshal private key", zap.Error(err))
+				}
+
+				wallet := NewSolanaWallet(priv)
+				accountFileKeys = append(accountFileKeys, wallet)
+			}
+		}
+		s.KnownAccounts = append(s.KnownAccounts, accountFileKeys...)
+		s.logger.Debug("Unmarshal accounts yaml done")
+	}
+
+	s.PrivateKeys = make(map[solana.PublicKey]*solana.PrivateKey, len(s.KnownAccounts)*2+2)
+	for _, acc := range s.KnownAccounts {
+		s.PrivateKeys[acc.PublicKey] = &acc.PrivateKey
+	}
 }
 
 func (s *SolanaInterface) Cleanup() results.Results {
@@ -68,6 +190,10 @@ func (s *SolanaInterface) Cleanup() results.Results {
 		s.SubscribeDone <- true
 	}
 
+	for _, connection := range s.Connections {
+		connection.Stop()
+	}
+
 	txLatencies := make([]float64, 0)
 	var avgLatency float64
 
@@ -76,8 +202,13 @@ func (s *SolanaInterface) Cleanup() results.Results {
 	success := uint(0)
 	fails := uint(s.Fail)
 
-	for sig, v := range s.TransactionInfo {
+	s.logger.Debug("Fail", zap.Uint64("count", s.Fail))
+
+	for _, v := range s.TransactionInfo {
 		if len(v) > 1 {
+			if v[0] == v[1] {
+				continue
+			}
 			txLatency := v[1].Sub(v[0]).Milliseconds()
 			txLatencies = append(txLatencies, float64(txLatency))
 			avgLatency += float64(txLatency)
@@ -87,16 +218,11 @@ func (s *SolanaInterface) Cleanup() results.Results {
 
 			success++
 		} else {
-			s.logger.Debug("Missing", zap.String("sig", sig.String()))
-			status, err := s.ActiveConn().rpcClient.GetSignatureStatuses(context.Background(), true, sig)
-			if err != nil {
-				s.logger.Debug("Status", zap.Error(err))
-			} else {
-				s.logger.Debug("Status", zap.Any("status", status.Value))
-			}
 			fails++
 		}
 	}
+
+	s.logger.Debug("TransactionInfo", zap.Int("len", len(s.TransactionInfo)))
 
 	s.logger.Debug("Statistics being returned",
 		zap.Uint("success", success),
@@ -161,13 +287,13 @@ func (s *SolanaInterface) ParseWorkload(workload workloadgenerators.WorkerThread
 	for _, v := range workload {
 		intervalTxs := make([]interface{}, 0)
 		for _, txBytes := range v {
-			t := solana.Transaction{}
+			var t *solana.Transaction
 			err := json.Unmarshal(txBytes, &t)
 			if err != nil {
 				return nil, err
 			}
 
-			intervalTxs = append(intervalTxs, &t)
+			intervalTxs = append(intervalTxs, t)
 		}
 		parsedWorkload = append(parsedWorkload, intervalTxs)
 	}
@@ -185,7 +311,7 @@ func (s *SolanaInterface) parseBlocksForTransactions(slot uint64) {
 	var err error
 	for attempt := 0; attempt < 100; attempt++ {
 		includeRewards := false
-		block, err = s.ActiveConn().rpcClient.GetBlockWithOpts(
+		block, err = s.Primary.rpcClient.GetBlockWithOpts(
 			context.Background(),
 			slot,
 			&rpc.GetBlockOpts{
@@ -195,14 +321,21 @@ func (s *SolanaInterface) parseBlocksForTransactions(slot uint64) {
 			})
 
 		if err != nil {
+			s.logger.Warn("GetBlock error", zap.Error(err), zap.Int("attempt", attempt))
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
 		if block == nil {
+			s.logger.Warn("GetBlock empty", zap.Int("attempt", attempt))
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
 		break
+	}
+
+	if block == nil {
+		s.logger.Warn("Empty block", zap.Uint64("slot", slot))
+		return
 	}
 
 	tNow := time.Now()
@@ -226,7 +359,7 @@ func (s *SolanaInterface) parseBlocksForTransactions(slot uint64) {
 // EventHandler subscribes to the blocks and handles the incoming information about the transactions
 func (s *SolanaInterface) EventHandler() {
 	s.logger.Debug("EventHandler")
-	sub, err := s.ActiveConn().wsClient.RootSubscribe()
+	sub, err := s.Primary.wsClient.RootSubscribe()
 	if err != nil {
 		s.logger.Warn("RootSubscribe", zap.Error(err))
 		return
@@ -250,17 +383,22 @@ func (s *SolanaInterface) EventHandler() {
 			s.logger.Warn("Empty root")
 			return
 		}
+		newSlot := uint64(*got)
 		if currentSlot == 0 {
-			s.logger.Debug("First slot", zap.Uint64("got", uint64(*got)))
-		} else if uint64(*got) <= currentSlot {
-			s.logger.Debug("Slot skipped", zap.Uint64("got", uint64(*got)), zap.Uint64("current", currentSlot))
+			s.logger.Debug("First slot", zap.Uint64("got", newSlot))
+		} else if newSlot <= currentSlot {
+			s.logger.Debug("Slot skipped", zap.Uint64("got", newSlot), zap.Uint64("current", currentSlot))
 			continue
-		} else if uint64(*got) > currentSlot+1 {
-			s.logger.Fatal("Missing slot update", zap.Uint64("got", uint64(*got)), zap.Uint64("current", currentSlot))
+		} else if newSlot > currentSlot+1 {
+			s.logger.Debug("Missing slot update, requesting missing slots", zap.Uint64("got", newSlot), zap.Uint64("current", currentSlot))
+			for currentSlot+1 < newSlot {
+				currentSlot++
+				go s.parseBlocksForTransactions(currentSlot)
+			}
 		}
-		currentSlot = uint64(*got)
+		currentSlot = newSlot
 		// Got a head
-		go s.parseBlocksForTransactions(uint64(*got))
+		go s.parseBlocksForTransactions(currentSlot)
 	}
 }
 
@@ -271,11 +409,6 @@ func (s *SolanaInterface) ConnectOne(id int) error {
 
 func (s *SolanaInterface) ConnectAll(primaryID int) error {
 	s.logger.Debug("ConnectAll")
-	// If our ID is greater than the nodes we know, there's a problem!
-	if primaryID >= len(s.Nodes) {
-		return errors.New("invalid client primary ID")
-	}
-
 	// Connect all the others
 	for _, node := range s.Nodes {
 		conn := rpc.New(fmt.Sprintf("http://%s", node))
@@ -294,8 +427,15 @@ func (s *SolanaInterface) ConnectAll(primaryID int) error {
 			return err
 		}
 
-		s.Connections = append(s.Connections, &solanaClient{conn, sock})
+		sc := NewSolanaClient(conn, sock, s.logger.Named(node))
+		sc.UpdateBlockhash()
+
+		s.Connections = append(s.Connections, sc)
+
+		go s.Connections[len(s.Connections)-1].PollBlockhash()
 	}
+
+	s.Primary = s.Connections[primaryID%len(s.Connections)]
 
 	if !s.HandlersStarted {
 		go s.EventHandler()
@@ -310,21 +450,36 @@ func (s *SolanaInterface) DeploySmartContract(tx interface{}) (interface{}, erro
 	return nil, errors.New("not implemented")
 }
 
+func (s *SolanaInterface) getPrivateKey(key solana.PublicKey) *solana.PrivateKey {
+	return s.PrivateKeys[key]
+}
+
 func (s *SolanaInterface) SendRawTransaction(tx interface{}) error {
 	go func() {
 		transaction := tx.(*solana.Transaction)
 
-		sig, err := s.ActiveConn().rpcClient.SendTransactionWithOpts(context.Background(), transaction, false, rpc.CommitmentFinalized)
+		conn := s.ActiveConn()
+		transaction.Message.RecentBlockhash = conn.Blockhash()
+
+		_, err := transaction.Sign(s.getPrivateKey)
+		if err != nil {
+			s.logger.Fatal("Failed to sign transaction", zap.Error(err))
+		}
+
+		sendTime := time.Now()
+		transactionInfo := []time.Time{sendTime}
+		sig, err := conn.rpcClient.SendTransactionWithOpts(context.Background(), transaction, false, rpc.CommitmentFinalized)
 		if err != nil {
 			s.logger.Debug("Err",
 				zap.Error(err),
 			)
 			atomic.AddUint64(&s.Fail, 1)
 			atomic.AddUint64(&s.NumTxDone, 1)
+			transactionInfo = append(transactionInfo, sendTime)
 		}
 
 		s.bigLock.Lock()
-		s.TransactionInfo[sig] = []time.Time{time.Now()}
+		s.TransactionInfo[sig] = transactionInfo
 		s.bigLock.Unlock()
 
 		atomic.AddUint64(&s.NumTxSent, 1)
