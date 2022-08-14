@@ -66,7 +66,13 @@ func (this *BlockchainClient) TriggerInteraction(iact core.Interaction) error {
 
 	iact.ReportSubmit()
 
-	_, err = this.client.SendTransactionWithOpts(this.ctx, stx, false, this.commitment)
+	_, err = this.client.SendTransactionWithOpts(
+		this.ctx,
+		stx,
+		rpc.TransactionOpts{
+			SkipPreflight:       false,
+			PreflightCommitment: this.commitment,
+		})
 	if err != nil {
 		iact.ReportAbort()
 		return err

@@ -314,7 +314,13 @@ func (s *SolanaInterface) SendRawTransaction(tx interface{}) error {
 	go func() {
 		transaction := tx.(*solana.Transaction)
 
-		sig, err := s.ActiveConn().rpcClient.SendTransactionWithOpts(context.Background(), transaction, false, rpc.CommitmentFinalized)
+		sig, err := s.ActiveConn().rpcClient.SendTransactionWithOpts(
+			context.Background(),
+			transaction,
+			rpc.TransactionOpts{
+				SkipPreflight:       false,
+				PreflightCommitment: rpc.CommitmentFinalized,
+			})
 		if err != nil {
 			s.logger.Debug("Err",
 				zap.Error(err),

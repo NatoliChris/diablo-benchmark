@@ -189,7 +189,13 @@ func (this *BlockchainBuilder) CreateContract(name string) (interface{}, error) 
 }
 
 func (this *BlockchainBuilder) submitTransaction(stx *solana.Transaction) error {
-	sig, err := this.client.SendTransactionWithOpts(this.ctx, stx, false, this.commitment)
+	sig, err := this.client.SendTransactionWithOpts(
+		this.ctx,
+		stx,
+		rpc.TransactionOpts{
+			SkipPreflight:       false,
+			PreflightCommitment: this.commitment,
+		})
 	if err != nil {
 		return err
 	}

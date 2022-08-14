@@ -321,7 +321,13 @@ func (s *SolanaWorkloadGenerator) sendTransactionsAndWait(transactionBuilders []
 		if err != nil {
 			return err
 		}
-		sig, err := conn.rpcClient.SendTransactionWithOpts(context.Background(), tx, false, rpc.CommitmentFinalized)
+		sig, err := conn.rpcClient.SendTransactionWithOpts(
+			context.Background(),
+			tx,
+			rpc.TransactionOpts{
+				SkipPreflight:       false,
+				PreflightCommitment: rpc.CommitmentFinalized,
+			})
 		if err != nil {
 			return err
 		}
