@@ -155,26 +155,38 @@ func (this *BlockchainBuilder) CreateContract(name string) (interface{}, error) 
 		return nil, err
 	}
 
+	this.logger.Tracef("accounts: from '%s', program '%s', storage '%s'", from.public, program.public, storage.public)
+
 	this.logger.Tracef("deploy new contract '%s'", name)
 
-	for _, batch := range txBatches {
+	for batch_idx, batch := range txBatches {
 		var wg sync.WaitGroup
-		results := make([]error, len(batch))
+		errs := make([]error, len(batch))
 		for idx, tx := range batch {
 			wg.Add(1)
 			go func(idx int, tx virtualTransaction) {
 				defer wg.Done()
 				_, stx, err := tx.getTx()
 				if err != nil {
-					results[idx] = err
+					errs[idx] = err
+					return
+				}
+				if stx == nil {
+					errs[idx] = fmt.Errorf("getTx stx is nil")
 					return
 				}
 				err = this.submitTransaction(stx)
 				if err != nil {
-					results[idx] = err
+					errs[idx] = err
 					return
 				}
 			}(idx, tx)
+		}
+		wg.Wait()
+		for transaction_idx, err := range errs {
+			if err != nil {
+				return nil, fmt.Errorf("batch %d, transaction %d: %w", batch_idx, transaction_idx, err)
+			}
 		}
 	}
 
@@ -214,6 +226,7 @@ func (this *BlockchainBuilder) submitTransaction(stx *solana.Transaction) error 
 
 		if result != nil &&
 			len(result.Value) > 0 &&
+			result.Value[0] != nil &&
 			result.Value[0].ConfirmationStatus == rpc.ConfirmationStatusFinalized {
 			break
 		}
