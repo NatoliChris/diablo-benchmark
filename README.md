@@ -1,3 +1,10 @@
+# UNMAINTAINED REPOSITORY
+
+The ownership of this repository has been moved to: [https://github.com/blockchain-benchmarking/diablo][https://github.com/blockchain-benchmarking/diablo]
+
+The main/master branch has also been decommissioned, as it has been superceded by `develop` and `v2` by the diablo team.
+I am unfortunately no longer involved in the project so this repository will be archived.
+
 # Diablo: Distributed Analytical BLOckchain Benchmark Framework
 
 Diablo, an analytical blockchain benchmark framework focusing on distributed clients performing real-world workloads. The focus of this benchmark is to provide a benchmark framework with a focus on truly distributed clients performing realistic workloads to evaluate and analyse different blockchain systems.
